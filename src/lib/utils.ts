@@ -51,6 +51,91 @@ export function getStatusColor(status: string): string {
   return colors[status] || '';
 }
 
+/**
+ * Convert a number to Arabic words with "جنيه مصري" currency.
+ * Example: 25300.50 → "فقط خمسة وعشرون ألف وثلاثمائة جنيه مصري و50 قرش لا غير"
+ */
+export function numberToArabicWords(num: number): string {
+  if (num === 0) return 'صفر جنيه مصري';
+
+  const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+    'عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر',
+    'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+  const tens = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+  const hundreds = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+
+  function convertBelow1000(n: number): string {
+    if (n === 0) return '';
+    if (n < 20) return ones[n];
+    if (n < 100) {
+      const t = Math.floor(n / 10);
+      const u = n % 10;
+      return u === 0 ? tens[t] : `${ones[u]} و${tens[t]}`;
+    }
+    const h = Math.floor(n / 100);
+    const remainder = n % 100;
+    if (remainder === 0) return hundreds[h];
+    return `${hundreds[h]} و${convertBelow1000(remainder)}`;
+  }
+
+  function convertWholeNumber(n: number): string {
+    if (n === 0) return '';
+
+    if (n < 1000) return convertBelow1000(n);
+
+    if (n < 1000000) {
+      const thousands = Math.floor(n / 1000);
+      const remainder = n % 1000;
+      let thousandWord = '';
+      if (thousands === 1) thousandWord = 'ألف';
+      else if (thousands === 2) thousandWord = 'ألفان';
+      else if (thousands <= 10) thousandWord = `${convertBelow1000(thousands)} آلاف`;
+      else thousandWord = `${convertWholeNumber(thousands)} ألف`;
+
+      if (remainder === 0) return thousandWord;
+      return `${thousandWord} و${convertBelow1000(remainder)}`;
+    }
+
+    if (n < 1000000000) {
+      const millions = Math.floor(n / 1000000);
+      const remainder = n % 1000000;
+      let millionWord = '';
+      if (millions === 1) millionWord = 'مليون';
+      else if (millions === 2) millionWord = 'مليونان';
+      else if (millions <= 10) millionWord = `${convertBelow1000(millions)} ملايين`;
+      else millionWord = `${convertWholeNumber(millions)} مليون`;
+
+      if (remainder === 0) return millionWord;
+      return `${millionWord} و${convertWholeNumber(remainder)}`;
+    }
+
+    const billions = Math.floor(n / 1000000000);
+    const remainder = n % 1000000000;
+    let billionWord = '';
+    if (billions === 1) billionWord = 'مليار';
+    else if (billions === 2) billionWord = 'ملياران';
+    else billionWord = `${convertWholeNumber(billions)} مليار`;
+
+    if (remainder === 0) return billionWord;
+    return `${billionWord} و${convertWholeNumber(remainder)}`;
+  }
+
+  const wholePart = Math.floor(num);
+  const decimalPart = Math.round((num - wholePart) * 100);
+
+  let result = '';
+  if (wholePart > 0) {
+    result = convertWholeNumber(wholePart) + ' جنيه مصري';
+  }
+
+  if (decimalPart > 0) {
+    if (wholePart > 0) result += ' و';
+    result += decimalPart.toString() + ' قرش';
+  }
+
+  return 'فقط ' + result + ' لا غير';
+}
+
 export function cn(...inputs: (string | boolean | undefined | null | Record<string, boolean>)[]): string {
   return clsx(inputs);
 }

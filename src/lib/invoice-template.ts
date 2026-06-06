@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate } from './utils';
+import { formatCurrency, formatDate, numberToArabicWords } from './utils';
 import type { Invoice, InvoiceItem, Settings } from './types';
 
 /**
@@ -411,6 +411,26 @@ function getInvoiceCSS(showUnitCount: boolean): string {
       margin-top: 2px;
     }
 
+    /* ===== AMOUNT IN WORDS ===== */
+    .inv-amount-words {
+      padding: 10px 14px;
+      background: #f0faf7;
+      border: 1px solid #b8e0d5;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      font-size: 12px;
+    }
+
+    .inv-amount-words .amount-label {
+      font-weight: 700;
+      color: #0D7C66;
+    }
+
+    .inv-amount-words .amount-text {
+      color: #1a1a2e;
+      font-weight: 500;
+    }
+
     /* ===== SIGNATURES ===== */
     .inv-signatures {
       display: grid;
@@ -655,6 +675,12 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
 
     <!-- CANCEL REASON -->
     ${cancelHtml}
+
+    <!-- AMOUNT IN WORDS -->
+    <div class="inv-amount-words">
+      <span class="amount-label">المبلغ بالحروف: </span>
+      <span class="amount-text">${numberToArabicWords(Number(invoice.total))}</span>
+    </div>
 
     <!-- SIGNATURES -->
     <div class="inv-signatures">
@@ -1096,6 +1122,20 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       margin-top: 1px;
     }
 
+    /* ===== AMOUNT IN WORDS ===== */
+    .r-amount-words {
+      width: calc(100% - 6mm);
+      margin: 2mm 3mm;
+      padding: 2mm;
+      background: #f0faf7;
+      border: 1px solid #b8e0d5;
+      border-radius: 2px;
+      font-size: 8px;
+      color: #0D7C66;
+      font-weight: 600;
+      text-align: center;
+    }
+
     /* ===== NOTES ===== */
     .r-notes {
       width: calc(100% - 6mm);
@@ -1280,6 +1320,11 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     <div class="r-grand-total-box">
       <span class="r-grand-label">الإجمالي النهائي</span>
       <span class="r-grand-value">${formatCurrency(invoice.total)}</span>
+    </div>
+
+    <!-- ===== AMOUNT IN WORDS ===== -->
+    <div class="r-amount-words">
+      ${numberToArabicWords(Number(invoice.total))}
     </div>
 
     <hr class="r-sep-dashed">

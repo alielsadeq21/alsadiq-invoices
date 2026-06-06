@@ -111,6 +111,8 @@ export default function InvoiceFormPage() {
     if (id) {
       setIsEdit(true);
       loadInvoice(id);
+    } else if (pageParams.duplicate) {
+      loadDuplicateInvoice(pageParams.duplicate);
     } else {
       generateNewInvoiceNumber();
     }
@@ -207,6 +209,61 @@ export default function InvoiceFormPage() {
       }
 
       // Mark as no changes after loading existing invoice
+      setHasChanges(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('حدث خطأ في تحميل الفاتورة');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDuplicateInvoice = async (sourceId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*, items:invoice_items(*)')
+        .eq('id', sourceId)
+        .single();
+
+      if (error || !data) {
+        toast.error('لم يتم العثور على الفاتورة الأصلية');
+        navigateTo('invoices');
+        return;
+      }
+
+      const source = data as Invoice & { items: InvoiceItem[] };
+
+      // Pre-fill form with source invoice data (new number, today's date/time)
+      generateNewInvoiceNumber();
+      setBranchId(source.branch_id);
+      setInvoiceDate(getTodayISO());
+      setInvoiceTime(() => {
+        const now = new Date();
+        return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      });
+      setReceiverName(source.receiver_name || '');
+      setDriverName(source.driver_name || '');
+      setDriverPhone(source.driver_phone || '');
+      setApplyTax(source.tax_rate > 0);
+      setTaxRate(source.tax_rate);
+      setNotes(source.notes || '');
+
+      if (source.items && source.items.length > 0) {
+        setItems(
+          source.items.map((item) => ({
+            item_name: item.item_name,
+            quantity: Number(item.quantity),
+            unit_count: Number(item.unit_count) || 1,
+            unit_price: Number(item.unit_price),
+            total_price: Number(item.total_price),
+          }))
+        );
+        setShowUnitCountCols(source.items.some(item => Number(item.unit_count) > 1));
+      }
+
+      toast.success('تم تحميل بيانات الفاتورة - عدّل واحفظ كفاتورة جديدة');
       setHasChanges(false);
     } catch (err) {
       console.error(err);

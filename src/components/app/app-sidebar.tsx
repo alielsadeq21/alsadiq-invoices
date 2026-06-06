@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Menu,
   Package,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,7 @@ const navItems = [
   { id: 'invoices', label: 'الفواتير', icon: FileText },
   { id: 'returns', label: 'المرتجعات', icon: RotateCcw },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },
+  { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList },
   { id: 'settings', label: 'الإعدادات', icon: Settings },
 ];
 

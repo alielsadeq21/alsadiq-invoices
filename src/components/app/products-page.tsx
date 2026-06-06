@@ -131,6 +131,10 @@ export default function ProductsPage() {
         });
 
         if (error) throw error;
+        await supabase.from('audit_log').insert({
+          action: 'create_product',
+          details: { product_name: form.name },
+        });
         toast.success('تم إضافة المنتج بنجاح');
       }
 

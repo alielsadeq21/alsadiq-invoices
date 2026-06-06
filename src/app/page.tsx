@@ -13,6 +13,7 @@ import InvoiceDetailPage from '@/components/app/invoice-detail-page';
 import ReturnsPage from '@/components/app/returns-page';
 import ReportsPage from '@/components/app/reports-page';
 import SettingsPage from '@/components/app/settings-page';
+import ActivityLogPage from '@/components/app/activity-log-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth } = useAppStore();
@@ -45,6 +46,8 @@ export default function Home() {
         return <ReportsPage />;
       case 'settings':
         return <SettingsPage />;
+      case 'activity-log':
+        return <ActivityLogPage />;
       default:
         return <DashboardPage />;
     }

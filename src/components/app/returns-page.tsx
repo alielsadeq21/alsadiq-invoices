@@ -226,6 +226,12 @@ export default function ReturnsPage() {
       }));
       await supabase.from('return_items').insert(itemsData);
 
+      // Log activity
+      await supabase.from('audit_log').insert({
+        action: 'create_return',
+        details: { return_number: returnNumber, total: returnTotal },
+      });
+
       // Update invoice status
       const allReturned = invoiceItems.every(
         (item) => !item.checked || item.quantity >= item.max_quantity

@@ -122,6 +122,10 @@ export default function BranchesPage() {
         });
 
         if (error) throw error;
+        await supabase.from('audit_log').insert({
+          action: 'create_branch',
+          details: { branch_name: form.name },
+        });
         toast.success('تم إضافة الفرع بنجاح');
       }
 

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Invoice, InvoiceItem } from '@/lib/types';
-import { formatCurrency, formatDate, formatDateTime, getStatusLabel, getStatusColor } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime, getStatusLabel, getStatusColor, numberToArabicWords } from '@/lib/utils';
 import { generateInvoiceDocument, generateThermalDocument } from '@/lib/invoice-template';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,7 @@ import {
   Loader2,
   Lock,
   Receipt,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -309,6 +310,14 @@ export default function InvoiceDetailPage() {
             <Download className="w-4 h-4" />
             PDF
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigateTo('invoice-form', { duplicate: invoice.id })}
+            className="gap-2"
+          >
+            <Copy className="w-4 h-4" />
+            تكرار
+          </Button>
           {/* Locked indicator for finalized invoices */}
           {isActive && (
             <div className="flex items-center gap-1 text-sm text-muted-foreground px-2">
@@ -488,6 +497,12 @@ export default function InvoiceDetailPage() {
               <span className="text-[12px] text-red-600">{invoice.cancel_reason}</span>
             </div>
           )}
+
+          {/* === AMOUNT IN WORDS === */}
+          <div className="mx-1 mt-4 p-3 bg-[#f0faf7] border border-[#b8e0d5] rounded-lg">
+            <span className="text-[12px] font-bold text-[#0D7C66]">المبلغ بالحروف: </span>
+            <span className="text-[12px] text-gray-800">{numberToArabicWords(Number(invoice.total))}</span>
+          </div>
 
           {/* === SIGNATURES === */}
           <div className="grid grid-cols-3 gap-4 mx-1 mt-6">

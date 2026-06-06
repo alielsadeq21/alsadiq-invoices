@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Invoice, Branch } from '@/lib/types';
 import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils';
+import { generateInvoiceDocument, generateThermalDocument } from '@/lib/invoice-template';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,8 @@ import {
   FileText,
   ChevronRight,
   ChevronLeft,
+  Printer,
+  Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -216,6 +219,58 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleQuickPrint = async (invoice: Invoice, type: 'a4' | 'thermal') => {
+    try {
+      // Load invoice items
+      const { data: items } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+
+      // Load branch name
+      const { data: branch } = await supabase
+        .from('branches')
+        .select('name')
+        .eq('id', invoice.branch_id)
+        .single();
+
+      const { settings } = useAppStore.getState();
+
+      const docData = {
+        invoice,
+        items: items || [],
+        branchName: branch?.name || '',
+        settings,
+        userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
+      };
+
+      const htmlDoc = type === 'a4'
+        ? generateInvoiceDocument(docData)
+        : generateThermalDocument(docData);
+
+      const windowFeatures = type === 'a4'
+        ? 'width=800,height=1000'
+        : 'width=340,height=800';
+
+      const printWindow = window.open('', '_blank', windowFeatures);
+      if (!printWindow) {
+        toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+        return;
+      }
+
+      printWindow.document.write(htmlDoc);
+      printWindow.document.close();
+
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء الطباعة');
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
@@ -364,6 +419,24 @@ export default function InvoicesPage() {
                               title="عرض"
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleQuickPrint(invoice, 'a4')}
+                              title="طباعة A4"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleQuickPrint(invoice, 'thermal')}
+                              title="طباعة حرارية"
+                            >
+                              <Receipt className="w-4 h-4" />
                             </Button>
                             {invoice.status === 'active' && (
                               <>
