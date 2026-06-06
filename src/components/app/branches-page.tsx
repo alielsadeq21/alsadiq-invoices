@@ -216,13 +216,17 @@ export default function BranchesPage() {
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
           ) : filteredBranches.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Building2 className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-lg font-medium mb-1">لا توجد فروع</p>
-              <p className="text-sm mb-4">أضف فرع لبدء إدارة الفواتير</p>
-              <Button onClick={openAddDialog} className="gap-2">
-                <Plus className="w-4 h-4" />
-                إضافة فرع
+            <div className="flex flex-col items-center justify-center py-20 px-4">
+              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
+                <Building2 className="w-12 h-12 text-primary/60" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">لا توجد فروع</h3>
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+                لم يتم إضافة أي فروع بعد. أضف فرعاً لبدء إدارة الفواتير وتتبع الصرف لكل فرع.
+              </p>
+              <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
+                <Plus className="w-5 h-5" />
+                إضافة فرع جديد
               </Button>
             </div>
           ) : (

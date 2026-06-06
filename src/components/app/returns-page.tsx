@@ -300,13 +300,17 @@ export default function ReturnsPage() {
               جاري التحميل...
             </div>
           ) : returns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <RotateCcw className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-lg font-medium mb-1">لا توجد مرتجعات</p>
-              <p className="text-sm mb-4">يمكنك إنشاء مرتجع من فاتورة نشطة</p>
-              <Button onClick={openCreateDialog} className="gap-2">
-                <Plus className="w-4 h-4" />
-                مرتجع جديد
+            <div className="flex flex-col items-center justify-center py-20 px-4">
+              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
+                <RotateCcw className="w-12 h-12 text-primary/60" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">لا توجد مرتجعات</h3>
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+                لم يتم تسجيل أي مرتجعات بعد. يمكنك إنشاء مرتجع من أي فاتورة نشطة لإدارة الاسترجاعات.
+              </p>
+              <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                <Plus className="w-5 h-5" />
+                إنشاء مرتجع جديد
               </Button>
             </div>
           ) : (
@@ -453,6 +457,7 @@ export default function ReturnsPage() {
                             <TableCell>
                               <Input
                                 type="number"
+                                inputMode="decimal"
                                 value={item.quantity || ''}
                                 onChange={(e) => updateReturnItem(index, Number(e.target.value) || 0)}
                                 disabled={!item.checked}

@@ -543,6 +543,8 @@ export default function InvoiceFormPage() {
               <div className="space-y-2">
                 <Label>هاتف السائق</Label>
                 <Input
+                  type="tel"
+                  inputMode="tel"
                   value={driverPhone}
                   onChange={(e) => setDriverPhoneChanged(e.target.value)}
                   placeholder="01XXXXXXXXX"
@@ -702,6 +704,7 @@ export default function InvoiceFormPage() {
                   <div className="flex items-center gap-2 mr-auto">
                     <Input
                       type="number"
+                      inputMode="decimal"
                       value={taxRate || ''}
                       onChange={(e) => { setTaxRate(Number(e.target.value) || 0); markChanged(); }}
                       className="w-20 h-8 text-left"
