@@ -583,7 +583,96 @@ export default function InvoiceFormPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            {/* Mobile Cards View */}
+            <div className="sm:hidden divide-y">
+              {items.map((item, index) => {
+                const totalItemPieces = item.quantity * item.unit_count;
+                return (
+                  <div key={index} className="p-4 space-y-3">
+                    {/* Row 1: Item name + delete */}
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold shrink-0">
+                        {index + 1}
+                      </span>
+                      <Input
+                        value={item.item_name}
+                        onChange={(e) => updateItem(index, 'item_name', e.target.value)}
+                        placeholder="اسم الصنف"
+                        className="h-9 flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeItem(index)}
+                        className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {/* Row 2: Quantity, unit_count, price */}
+                    <div className={`grid gap-2 ${showUnitCount ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">الكمية</Label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          value={item.quantity || ''}
+                          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                          placeholder="0"
+                          className="h-9 text-left"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                      {showUnitCount && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">عدد/وحدة</Label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            value={item.unit_count || ''}
+                            onChange={(e) => updateItem(index, 'unit_count', e.target.value)}
+                            placeholder="1"
+                            className="h-9 text-center"
+                            min="1"
+                            step="1"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">سعر الوحدة</Label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          value={item.unit_price || ''}
+                          onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+                          placeholder="0.00"
+                          className="h-9 text-left"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                    {/* Row 3: Total + pieces */}
+                    <div className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {showUnitCount && item.unit_count > 1 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {item.quantity} × {item.unit_count} = {totalItemPieces.toLocaleString('ar-EG')} قطعة
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-bold text-primary">
+                        {formatCurrency(item.total_price)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
