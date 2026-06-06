@@ -697,8 +697,87 @@ export function extractInvoiceParts(htmlDoc: string): { css: string; body: strin
 }
 
 /**
- * Generates a thermal receipt HTML document for 80mm thermal printers.
- * Compact layout with minimal styling, optimized for small paper width.
+ * Code128B Barcode SVG Generator
+ * Generates a scannable barcode as inline SVG markup.
+ * No external dependencies - pure TypeScript implementation.
+ */
+function generateBarcodeSVG(text: string): string {
+  // Code128 binary patterns (1=bar, 0=space), 11 modules each
+  const PATTERNS = [
+    '11011001100','11001101100','11001100110','10010011000','10010001100',
+    '10001001100','10011001000','10011000100','10001100100','11001001000',
+    '11001000100','11000100100','10110011100','10011011100','10011001110',
+    '10111001100','10011101100','10011100110','11001110010','11001011100',
+    '11001001110','11011100100','11001110100','11101101110','11101001100',
+    '11100101100','11100100110','11101100100','11100110100','11100110010',
+    '11011011000','11011000110','11000110110','10100011000','10001011000',
+    '10001000110','10110001000','10001101000','10001100010','11010001000',
+    '11000101000','11000100010','10110111000','10110001110','10001101110',
+    '10111011000','10111000110','10001110110','11101110110','11010001110',
+    '11000101110','11011101000','11011100010','11011101110','11101011000',
+    '11101000110','11100010110','11101101000','11101100010','11100011010',
+    '11101111010','11001000010','11110001010','10100110000','10100001100',
+    '10010110000','10010000110','10000101100','10000100110','10110010000',
+    '10110000100','10011010000','10011000010','10000110100','10000110010',
+    '11000010010','11001010000','11110111010','11000010100','10001111010',
+    '10100111100','10010111100','10010011110','10111100100','10011110100',
+    '10011110010','11110100100','11110010100','11110010010','11011011110',
+    '11011110110','11110110110','10101111000','10100011110','10001011110',
+    '10111101000','10111100010','11110101000','11110100010','10111011110',
+    '10111101110','11101011110','11110101110','11010000100','11010010000',
+    '11010011100'
+  ];
+  const STOP = '1100011101011'; // 13 modules
+
+  // Encode using Code128B (supports ASCII 32-127)
+  const values: number[] = [104]; // Start Code B
+  let checksum = 104;
+  let position = 1;
+
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i);
+    if (charCode < 32 || charCode > 127) continue;
+    const val = charCode - 32;
+    values.push(val);
+    checksum += val * position;
+    position++;
+  }
+
+  checksum = checksum % 103;
+  values.push(checksum);
+
+  // Build binary string
+  let binary = '';
+  for (const val of values) {
+    if (val >= 0 && val < PATTERNS.length) {
+      binary += PATTERNS[val];
+    }
+  }
+  binary += STOP;
+
+  // Generate SVG rect elements
+  const moduleWidth = 1.2; // mm per module (optimized for 80mm paper)
+  const barHeight = 12; // mm
+  const quietZone = 3; // mm quiet zone for scanner reliability
+
+  let x = quietZone;
+  let rects = '';
+  for (let i = 0; i < binary.length; i++) {
+    if (binary[i] === '1') {
+      rects += `<rect x="${x.toFixed(2)}" y="0" width="${moduleWidth}" height="${barHeight}" fill="#000"/>`;
+    }
+    x += moduleWidth;
+  }
+
+  const svgWidth = x + quietZone;
+  const svgHeight = barHeight + 5;
+
+  return `<svg width="${svgWidth.toFixed(2)}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth.toFixed(2)} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">${rects}<text x="${(svgWidth / 2).toFixed(2)}" y="${barHeight + 4}" text-anchor="middle" font-size="8" font-family="monospace, 'Cairo'" fill="#000">${text}</text></svg>`;
+}
+
+/**
+ * Generates a professional thermal receipt HTML document for 80mm thermal printers.
+ * Features: brand header, items table, barcode, decorative separators, signatures.
  */
 export function generateThermalDocument(data: InvoiceDocumentData): string {
   const { invoice, items, branchName, settings, userFullName } = data;
@@ -707,33 +786,56 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
   const factoryName = settings?.factory_name || 'مصنع الصادق';
   const factoryPhone = settings?.phone || '';
   const factoryAddress = settings?.address || '';
+  const factoryEmail = settings?.email || '';
+  const taxNumber = settings?.tax_number || '';
+  const commercialRegister = settings?.commercial_register || '';
   const invoiceFooter = settings?.invoice_footer || 'شكراً لتعاملكم معنا';
   const showUnitCount = hasUnitCount(items);
 
   const logoSection = settings?.logo_url
-    ? `<img src="${settings.logo_url}" alt="شعار" style="width:50px;height:50px;object-fit:contain;" />`
-    : `<span class="receipt-logo-text">ص</span>`;
+    ? `<img src="${settings.logo_url}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
+    : `<span class="r-logo-text">ص</span>`;
 
   const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
+  const isCancelled = invoice.status === 'cancelled';
 
+  // Items table rows
   const itemsRows = items.map((item, index) => {
     const unitCount = Number(item.unit_count) || 1;
     const itemTotalPieces = Number(item.quantity) * unitCount;
+    const hasUnitInfo = showUnitCount && unitCount > 1;
     return `
-      <div class="receipt-item">
-        <div class="receipt-item-header">
-          <span class="receipt-item-name">${item.item_name}</span>
-          <span class="receipt-item-total">${formatCurrency(Number(item.total_price))}</span>
-        </div>
-        <div class="receipt-item-details">
-          <span>${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} × ${formatCurrency(Number(item.unit_price))}</span>
-          ${showUnitCount && unitCount > 1 ? `<span> | عدد/وحدة: ${unitCount} | قطع: ${itemTotalPieces}</span>` : ''}
-        </div>
-      </div>`;
+      <tr class="${index % 2 === 1 ? 'r-row-alt' : ''}">
+        <td class="r-col-num">${index + 1}</td>
+        <td class="r-col-name">${item.item_name}</td>
+        <td class="r-col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+        ${hasUnitInfo ? `<td class="r-col-uc">${unitCount}</td>` : ''}
+        <td class="r-col-price">${formatCurrency(Number(item.unit_price))}</td>
+        <td class="r-col-total">${formatCurrency(Number(item.total_price))}</td>
+      </tr>
+      ${hasUnitInfo ? `<tr class="${index % 2 === 1 ? 'r-row-alt' : ''}"><td></td><td colspan="5" class="r-sub-row">إجمالي القطع: ${itemTotalPieces.toLocaleString('ar-EG')}</td></tr>` : ''}`;
   }).join('');
 
   const taxRow = invoice.tax_rate > 0
-    ? `<div class="receipt-total-row"><span>الضريبة (${invoice.tax_rate}%)</span><span>${formatCurrency(invoice.tax_amount)}</span></div>`
+    ? `<div class="r-total-row"><span class="r-total-label">الضريبة (${invoice.tax_rate}%)</span><span class="r-total-val">${formatCurrency(invoice.tax_amount)}</span></div>`
+    : '';
+
+  // Barcode SVG
+  const barcodeSvg = generateBarcodeSVG(invoice.invoice_number);
+
+  // Cancelled watermark
+  const watermarkHtml = isCancelled
+    ? '<div class="r-watermark">ملغاة</div>'
+    : '';
+
+  // Notes
+  const notesHtml = invoice.notes
+    ? `<div class="r-notes"><strong>ملاحظات:</strong> ${invoice.notes}</div>`
+    : '';
+
+  // Cancel reason
+  const cancelHtml = invoice.cancel_reason
+    ? `<div class="r-cancel"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -743,12 +845,15 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>فاتورة حرارية - ${invoice.invoice_number}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
 
     *, *::before, *::after {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
 
     body {
@@ -759,267 +864,557 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       line-height: 1.4;
       margin: 0;
       padding: 0;
-      font-size: 11px;
+      font-size: 10px;
     }
 
     @page {
       size: 80mm auto;
-      margin: 2mm;
+      margin: 0;
     }
 
-    .receipt-container {
-      width: 76mm;
+    .r-container {
+      width: 80mm;
       margin: 0 auto;
-      padding: 2mm;
+      padding: 0;
     }
 
-    /* ===== HEADER ===== */
-    .receipt-header {
+    /* ===== TOP BRAND BAR ===== */
+    .r-brand-bar {
+      background: #0D7C66;
+      padding: 4mm 3mm 3mm 3mm;
       text-align: center;
-      border-bottom: 2px dashed #000;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
+      position: relative;
     }
 
-    .receipt-logo {
-      margin-bottom: 4px;
+    .r-brand-bar::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #D4A843;
     }
 
-    .receipt-logo-text {
-      font-size: 36px;
+    .r-brand-logo {
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .r-logo-text {
+      font-size: 28px;
       font-weight: 800;
-      color: #0D7C66;
+      color: #D4A843;
       line-height: 1;
     }
 
-    .receipt-factory-name {
-      font-size: 14px;
+    .r-brand-bar img {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      vertical-align: middle;
+    }
+
+    .r-brand-name {
+      font-size: 13px;
       font-weight: 800;
-      margin-bottom: 2px;
-    }
-
-    .receipt-factory-info {
-      font-size: 9px;
-      color: #444;
-      line-height: 1.5;
-    }
-
-    /* ===== INVOICE INFO ===== */
-    .receipt-inv-info {
-      border-bottom: 1px dashed #000;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
-      font-size: 10px;
-    }
-
-    .receipt-inv-info-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 2px;
-    }
-
-    .receipt-inv-info-row .label {
-      font-weight: 700;
-    }
-
-    /* ===== DASHED DIVIDER ===== */
-    .receipt-divider {
-      border-top: 1px dashed #000;
-      margin: 4px 0;
-    }
-
-    /* ===== ITEMS ===== */
-    .receipt-items {
-      margin-bottom: 6px;
-    }
-
-    .receipt-item {
-      padding: 3px 0;
-      border-bottom: 1px dotted #ccc;
-    }
-
-    .receipt-item:last-child {
-      border-bottom: none;
-    }
-
-    .receipt-item-header {
-      display: flex;
-      justify-content: space-between;
-      font-weight: 700;
-      font-size: 11px;
-    }
-
-    .receipt-item-details {
-      font-size: 9px;
-      color: #555;
-      margin-top: 1px;
-    }
-
-    /* ===== TOTALS ===== */
-    .receipt-totals {
-      border-top: 2px dashed #000;
-      padding-top: 6px;
-      margin-top: 4px;
-    }
-
-    .receipt-total-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      padding: 2px 0;
-    }
-
-    .receipt-grand-total {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
-      font-weight: 800;
-      padding: 4px 0;
-      border-top: 2px solid #000;
+      color: #fff;
       margin-top: 2px;
     }
 
-    /* ===== NOTES ===== */
-    .receipt-notes {
+    .r-brand-info {
+      font-size: 7.5px;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.5;
+      margin-top: 1px;
+    }
+
+    /* ===== INVOICE TITLE BOX ===== */
+    .r-title-box {
+      border: 2px solid #0D7C66;
+      border-top: none;
+      text-align: center;
+      padding: 2mm 0;
+      background: linear-gradient(to left, rgba(13,124,102,0.05), rgba(212,168,67,0.05), rgba(13,124,102,0.05));
+    }
+
+    .r-title-text {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0D7C66;
+      letter-spacing: 1px;
+    }
+
+    /* ===== DECORATIVE SEPARATORS ===== */
+    .r-sep-double {
+      border: none;
+      border-top: 2px double #0D7C66;
+      margin: 2mm 3mm;
+    }
+
+    .r-sep-dashed {
+      border: none;
+      border-top: 1px dashed #999;
+      margin: 2mm 3mm;
+    }
+
+    .r-sep-star {
+      text-align: center;
+      color: #0D7C66;
       font-size: 9px;
-      color: #444;
-      border-top: 1px dashed #000;
-      padding-top: 4px;
-      margin-top: 4px;
+      margin: 2mm 3mm;
+      line-height: 1;
+      position: relative;
+    }
+
+    .r-sep-star::before,
+    .r-sep-star::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: calc(50% - 12px);
+      border-top: 1px solid #0D7C66;
+    }
+
+    .r-sep-star::before { right: 0; }
+    .r-sep-star::after { left: 0; }
+
+    .r-sep-thick {
+      border: none;
+      border-top: 2.5px solid #000;
+      margin: 2mm 3mm;
+    }
+
+    /* ===== INVOICE INFO TABLE ===== */
+    .r-info-table {
+      width: calc(100% - 6mm);
+      margin: 0 3mm;
+      border-collapse: collapse;
+      font-size: 9px;
+    }
+
+    .r-info-table tr {
+      border-bottom: 1px dotted #ccc;
+    }
+
+    .r-info-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .r-info-table td {
+      padding: 1.5px 0;
+      vertical-align: top;
+    }
+
+    .r-info-label {
+      font-weight: 700;
+      color: #0D7C66;
+      width: 28%;
+      white-space: nowrap;
+    }
+
+    .r-info-value {
+      color: #000;
+      font-weight: 600;
+    }
+
+    /* ===== ITEMS TABLE ===== */
+    .r-items-table {
+      width: calc(100% - 6mm);
+      margin: 0 3mm;
+      border-collapse: collapse;
+      font-size: 9px;
+      border-top: 1.5px solid #0D7C66;
+      border-bottom: 1.5px solid #0D7C66;
+    }
+
+    .r-items-table thead tr {
+      background: #0D7C66;
+    }
+
+    .r-items-table thead th {
+      padding: 3px 2px;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 700;
+      text-align: center;
+      border-left: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .r-items-table thead th:last-child {
+      border-left: none;
+    }
+
+    .r-items-table thead th.r-th-name {
+      text-align: right;
+    }
+
+    .r-items-table tbody td {
+      padding: 2.5px 2px;
+      border-bottom: 1px dotted #ddd;
+    }
+
+    .r-items-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .r-row-alt {
+      background: #f5f9f8;
+    }
+
+    .r-col-num {
+      text-align: center;
+      color: #888;
+      width: 8%;
+    }
+
+    .r-col-name {
+      text-align: right;
+      font-weight: 600;
+      width: 28%;
+    }
+
+    .r-col-qty {
+      text-align: center;
+      width: 14%;
+    }
+
+    .r-col-uc {
+      text-align: center;
+      color: #0D7C66;
+      font-weight: 600;
+      width: 10%;
+    }
+
+    .r-col-price {
+      text-align: center;
+      width: 18%;
+    }
+
+    .r-col-total {
+      text-align: left;
+      font-weight: 700;
+      color: #0D7C66;
+      width: 22%;
+    }
+
+    .r-sub-row {
+      font-size: 7.5px;
+      color: #0D7C66;
+      font-weight: 600;
+      padding: 0 2px !important;
+      border-bottom: 1px dotted #ddd !important;
+    }
+
+    /* ===== ITEMS COUNT ===== */
+    .r-items-count {
+      width: calc(100% - 6mm);
+      margin: 1mm 3mm 0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8px;
+      color: #888;
+    }
+
+    .r-items-count .r-pieces-count {
+      color: #0D7C66;
+      font-weight: 700;
+    }
+
+    /* ===== TOTALS SECTION ===== */
+    .r-totals {
+      width: calc(100% - 6mm);
+      margin: 0 3mm;
+    }
+
+    .r-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
+      font-size: 10px;
+    }
+
+    .r-total-label {
+      color: #555;
+    }
+
+    .r-total-val {
+      font-weight: 600;
+    }
+
+    /* ===== GRAND TOTAL BOX ===== */
+    .r-grand-total-box {
+      border: 2px solid #000;
+      padding: 3mm;
+      margin: 2mm 3mm;
+      text-align: center;
+      background: #0D7C66;
+      position: relative;
+    }
+
+    .r-grand-total-box::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      bottom: 2px;
+      border: 1px solid #D4A843;
+    }
+
+    .r-grand-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      display: block;
+    }
+
+    .r-grand-value {
+      font-size: 18px;
+      font-weight: 800;
+      color: #D4A843;
+      display: block;
+      margin-top: 1px;
+    }
+
+    /* ===== BARCODE ===== */
+    .r-barcode {
+      text-align: center;
+      margin: 3mm 3mm 2mm;
+      padding: 2mm 0;
+    }
+
+    .r-barcode svg {
+      display: inline-block;
+    }
+
+    /* ===== NOTES ===== */
+    .r-notes {
+      width: calc(100% - 6mm);
+      margin: 2mm 3mm;
+      padding: 2mm;
+      background: #FFF9E6;
+      border: 1px solid #E8D060;
+      border-radius: 2px;
+      font-size: 8px;
+      color: #6B5510;
+    }
+
+    .r-cancel {
+      width: calc(100% - 6mm);
+      margin: 2mm 3mm;
+      padding: 2mm;
+      background: #FFF0F0;
+      border: 1px solid #E8A0A0;
+      border-radius: 2px;
+      font-size: 8px;
+      color: #8B2020;
     }
 
     /* ===== SIGNATURES ===== */
-    .receipt-signatures {
+    .r-signatures {
       display: flex;
       justify-content: space-between;
-      margin-top: 8px;
-      padding-top: 4px;
-      border-top: 1px dashed #000;
+      width: calc(100% - 6mm);
+      margin: 3mm 3mm 2mm;
     }
 
-    .receipt-sig {
+    .r-sig {
       text-align: center;
       width: 30%;
     }
 
-    .receipt-sig-label {
-      font-size: 9px;
-      font-weight: 700;
-      margin-bottom: 16px;
+    .r-sig-line {
+      border-bottom: 1px dashed #000;
+      margin-bottom: 2px;
+      height: 14mm;
     }
 
-    .receipt-sig-line {
-      border-top: 1px dashed #000;
+    .r-sig-label {
       font-size: 8px;
-      padding-top: 2px;
+      font-weight: 700;
+      color: #0D7C66;
+    }
+
+    .r-sig-name {
+      font-size: 7px;
+      color: #666;
     }
 
     /* ===== FOOTER ===== */
-    .receipt-footer {
+    .r-footer {
       text-align: center;
+      margin: 0 3mm;
+      padding: 2mm 0 3mm;
+      border-top: 2px solid #0D7C66;
+    }
+
+    .r-footer-msg {
       font-size: 9px;
-      color: #666;
-      margin-top: 6px;
-      padding-top: 4px;
-      border-top: 2px dashed #000;
+      color: #555;
+    }
+
+    .r-footer-brand {
+      font-size: 7px;
+      color: #999;
+      margin-top: 1px;
+    }
+
+    /* ===== BOTTOM BRAND BAR ===== */
+    .r-bottom-bar {
+      background: #0D7C66;
+      height: 3mm;
     }
 
     /* ===== WATERMARK ===== */
-    .watermark {
-      text-align: center;
-      font-size: 20px;
+    .r-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      font-size: 40px;
       font-weight: 800;
-      color: rgba(220, 50, 50, 0.15);
-      margin-bottom: 4px;
+      color: rgba(220, 50, 50, 0.1);
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
     }
 
+    /* ===== PRINT MEDIA ===== */
     @media print {
-      body { margin: 0; }
-      .receipt-container { padding: 0; width: 100%; }
+      body { margin: 0; background: white !important; }
+      .r-container { padding: 0; width: 100%; }
+      .r-watermark { color: rgba(220, 50, 50, 0.12); }
     }
   </style>
 </head>
 <body>
-  <div class="receipt-container">
-    <!-- WATERMARK -->
-    ${invoice.status === 'cancelled' ? '<div class="watermark">ملغاة</div>' : ''}
+  <div class="r-container" style="position:relative;">
+    ${watermarkHtml}
 
-    <!-- HEADER -->
-    <div class="receipt-header">
-      <div class="receipt-logo">${logoSection}</div>
-      <div class="receipt-factory-name">${factoryName}</div>
-      <div class="receipt-factory-info">
-        ${factoryAddress ? `${factoryAddress}<br>` : ''}
-        ${factoryPhone ? `هاتف: ${factoryPhone}<br>` : ''}
+    <!-- ===== TOP BRAND BAR ===== -->
+    <div class="r-brand-bar">
+      <div class="r-brand-logo">${logoSection}</div>
+      <div class="r-brand-name">${factoryName}</div>
+      <div class="r-brand-info">
+        ${factoryAddress ? `${factoryAddress}` : ''}
+        ${factoryPhone ? `${factoryAddress ? ' &bull; ' : ''}هاتف: ${factoryPhone}` : ''}
+        ${factoryEmail ? `${factoryAddress || factoryPhone ? ' &bull; ' : ''}${factoryEmail}` : ''}
       </div>
-      <div style="font-size:12px;font-weight:800;margin-top:4px;color:#0D7C66;">فاتورة صرف</div>
+      <div class="r-brand-info">
+        ${taxNumber ? `ض: ${taxNumber}` : ''}
+        ${commercialRegister ? `${taxNumber ? ' &bull; ' : ''}سجل: ${commercialRegister}` : ''}
+      </div>
     </div>
 
-    <!-- INVOICE INFO -->
-    <div class="receipt-inv-info">
-      <div class="receipt-inv-info-row">
-        <span class="label">رقم الفاتورة:</span>
-        <span>${invoice.invoice_number}</span>
-      </div>
-      <div class="receipt-inv-info-row">
-        <span class="label">التاريخ:</span>
-        <span>${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</span>
-      </div>
-      <div class="receipt-inv-info-row">
-        <span class="label">الفرع:</span>
-        <span>${branchName}</span>
-      </div>
-      ${invoice.receiver_name ? `<div class="receipt-inv-info-row"><span class="label">المستلم:</span><span>${invoice.receiver_name}</span></div>` : ''}
-      ${invoice.driver_name ? `<div class="receipt-inv-info-row"><span class="label">السائق:</span><span>${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</span></div>` : ''}
+    <!-- ===== INVOICE TITLE BOX ===== -->
+    <div class="r-title-box">
+      <span class="r-title-text">فاتورة صرف</span>
     </div>
 
-    <!-- ITEMS -->
-    <div class="receipt-items">
-      ${itemsRows}
+    <hr class="r-sep-double">
+
+    <!-- ===== INVOICE INFO ===== -->
+    <table class="r-info-table">
+      <tr>
+        <td class="r-info-label">رقم الفاتورة</td>
+        <td class="r-info-value">${invoice.invoice_number}</td>
+      </tr>
+      <tr>
+        <td class="r-info-label">التاريخ</td>
+        <td class="r-info-value">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</td>
+      </tr>
+      <tr>
+        <td class="r-info-label">الفرع</td>
+        <td class="r-info-value">${branchName}</td>
+      </tr>
+      ${invoice.receiver_name ? `<tr><td class="r-info-label">المستلم</td><td class="r-info-value">${invoice.receiver_name}</td></tr>` : ''}
+      ${invoice.driver_name ? `<tr><td class="r-info-label">السائق</td><td class="r-info-value">${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</td></tr>` : ''}
+    </table>
+
+    <hr class="r-sep-double">
+
+    <!-- ===== ITEMS TABLE ===== -->
+    <table class="r-items-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th class="r-th-name">الصنف</th>
+          <th>الكمية</th>
+          ${showUnitCount ? '<th>عدد</th>' : ''}
+          <th>السعر</th>
+          <th>الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows}
+      </tbody>
+    </table>
+
+    <!-- Items count -->
+    <div class="r-items-count">
+      <span>أصناف: ${items.length}</span>
+      ${showUnitCount ? `<span class="r-pieces-count">قطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
     </div>
 
-    <!-- TOTALS -->
-    <div class="receipt-totals">
-      <div class="receipt-total-row">
-        <span>المجموع الفرعي</span>
-        <span>${formatCurrency(invoice.subtotal)}</span>
+    <div class="r-sep-star">✦</div>
+
+    <!-- ===== TOTALS ===== -->
+    <div class="r-totals">
+      <div class="r-total-row">
+        <span class="r-total-label">المجموع الفرعي</span>
+        <span class="r-total-val">${formatCurrency(invoice.subtotal)}</span>
       </div>
       ${taxRow}
-      <div class="receipt-grand-total">
-        <span>الإجمالي</span>
-        <span>${formatCurrency(invoice.total)}</span>
+    </div>
+
+    <!-- ===== GRAND TOTAL BOX ===== -->
+    <div class="r-grand-total-box">
+      <span class="r-grand-label">الإجمالي النهائي</span>
+      <span class="r-grand-value">${formatCurrency(invoice.total)}</span>
+    </div>
+
+    <!-- ===== BARCODE ===== -->
+    <div class="r-barcode">
+      ${barcodeSvg}
+    </div>
+
+    <hr class="r-sep-dashed">
+
+    <!-- ===== NOTES ===== -->
+    ${notesHtml}
+    ${cancelHtml}
+
+    <!-- ===== SIGNATURES ===== -->
+    <div class="r-signatures">
+      <div class="r-sig">
+        <div class="r-sig-label">المحاسب</div>
+        <div class="r-sig-line"></div>
+        <div class="r-sig-name">${userFullName}</div>
       </div>
-      <div style="font-size:9px;color:#666;display:flex;justify-content:space-between;margin-top:2px;">
-        <span>أصناف: ${items.length}</span>
-        ${showUnitCount ? `<span>قطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
+      <div class="r-sig">
+        <div class="r-sig-label">المستلم</div>
+        <div class="r-sig-line"></div>
+        <div class="r-sig-name">${invoice.receiver_name || ''}</div>
+      </div>
+      <div class="r-sig">
+        <div class="r-sig-label">السائق</div>
+        <div class="r-sig-line"></div>
+        <div class="r-sig-name">${invoice.driver_name || ''}</div>
       </div>
     </div>
 
-    <!-- NOTES -->
-    ${invoice.notes ? `<div class="receipt-notes"><strong>ملاحظات:</strong> ${invoice.notes}</div>` : ''}
-    ${invoice.cancel_reason ? `<div class="receipt-notes" style="color:#8B2020;"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>` : ''}
+    <hr class="r-sep-star">
 
-    <!-- SIGNATURES -->
-    <div class="receipt-signatures">
-      <div class="receipt-sig">
-        <div class="receipt-sig-label">المحاسب</div>
-        <div class="receipt-sig-line">${userFullName}</div>
-      </div>
-      <div class="receipt-sig">
-        <div class="receipt-sig-label">المستلم</div>
-        <div class="receipt-sig-line">${invoice.receiver_name || ''}</div>
-      </div>
-      <div class="receipt-sig">
-        <div class="receipt-sig-label">السائق</div>
-        <div class="receipt-sig-line">${invoice.driver_name || ''}</div>
-      </div>
+    <!-- ===== FOOTER ===== -->
+    <div class="r-footer">
+      <p class="r-footer-msg">${invoiceFooter}</p>
+      <p class="r-footer-brand">${factoryName} - نظام فواتير الصرف</p>
     </div>
 
-    <!-- FOOTER -->
-    <div class="receipt-footer">
-      <p>${invoiceFooter}</p>
-      <p style="margin-top:2px;font-size:8px;">${factoryName} - نظام فواتير الصرف</p>
-    </div>
+    <!-- ===== BOTTOM BRAND BAR ===== -->
+    <div class="r-bottom-bar"></div>
   </div>
 </body>
 </html>`;

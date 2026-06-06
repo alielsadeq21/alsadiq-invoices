@@ -127,7 +127,7 @@ export default function InvoiceDetailPage() {
       userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
     });
 
-    const printWindow = window.open('', '_blank', 'width=320,height=600');
+    const printWindow = window.open('', '_blank', 'width=340,height=800');
     if (!printWindow) {
       toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
       return;
@@ -139,7 +139,7 @@ export default function InvoiceDetailPage() {
     setTimeout(() => {
       printWindow.focus();
       printWindow.print();
-    }, 1200);
+    }, 1500);
   };
 
   const handleExportPDF = async () => {
