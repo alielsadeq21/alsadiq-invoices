@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Invoice, InvoiceItem } from '@/lib/types';
 import { formatCurrency, formatDate, formatDateTime, getStatusLabel, getStatusColor } from '@/lib/utils';
-import { generateInvoiceDocument } from '@/lib/invoice-template';
+import { generateInvoiceDocument, generateThermalDocument } from '@/lib/invoice-template';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +27,7 @@ import {
   XCircle,
   Loader2,
   Lock,
+  Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -101,6 +102,32 @@ export default function InvoiceDetailPage() {
     });
 
     const printWindow = window.open('', '_blank', 'width=800,height=1000');
+    if (!printWindow) {
+      toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+      return;
+    }
+
+    printWindow.document.write(htmlDoc);
+    printWindow.document.close();
+
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 1200);
+  };
+
+  const handlePrintThermal = () => {
+    if (!invoice) return;
+
+    const htmlDoc = generateThermalDocument({
+      invoice,
+      items,
+      branchName,
+      settings,
+      userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
+    });
+
+    const printWindow = window.open('', '_blank', 'width=320,height=600');
     if (!printWindow) {
       toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
       return;
@@ -272,7 +299,11 @@ export default function InvoiceDetailPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={handlePrint} className="gap-2">
             <Printer className="w-4 h-4" />
-            طباعة
+            طباعة A4
+          </Button>
+          <Button variant="outline" onClick={handlePrintThermal} className="gap-2">
+            <Receipt className="w-4 h-4" />
+            حرارية
           </Button>
           <Button variant="outline" onClick={handleExportPDF} className="gap-2">
             <Download className="w-4 h-4" />

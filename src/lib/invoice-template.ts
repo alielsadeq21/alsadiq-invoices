@@ -695,3 +695,332 @@ export function extractInvoiceParts(htmlDoc: string): { css: string; body: strin
     body: bodyMatch ? bodyMatch[1] : '',
   };
 }
+
+/**
+ * Generates a thermal receipt HTML document for 80mm thermal printers.
+ * Compact layout with minimal styling, optimized for small paper width.
+ */
+export function generateThermalDocument(data: InvoiceDocumentData): string {
+  const { invoice, items, branchName, settings, userFullName } = data;
+
+  const invoiceTime = formatTime(invoice.invoice_time);
+  const factoryName = settings?.factory_name || 'مصنع الصادق';
+  const factoryPhone = settings?.phone || '';
+  const factoryAddress = settings?.address || '';
+  const invoiceFooter = settings?.invoice_footer || 'شكراً لتعاملكم معنا';
+  const showUnitCount = hasUnitCount(items);
+
+  const logoSection = settings?.logo_url
+    ? `<img src="${settings.logo_url}" alt="شعار" style="width:50px;height:50px;object-fit:contain;" />`
+    : `<span class="receipt-logo-text">ص</span>`;
+
+  const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
+
+  const itemsRows = items.map((item, index) => {
+    const unitCount = Number(item.unit_count) || 1;
+    const itemTotalPieces = Number(item.quantity) * unitCount;
+    return `
+      <div class="receipt-item">
+        <div class="receipt-item-header">
+          <span class="receipt-item-name">${item.item_name}</span>
+          <span class="receipt-item-total">${formatCurrency(Number(item.total_price))}</span>
+        </div>
+        <div class="receipt-item-details">
+          <span>${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} × ${formatCurrency(Number(item.unit_price))}</span>
+          ${showUnitCount && unitCount > 1 ? `<span> | عدد/وحدة: ${unitCount} | قطع: ${itemTotalPieces}</span>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  const taxRow = invoice.tax_rate > 0
+    ? `<div class="receipt-total-row"><span>الضريبة (${invoice.tax_rate}%)</span><span>${formatCurrency(invoice.tax_amount)}</span></div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فاتورة حرارية - ${invoice.invoice_number}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
+      color: #000;
+      background: #fff;
+      direction: rtl;
+      line-height: 1.4;
+      margin: 0;
+      padding: 0;
+      font-size: 11px;
+    }
+
+    @page {
+      size: 80mm auto;
+      margin: 2mm;
+    }
+
+    .receipt-container {
+      width: 76mm;
+      margin: 0 auto;
+      padding: 2mm;
+    }
+
+    /* ===== HEADER ===== */
+    .receipt-header {
+      text-align: center;
+      border-bottom: 2px dashed #000;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+    }
+
+    .receipt-logo {
+      margin-bottom: 4px;
+    }
+
+    .receipt-logo-text {
+      font-size: 36px;
+      font-weight: 800;
+      color: #0D7C66;
+      line-height: 1;
+    }
+
+    .receipt-factory-name {
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    .receipt-factory-info {
+      font-size: 9px;
+      color: #444;
+      line-height: 1.5;
+    }
+
+    /* ===== INVOICE INFO ===== */
+    .receipt-inv-info {
+      border-bottom: 1px dashed #000;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      font-size: 10px;
+    }
+
+    .receipt-inv-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .receipt-inv-info-row .label {
+      font-weight: 700;
+    }
+
+    /* ===== DASHED DIVIDER ===== */
+    .receipt-divider {
+      border-top: 1px dashed #000;
+      margin: 4px 0;
+    }
+
+    /* ===== ITEMS ===== */
+    .receipt-items {
+      margin-bottom: 6px;
+    }
+
+    .receipt-item {
+      padding: 3px 0;
+      border-bottom: 1px dotted #ccc;
+    }
+
+    .receipt-item:last-child {
+      border-bottom: none;
+    }
+
+    .receipt-item-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .receipt-item-details {
+      font-size: 9px;
+      color: #555;
+      margin-top: 1px;
+    }
+
+    /* ===== TOTALS ===== */
+    .receipt-totals {
+      border-top: 2px dashed #000;
+      padding-top: 6px;
+      margin-top: 4px;
+    }
+
+    .receipt-total-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      padding: 2px 0;
+    }
+
+    .receipt-grand-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 4px 0;
+      border-top: 2px solid #000;
+      margin-top: 2px;
+    }
+
+    /* ===== NOTES ===== */
+    .receipt-notes {
+      font-size: 9px;
+      color: #444;
+      border-top: 1px dashed #000;
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+
+    /* ===== SIGNATURES ===== */
+    .receipt-signatures {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      padding-top: 4px;
+      border-top: 1px dashed #000;
+    }
+
+    .receipt-sig {
+      text-align: center;
+      width: 30%;
+    }
+
+    .receipt-sig-label {
+      font-size: 9px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .receipt-sig-line {
+      border-top: 1px dashed #000;
+      font-size: 8px;
+      padding-top: 2px;
+    }
+
+    /* ===== FOOTER ===== */
+    .receipt-footer {
+      text-align: center;
+      font-size: 9px;
+      color: #666;
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 2px dashed #000;
+    }
+
+    /* ===== WATERMARK ===== */
+    .watermark {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 800;
+      color: rgba(220, 50, 50, 0.15);
+      margin-bottom: 4px;
+    }
+
+    @media print {
+      body { margin: 0; }
+      .receipt-container { padding: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-container">
+    <!-- WATERMARK -->
+    ${invoice.status === 'cancelled' ? '<div class="watermark">ملغاة</div>' : ''}
+
+    <!-- HEADER -->
+    <div class="receipt-header">
+      <div class="receipt-logo">${logoSection}</div>
+      <div class="receipt-factory-name">${factoryName}</div>
+      <div class="receipt-factory-info">
+        ${factoryAddress ? `${factoryAddress}<br>` : ''}
+        ${factoryPhone ? `هاتف: ${factoryPhone}<br>` : ''}
+      </div>
+      <div style="font-size:12px;font-weight:800;margin-top:4px;color:#0D7C66;">فاتورة صرف</div>
+    </div>
+
+    <!-- INVOICE INFO -->
+    <div class="receipt-inv-info">
+      <div class="receipt-inv-info-row">
+        <span class="label">رقم الفاتورة:</span>
+        <span>${invoice.invoice_number}</span>
+      </div>
+      <div class="receipt-inv-info-row">
+        <span class="label">التاريخ:</span>
+        <span>${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</span>
+      </div>
+      <div class="receipt-inv-info-row">
+        <span class="label">الفرع:</span>
+        <span>${branchName}</span>
+      </div>
+      ${invoice.receiver_name ? `<div class="receipt-inv-info-row"><span class="label">المستلم:</span><span>${invoice.receiver_name}</span></div>` : ''}
+      ${invoice.driver_name ? `<div class="receipt-inv-info-row"><span class="label">السائق:</span><span>${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</span></div>` : ''}
+    </div>
+
+    <!-- ITEMS -->
+    <div class="receipt-items">
+      ${itemsRows}
+    </div>
+
+    <!-- TOTALS -->
+    <div class="receipt-totals">
+      <div class="receipt-total-row">
+        <span>المجموع الفرعي</span>
+        <span>${formatCurrency(invoice.subtotal)}</span>
+      </div>
+      ${taxRow}
+      <div class="receipt-grand-total">
+        <span>الإجمالي</span>
+        <span>${formatCurrency(invoice.total)}</span>
+      </div>
+      <div style="font-size:9px;color:#666;display:flex;justify-content:space-between;margin-top:2px;">
+        <span>أصناف: ${items.length}</span>
+        ${showUnitCount ? `<span>قطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
+      </div>
+    </div>
+
+    <!-- NOTES -->
+    ${invoice.notes ? `<div class="receipt-notes"><strong>ملاحظات:</strong> ${invoice.notes}</div>` : ''}
+    ${invoice.cancel_reason ? `<div class="receipt-notes" style="color:#8B2020;"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>` : ''}
+
+    <!-- SIGNATURES -->
+    <div class="receipt-signatures">
+      <div class="receipt-sig">
+        <div class="receipt-sig-label">المحاسب</div>
+        <div class="receipt-sig-line">${userFullName}</div>
+      </div>
+      <div class="receipt-sig">
+        <div class="receipt-sig-label">المستلم</div>
+        <div class="receipt-sig-line">${invoice.receiver_name || ''}</div>
+      </div>
+      <div class="receipt-sig">
+        <div class="receipt-sig-label">السائق</div>
+        <div class="receipt-sig-line">${invoice.driver_name || ''}</div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="receipt-footer">
+      <p>${invoiceFooter}</p>
+      <p style="margin-top:2px;font-size:8px;">${factoryName} - نظام فواتير الصرف</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
