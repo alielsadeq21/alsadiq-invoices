@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import type { Branch, Invoice, InvoiceItem, InvoiceFormItem } from '@/lib/types';
+import type { Branch, Invoice, InvoiceItem, InvoiceFormItem, Product } from '@/lib/types';
 import { formatCurrency, generateInvoiceNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ export default function InvoiceFormPage() {
   const id = pageParams.id;
 
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
@@ -67,6 +68,7 @@ export default function InvoiceFormPage() {
     { item_name: '', quantity: 1, unit_count: 1, unit_price: 0, total_price: 0 },
   ]);
   const [showUnitCountCols, setShowUnitCountCols] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState<number | null>(null);
   const [applyTax, setApplyTax] = useState(false);
   const [taxRate, setTaxRate] = useState(settings?.default_tax_rate || 0);
   const [notes, setNotes] = useState('');
@@ -105,6 +107,7 @@ export default function InvoiceFormPage() {
 
   useEffect(() => {
     loadBranches();
+    loadProducts();
     if (id) {
       setIsEdit(true);
       loadInvoice(id);
@@ -127,6 +130,15 @@ export default function InvoiceFormPage() {
       .eq('is_active', true)
       .order('name');
     if (data) setBranches(data as Branch[]);
+  };
+
+  const loadProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    if (data) setProducts(data as Product[]);
   };
 
   const generateNewInvoiceNumber = async () => {
@@ -243,6 +255,32 @@ export default function InvoiceFormPage() {
     }
     markChanged();
     setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const selectProduct = (index: number, product: Product) => {
+    markChanged();
+    setActiveSuggestion(null);
+    setItems((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      item.item_name = product.name;
+      item.unit_price = product.unit_price;
+      if (product.unit_count > 1) {
+        item.unit_count = product.unit_count;
+        setShowUnitCountCols(true);
+      }
+      item.total_price = item.quantity * item.unit_count * item.unit_price;
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const getFilteredProducts = (index: number) => {
+    const itemName = items[index]?.item_name?.trim() || '';
+    if (!itemName || itemName.length < 1) return [];
+    return products.filter(p =>
+      p.name.includes(itemName) && p.name !== itemName
+    ).slice(0, 5);
   };
 
   const showUnitCount = showUnitCountCols || items.some(item => item.unit_count > 1);
@@ -594,12 +632,32 @@ export default function InvoiceFormPage() {
                       <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold shrink-0">
                         {index + 1}
                       </span>
-                      <Input
-                        value={item.item_name}
-                        onChange={(e) => updateItem(index, 'item_name', e.target.value)}
-                        placeholder="اسم الصنف"
-                        className="h-9 flex-1"
-                      />
+                      <div className="flex-1 relative">
+                        <Input
+                          value={item.item_name}
+                          onChange={(e) => { updateItem(index, 'item_name', e.target.value); setActiveSuggestion(index); }}
+                          onFocus={() => setActiveSuggestion(index)}
+                          onBlur={() => setTimeout(() => setActiveSuggestion(null), 200)}
+                          placeholder="اسم الصنف"
+                          className="h-9"
+                        />
+                        {activeSuggestion === index && getFilteredProducts(index).length > 0 && (
+                          <div className="absolute top-full right-0 left-0 z-10 mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden">
+                            {getFilteredProducts(index).map((product) => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => selectProduct(index, product)}
+                                className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors"
+                              >
+                                <span className="font-medium">{product.name}</span>
+                                <span className="text-muted-foreground text-xs">{formatCurrency(product.unit_price)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -695,12 +753,32 @@ export default function InvoiceFormPage() {
                           {index + 1}
                         </TableCell>
                         <TableCell>
-                          <Input
-                            value={item.item_name}
-                            onChange={(e) => updateItem(index, 'item_name', e.target.value)}
-                            placeholder="اسم الصنف"
-                            className="h-9"
-                          />
+                          <div className="relative">
+                            <Input
+                              value={item.item_name}
+                              onChange={(e) => { updateItem(index, 'item_name', e.target.value); setActiveSuggestion(index); }}
+                              onFocus={() => setActiveSuggestion(index)}
+                              onBlur={() => setTimeout(() => setActiveSuggestion(null), 200)}
+                              placeholder="اسم الصنف"
+                              className="h-9"
+                            />
+                            {activeSuggestion === index && getFilteredProducts(index).length > 0 && (
+                              <div className="absolute top-full right-0 left-0 z-10 mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden min-w-[200px]">
+                                {getFilteredProducts(index).map((product) => (
+                                  <button
+                                    key={product.id}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => selectProduct(index, product)}
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors"
+                                  >
+                                    <span className="font-medium">{product.name}</span>
+                                    <span className="text-muted-foreground text-xs">{formatCurrency(product.unit_price)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Input

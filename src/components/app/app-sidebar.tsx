@@ -21,12 +21,14 @@ import {
   Factory,
   ChevronRight,
   Menu,
+  Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
   { id: 'branches', label: 'الفروع', icon: Building2 },
+  { id: 'products', label: 'المنتجات', icon: Package },
   { id: 'invoices', label: 'الفواتير', icon: FileText },
   { id: 'returns', label: 'المرتجعات', icon: RotateCcw },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },

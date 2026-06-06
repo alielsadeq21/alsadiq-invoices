@@ -91,6 +91,17 @@ export interface ReturnItem {
   created_at: string;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  unit_price: number;
+  unit_count: number;
+  category: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AuditLog {
   id: string;
   action: string;
