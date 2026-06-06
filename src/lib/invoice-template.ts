@@ -697,87 +697,8 @@ export function extractInvoiceParts(htmlDoc: string): { css: string; body: strin
 }
 
 /**
- * Code128B Barcode SVG Generator
- * Generates a scannable barcode as inline SVG markup.
- * No external dependencies - pure TypeScript implementation.
- */
-function generateBarcodeSVG(text: string): string {
-  // Code128 binary patterns (1=bar, 0=space), 11 modules each
-  const PATTERNS = [
-    '11011001100','11001101100','11001100110','10010011000','10010001100',
-    '10001001100','10011001000','10011000100','10001100100','11001001000',
-    '11001000100','11000100100','10110011100','10011011100','10011001110',
-    '10111001100','10011101100','10011100110','11001110010','11001011100',
-    '11001001110','11011100100','11001110100','11101101110','11101001100',
-    '11100101100','11100100110','11101100100','11100110100','11100110010',
-    '11011011000','11011000110','11000110110','10100011000','10001011000',
-    '10001000110','10110001000','10001101000','10001100010','11010001000',
-    '11000101000','11000100010','10110111000','10110001110','10001101110',
-    '10111011000','10111000110','10001110110','11101110110','11010001110',
-    '11000101110','11011101000','11011100010','11011101110','11101011000',
-    '11101000110','11100010110','11101101000','11101100010','11100011010',
-    '11101111010','11001000010','11110001010','10100110000','10100001100',
-    '10010110000','10010000110','10000101100','10000100110','10110010000',
-    '10110000100','10011010000','10011000010','10000110100','10000110010',
-    '11000010010','11001010000','11110111010','11000010100','10001111010',
-    '10100111100','10010111100','10010011110','10111100100','10011110100',
-    '10011110010','11110100100','11110010100','11110010010','11011011110',
-    '11011110110','11110110110','10101111000','10100011110','10001011110',
-    '10111101000','10111100010','11110101000','11110100010','10111011110',
-    '10111101110','11101011110','11110101110','11010000100','11010010000',
-    '11010011100'
-  ];
-  const STOP = '1100011101011'; // 13 modules
-
-  // Encode using Code128B (supports ASCII 32-127)
-  const values: number[] = [104]; // Start Code B
-  let checksum = 104;
-  let position = 1;
-
-  for (let i = 0; i < text.length; i++) {
-    const charCode = text.charCodeAt(i);
-    if (charCode < 32 || charCode > 127) continue;
-    const val = charCode - 32;
-    values.push(val);
-    checksum += val * position;
-    position++;
-  }
-
-  checksum = checksum % 103;
-  values.push(checksum);
-
-  // Build binary string
-  let binary = '';
-  for (const val of values) {
-    if (val >= 0 && val < PATTERNS.length) {
-      binary += PATTERNS[val];
-    }
-  }
-  binary += STOP;
-
-  // Generate SVG rect elements
-  const moduleWidth = 1.2; // mm per module (optimized for 80mm paper)
-  const barHeight = 12; // mm
-  const quietZone = 3; // mm quiet zone for scanner reliability
-
-  let x = quietZone;
-  let rects = '';
-  for (let i = 0; i < binary.length; i++) {
-    if (binary[i] === '1') {
-      rects += `<rect x="${x.toFixed(2)}" y="0" width="${moduleWidth}" height="${barHeight}" fill="#000"/>`;
-    }
-    x += moduleWidth;
-  }
-
-  const svgWidth = x + quietZone;
-  const svgHeight = barHeight + 5;
-
-  return `<svg width="${svgWidth.toFixed(2)}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth.toFixed(2)} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">${rects}<text x="${(svgWidth / 2).toFixed(2)}" y="${barHeight + 4}" text-anchor="middle" font-size="8" font-family="monospace, 'Cairo'" fill="#000">${text}</text></svg>`;
-}
-
-/**
  * Generates a professional thermal receipt HTML document for 80mm thermal printers.
- * Features: brand header, items table, barcode, decorative separators, signatures.
+ * Features: brand header, items table, decorative separators, signatures.
  */
 export function generateThermalDocument(data: InvoiceDocumentData): string {
   const { invoice, items, branchName, settings, userFullName } = data;
@@ -819,9 +740,6 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
   const taxRow = invoice.tax_rate > 0
     ? `<div class="r-total-row"><span class="r-total-label">الضريبة (${invoice.tax_rate}%)</span><span class="r-total-val">${formatCurrency(invoice.tax_amount)}</span></div>`
     : '';
-
-  // Barcode SVG
-  const barcodeSvg = generateBarcodeSVG(invoice.invoice_number);
 
   // Cancelled watermark
   const watermarkHtml = isCancelled
@@ -1178,17 +1096,6 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       margin-top: 1px;
     }
 
-    /* ===== BARCODE ===== */
-    .r-barcode {
-      text-align: center;
-      margin: 3mm 3mm 2mm;
-      padding: 2mm 0;
-    }
-
-    .r-barcode svg {
-      display: inline-block;
-    }
-
     /* ===== NOTES ===== */
     .r-notes {
       width: calc(100% - 6mm);
@@ -1373,11 +1280,6 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     <div class="r-grand-total-box">
       <span class="r-grand-label">الإجمالي النهائي</span>
       <span class="r-grand-value">${formatCurrency(invoice.total)}</span>
-    </div>
-
-    <!-- ===== BARCODE ===== -->
-    <div class="r-barcode">
-      ${barcodeSvg}
     </div>
 
     <hr class="r-sep-dashed">
