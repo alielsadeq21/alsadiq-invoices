@@ -66,6 +66,7 @@ export default function InvoiceFormPage() {
   const [items, setItems] = useState<InvoiceFormItem[]>([
     { item_name: '', quantity: 1, unit_count: 1, unit_price: 0, total_price: 0 },
   ]);
+  const [showUnitCountCols, setShowUnitCountCols] = useState(false);
   const [applyTax, setApplyTax] = useState(false);
   const [taxRate, setTaxRate] = useState(settings?.default_tax_rate || 0);
   const [notes, setNotes] = useState('');
@@ -244,6 +245,7 @@ export default function InvoiceFormPage() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const showUnitCount = showUnitCountCols || items.some(item => item.unit_count > 1);
   const subtotal = items.reduce((sum, item) => sum + item.total_price, 0);
   const taxAmount = applyTax ? (subtotal * taxRate) / 100 : 0;
   const total = subtotal + taxAmount;
@@ -562,10 +564,23 @@ export default function InvoiceFormPage() {
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-3 flex-row items-center justify-between">
             <CardTitle className="text-lg">الأصناف</CardTitle>
-            <Button onClick={addItem} size="sm" variant="outline" className="gap-1">
-              <Plus className="w-4 h-4" />
-              إضافة صنف
-            </Button>
+            <div className="flex items-center gap-2">
+              {!showUnitCount && (
+                <Button
+                  onClick={() => setShowUnitCountCols(true)}
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1 text-primary hover:text-primary hover:bg-primary/10"
+                >
+                  <Calculator className="w-4 h-4" />
+                  <span className="hidden sm:inline">عدد/وحدة</span>
+                </Button>
+              )}
+              <Button onClick={addItem} size="sm" variant="outline" className="gap-1">
+                <Plus className="w-4 h-4" />
+                إضافة صنف
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -575,8 +590,8 @@ export default function InvoiceFormPage() {
                     <TableHead className="text-right w-8">#</TableHead>
                     <TableHead className="text-right min-w-[160px]">اسم الصنف</TableHead>
                     <TableHead className="text-right w-28">الكمية</TableHead>
-                    <TableHead className="text-center w-28">عدد/وحدة</TableHead>
-                    <TableHead className="text-center w-32">إجمالي القطع</TableHead>
+                    {showUnitCount && <TableHead className="text-center w-28">عدد/وحدة</TableHead>}
+                    {showUnitCount && <TableHead className="text-center w-32">إجمالي القطع</TableHead>}
                     <TableHead className="text-right w-32">سعر الوحدة</TableHead>
                     <TableHead className="text-right w-36">الإجمالي</TableHead>
                     <TableHead className="text-center w-12"></TableHead>
@@ -610,31 +625,35 @@ export default function InvoiceFormPage() {
                             step="0.01"
                           />
                         </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            value={item.unit_count || ''}
-                            onChange={(e) => updateItem(index, 'unit_count', e.target.value)}
-                            placeholder="1"
-                            className="h-9 text-center"
-                            min="1"
-                            step="1"
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Calculator className="w-3.5 h-3.5 text-primary" />
-                            <span className={`font-bold text-sm ${totalItemPieces > 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-                              {totalItemPieces.toLocaleString('ar-EG')}
-                            </span>
-                          </div>
-                          {item.unit_count > 1 && (
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              {item.quantity} × {item.unit_count}
+                        {showUnitCount && (
+                          <TableCell>
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              value={item.unit_count || ''}
+                              onChange={(e) => updateItem(index, 'unit_count', e.target.value)}
+                              placeholder="1"
+                              className="h-9 text-center"
+                              min="1"
+                              step="1"
+                            />
+                          </TableCell>
+                        )}
+                        {showUnitCount && (
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Calculator className="w-3.5 h-3.5 text-primary" />
+                              <span className={`font-bold text-sm ${totalItemPieces > 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+                                {totalItemPieces.toLocaleString('ar-EG')}
+                              </span>
                             </div>
-                          )}
-                        </TableCell>
+                            {item.unit_count > 1 && (
+                              <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {item.quantity} × {item.unit_count}
+                              </div>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <Input
                             type="number"
