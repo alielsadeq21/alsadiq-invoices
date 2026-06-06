@@ -678,7 +678,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
 
     <!-- AMOUNT IN WORDS -->
     <div class="inv-amount-words">
-      <span class="amount-label">المبلغ بالحروف: </span>
+      <span class="amount-label">المبلغ: </span>
       <span class="amount-text">${numberToArabicWords(Number(invoice.total))}</span>
     </div>
 
@@ -1324,7 +1324,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
 
     <!-- ===== AMOUNT IN WORDS ===== -->
     <div class="r-amount-words">
-      ${numberToArabicWords(Number(invoice.total))}
+      المبلغ: ${numberToArabicWords(Number(invoice.total))}
     </div>
 
     <hr class="r-sep-dashed">
