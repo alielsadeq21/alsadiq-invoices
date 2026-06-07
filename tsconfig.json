@@ -39,6 +39,8 @@
   "exclude": [
     "node_modules",
     "skills",
+    "alsadiq-invoices/skills",
+    "repo/skills",
     "seed.ts"
   ]
 }

@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Payment, Branch } from '@/lib/types';
 import { formatCurrency, formatDate, generatePaymentNumber, getCurrentYear } from '@/lib/utils';
+import { generatePaymentReceiptDocument, generateThermalPaymentReceiptDocument } from '@/lib/payment-receipt-template';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,10 +38,12 @@ import {
   Banknote,
   Plus,
   Search,
-  Eye,
   ChevronRight,
   ChevronLeft,
-  ArrowRight,
+  Printer,
+  Download,
+  Receipt,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -59,7 +62,7 @@ const paymentMethodColors: Record<string, string> = {
 };
 
 export default function PaymentsPage() {
-  const { navigateTo } = useAppStore();
+  const { navigateTo, settings } = useAppStore();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +125,6 @@ export default function PaymentsPage() {
   };
 
   const openCreateDialog = async () => {
-    // Generate payment number
     const year = getCurrentYear();
     const { data: lastPay } = await supabase
       .from('payments')
@@ -186,6 +188,153 @@ export default function PaymentsPage() {
       toast.error('حدث خطأ أثناء حفظ الإيصال');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Print payment receipt A4
+  const handlePrintReceipt = (payment: Payment) => {
+    const branchName = (payment as any).branches?.name || '—';
+
+    const htmlDoc = generatePaymentReceiptDocument({
+      paymentNumber: payment.payment_number,
+      branchName,
+      branchAddress: null,
+      branchPhone: null,
+      amount: Number(payment.amount),
+      paymentDate: payment.payment_date,
+      paymentMethod: payment.payment_method,
+      notes: payment.notes,
+      settings,
+      generatedAt: new Date().toISOString(),
+    });
+
+    const printWindow = window.open('', '_blank', 'width=800,height=1000');
+    if (!printWindow) {
+      toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+      return;
+    }
+
+    printWindow.document.write(htmlDoc);
+    printWindow.document.close();
+
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 1200);
+  };
+
+  // Print thermal payment receipt
+  const handlePrintThermal = (payment: Payment) => {
+    const branchName = (payment as any).branches?.name || '—';
+
+    const htmlDoc = generateThermalPaymentReceiptDocument({
+      paymentNumber: payment.payment_number,
+      branchName,
+      branchAddress: null,
+      branchPhone: null,
+      amount: Number(payment.amount),
+      paymentDate: payment.payment_date,
+      paymentMethod: payment.payment_method,
+      notes: payment.notes,
+      settings,
+      generatedAt: new Date().toISOString(),
+    });
+
+    const printWindow = window.open('', '_blank', 'width=340,height=800');
+    if (!printWindow) {
+      toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+      return;
+    }
+
+    printWindow.document.write(htmlDoc);
+    printWindow.document.close();
+
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 1500);
+  };
+
+  // Export payment receipt as PDF
+  const handleExportPDF = async (payment: Payment) => {
+    const branchName = (payment as any).branches?.name || '—';
+    toast.info('جاري إنشاء ملف PDF...');
+
+    let iframe: HTMLIFrameElement | null = null;
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
+      const htmlDoc = generatePaymentReceiptDocument({
+        paymentNumber: payment.payment_number,
+        branchName,
+        branchAddress: null,
+        branchPhone: null,
+        amount: Number(payment.amount),
+        paymentDate: payment.payment_date,
+        paymentMethod: payment.payment_method,
+        notes: payment.notes,
+        settings,
+        generatedAt: new Date().toISOString(),
+      });
+
+      iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1200px;border:none;z-index:-1;';
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) {
+        document.body.removeChild(iframe);
+        toast.error('حدث خطأ أثناء إنشاء ملف PDF');
+        return;
+      }
+
+      iframeDoc.open();
+      iframeDoc.write(htmlDoc);
+      iframeDoc.close();
+
+      await new Promise<void>((resolve) => {
+        const checkReady = () => {
+          const container = iframeDoc.querySelector('.rcpt-container');
+          if (container) {
+            setTimeout(resolve, 2500);
+          } else {
+            setTimeout(checkReady, 500);
+          }
+        };
+        checkReady();
+      });
+
+      const rcptEl = iframeDoc.querySelector('.rcpt-container') as HTMLElement;
+      if (!rcptEl) {
+        if (iframe.parentNode) document.body.removeChild(iframe);
+        toast.error('حدث خطأ أثناء إنشاء ملف PDF');
+        return;
+      }
+
+      const canvas = await html2canvas(rcptEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: rcptEl.scrollWidth,
+        windowWidth: 794,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, Math.min(pdfHeight, pdf.internal.pageSize.getHeight()));
+      pdf.save(`إيصال_${payment.payment_number}.pdf`);
+
+      if (iframe.parentNode) document.body.removeChild(iframe);
+      toast.success('تم تحميل ملف PDF');
+    } catch (err) {
+      console.error(err);
+      if (iframe?.parentNode) document.body.removeChild(iframe);
+      toast.error('حدث خطأ أثناء إنشاء ملف PDF');
     }
   };
 
@@ -269,7 +418,7 @@ export default function PaymentsPage() {
                       <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
                       <TableHead className="text-right">المبلغ</TableHead>
                       <TableHead className="text-center hidden md:table-cell">طريقة الدفع</TableHead>
-                      <TableHead className="text-right hidden lg:table-cell">ملاحظات</TableHead>
+                      <TableHead className="text-center">طباعة</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -284,8 +433,36 @@ export default function PaymentsPage() {
                             {paymentMethodLabels[payment.payment_method] || payment.payment_method}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate hidden lg:table-cell">
-                          {payment.notes || '—'}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handlePrintReceipt(payment)}
+                              title="طباعة A4"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handlePrintThermal(payment)}
+                              title="طباعة حرارية"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleExportPDF(payment)}
+                              title="تحميل PDF"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
