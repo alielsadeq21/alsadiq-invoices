@@ -9,7 +9,10 @@ interface AppState {
   user: { id: string; username: string; full_name: string } | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  autoLogout: (reason: string) => void;
+  clearAutoLogoutReason: () => void;
   checkAuth: () => void;
+  autoLogoutReason: string | null;
 
   // Navigation
   currentPage: string;
@@ -30,6 +33,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Auth
   isLoggedIn: false,
   user: null,
+  autoLogoutReason: null,
 
   login: async (username: string, password: string) => {
     try {
@@ -83,6 +87,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   logout: () => {
     set({ isLoggedIn: false, user: null, currentPage: 'login' });
     localStorage.removeItem('alsadeq_user');
+  },
+
+  autoLogout: (reason: string) => {
+    set({ isLoggedIn: false, user: null, currentPage: 'login', autoLogoutReason: reason });
+    localStorage.removeItem('alsadeq_user');
+  },
+
+  clearAutoLogoutReason: () => {
+    set({ autoLogoutReason: null });
   },
 
   checkAuth: () => {

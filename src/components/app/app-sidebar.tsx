@@ -23,6 +23,8 @@ import {
   Menu,
   Package,
   ClipboardList,
+  Wallet,
+  Banknote,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +34,8 @@ const navItems = [
   { id: 'products', label: 'المنتجات', icon: Package },
   { id: 'invoices', label: 'الفواتير', icon: FileText },
   { id: 'returns', label: 'المرتجعات', icon: RotateCcw },
+  { id: 'payments', label: 'القبض', icon: Banknote },
+  { id: 'branch-accounts', label: 'كشف الحسابات', icon: Wallet },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },
   { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList },
   { id: 'settings', label: 'الإعدادات', icon: Settings },

@@ -12,7 +12,7 @@ import { Factory, Lock, User, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function LoginPage() {
-  const { login, settings } = useAppStore();
+  const { login, settings, autoLogoutReason, clearAutoLogoutReason } = useAppStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,6 +47,8 @@ export default function LoginPage() {
       const success = await login(username, password);
       if (!success) {
         toast.error('اسم المستخدم أو كلمة المرور غير صحيحة');
+      } else {
+        clearAutoLogoutReason();
       }
     } finally {
       setLoading(false);
@@ -79,6 +81,11 @@ export default function LoginPage() {
             <p className="text-muted-foreground text-sm mt-1">نظام فواتير الصرف</p>
           </CardHeader>
           <CardContent className="pt-4 pb-8 px-8">
+            {autoLogoutReason && (
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-center">
+                <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">{autoLogoutReason}</p>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-sm font-medium">

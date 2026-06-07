@@ -31,6 +31,7 @@ import {
   Package,
   Settings,
   Filter,
+  Banknote,
 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -42,6 +43,7 @@ const actionLabels: Record<string, { label: string; icon: typeof FileText; color
   create_branch: { label: 'إضافة فرع', icon: Building2, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
   update_settings: { label: 'تحديث الإعدادات', icon: Settings, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
   create_product: { label: 'إضافة منتج', icon: Package, color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400' },
+  create_payment: { label: 'إيصال قبض', icon: Banknote, color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400' },
 };
 
 export default function ActivityLogPage() {
@@ -100,6 +102,7 @@ export default function ActivityLogPage() {
     if (details.product_name) parts.push(`منتج: ${details.product_name}`);
     if (details.reason) parts.push(`السبب: ${details.reason}`);
     if (details.total) parts.push(`المبلغ: ${Number(details.total).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م`);
+    if (details.amount) parts.push(`المبلغ: ${Number(details.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م`);
 
     if (parts.length === 0) {
       return JSON.stringify(details, null, 2).slice(0, 100);
@@ -131,6 +134,7 @@ export default function ActivityLogPage() {
               <SelectItem value="create_return">إنشاء مرتجع</SelectItem>
               <SelectItem value="create_branch">إضافة فرع</SelectItem>
               <SelectItem value="create_product">إضافة منتج</SelectItem>
+              <SelectItem value="create_payment">إيصال قبض</SelectItem>
               <SelectItem value="update_settings">تحديث الإعدادات</SelectItem>
             </SelectContent>
           </Select>

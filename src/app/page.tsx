@@ -14,6 +14,8 @@ import ReturnsPage from '@/components/app/returns-page';
 import ReportsPage from '@/components/app/reports-page';
 import SettingsPage from '@/components/app/settings-page';
 import ActivityLogPage from '@/components/app/activity-log-page';
+import PaymentsPage from '@/components/app/payments-page';
+import BranchAccountsPage from '@/components/app/branch-accounts-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth } = useAppStore();
@@ -48,6 +50,10 @@ export default function Home() {
         return <SettingsPage />;
       case 'activity-log':
         return <ActivityLogPage />;
+      case 'payments':
+        return <PaymentsPage />;
+      case 'branch-accounts':
+        return <BranchAccountsPage />;
       default:
         return <DashboardPage />;
     }

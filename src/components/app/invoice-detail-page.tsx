@@ -500,7 +500,7 @@ export default function InvoiceDetailPage() {
 
           {/* === AMOUNT IN WORDS === */}
           <div className="mx-1 mt-4 p-3 bg-[#f0faf7] border border-[#b8e0d5] rounded-lg">
-            <span className="text-[12px] font-bold text-[#0D7C66]">المبلغ بالحروف: </span>
+            <span className="text-[12px] font-bold text-[#0D7C66]">المبلغ: </span>
             <span className="text-[12px] text-gray-800">{numberToArabicWords(Number(invoice.total))}</span>
           </div>
 
