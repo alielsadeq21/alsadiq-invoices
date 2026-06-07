@@ -520,6 +520,155 @@ function getInvoiceCSS(showUnitCount: boolean): string {
         padding: 0;
         max-width: 100%;
       }
+
+      /* ===== HIGH-CONTRAST B&W OVERRIDES ===== */
+      .inv-header {
+        border-color: #000 !important;
+        border-width: 3px !important;
+      }
+      .inv-header-logo {
+        background: #000 !important;
+      }
+      .inv-header-logo .logo-text {
+        color: #fff !important;
+      }
+      .inv-header-logo img {
+        filter: brightness(0) invert(1) !important;
+      }
+      .inv-header-info h1 {
+        color: #000 !important;
+      }
+      .inv-header-title {
+        background: #222 !important;
+      }
+      .inv-header-title h2 {
+        color: #fff !important;
+      }
+      .inv-header-title .inv-num {
+        color: #ccc !important;
+      }
+      .inv-header-title .inv-date {
+        color: #999 !important;
+      }
+      .gold-divider {
+        background: #333 !important;
+      }
+      .inv-info-grid {
+        border-color: #333 !important;
+      }
+      .inv-info-cell {
+        border-left-color: #ccc !important;
+      }
+      .inv-info-cell .label {
+        color: #555 !important;
+      }
+      .inv-info-cell .value {
+        color: #000 !important;
+      }
+      .inv-table {
+        border-color: #000 !important;
+      }
+      .inv-table thead tr {
+        background: #000 !important;
+      }
+      .inv-table thead th {
+        color: #fff !important;
+        border-left-color: rgba(255,255,255,0.3) !important;
+      }
+      .inv-table tbody td {
+        border-bottom-color: #999 !important;
+        border-left-color: #999 !important;
+        color: #000 !important;
+      }
+      .inv-table tbody tr.even-row {
+        background: #f0f0f0 !important;
+      }
+      .inv-table tbody td.col-unit-count,
+      .inv-table tbody td.col-total-pieces {
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .inv-table tbody td.col-total {
+        color: #000 !important;
+        font-weight: 800 !important;
+      }
+      .inv-totals-box {
+        border-color: #333 !important;
+      }
+      .inv-totals-box .total-row {
+        border-bottom-color: #ccc !important;
+      }
+      .inv-totals-box .total-row .total-label {
+        color: #333 !important;
+      }
+      .inv-totals-box .total-row .total-value {
+        color: #000 !important;
+      }
+      .inv-totals-box .grand-total {
+        background: #000 !important;
+      }
+      .inv-totals-box .grand-total .total-label,
+      .inv-totals-box .grand-total .total-value {
+        color: #fff !important;
+      }
+      .inv-amount-words {
+        background: #eee !important;
+        border-color: #999 !important;
+      }
+      .inv-amount-words .amount-label {
+        color: #000 !important;
+      }
+      .inv-amount-words .amount-text {
+        color: #000 !important;
+      }
+      .inv-notes {
+        background: #f5f5f5 !important;
+        border-color: #999 !important;
+      }
+      .inv-notes .notes-label {
+        color: #333 !important;
+      }
+      .inv-notes .notes-text {
+        color: #000 !important;
+      }
+      .inv-cancel {
+        background: #f0f0f0 !important;
+        border-color: #999 !important;
+      }
+      .inv-cancel .cancel-label {
+        color: #000 !important;
+      }
+      .inv-cancel .cancel-text {
+        color: #333 !important;
+      }
+      .inv-signatures .sig-box {
+        border-color: #666 !important;
+      }
+      .inv-signatures .sig-label {
+        color: #000 !important;
+      }
+      .inv-signatures .sig-line {
+        border-top-color: #666 !important;
+        color: #333 !important;
+      }
+      .inv-footer {
+        border-top-color: #000 !important;
+      }
+      .inv-footer .footer-text {
+        color: #333 !important;
+      }
+      .inv-footer .footer-brand {
+        color: #666 !important;
+      }
+      .watermark.cancelled {
+        color: rgba(0,0,0,0.12) !important;
+      }
+      .items-count {
+        color: #333 !important;
+      }
+      .items-count .total-pieces {
+        color: #000 !important;
+      }
     }
   `;
 }
@@ -1232,7 +1381,151 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     @media print {
       body { margin: 0; background: white !important; }
       .r-container { padding: 0; width: 100%; }
-      .r-watermark { color: rgba(220, 50, 50, 0.12); }
+      .r-watermark { color: rgba(0,0,0,0.12) !important; }
+
+      /* ===== HIGH-CONTRAST B&W OVERRIDES ===== */
+      .r-brand-bar {
+        background: #000 !important;
+      }
+      .r-logo-text {
+        color: #fff !important;
+      }
+      .r-brand-bar img {
+        filter: brightness(0) invert(1) !important;
+      }
+      .r-brand-name {
+        color: #fff !important;
+      }
+      .r-brand-info {
+        color: rgba(255,255,255,0.8) !important;
+      }
+      .r-brand-bar::after {
+        background: #666 !important;
+      }
+      .r-title-box {
+        border-color: #000 !important;
+        background: #f5f5f5 !important;
+      }
+      .r-title-text {
+        color: #000 !important;
+      }
+      .r-sep-double {
+        border-top-color: #000 !important;
+      }
+      .r-sep-star {
+        color: #000 !important;
+      }
+      .r-sep-star::before,
+      .r-sep-star::after {
+        border-top-color: #000 !important;
+      }
+      .r-sep-thick {
+        border-top-color: #000 !important;
+      }
+      .r-info-label {
+        color: #000 !important;
+        font-weight: 800 !important;
+      }
+      .r-info-value {
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .r-items-table {
+        border-top-color: #000 !important;
+        border-bottom-color: #000 !important;
+      }
+      .r-items-table thead tr {
+        background: #000 !important;
+      }
+      .r-items-table thead th {
+        color: #fff !important;
+        border-left-color: rgba(255,255,255,0.3) !important;
+      }
+      .r-items-table tbody td {
+        border-bottom-color: #999 !important;
+        color: #000 !important;
+      }
+      .r-row-alt {
+        background: #f0f0f0 !important;
+      }
+      .r-col-num {
+        color: #555 !important;
+      }
+      .r-col-name {
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .r-col-uc {
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .r-col-total {
+        color: #000 !important;
+        font-weight: 800 !important;
+      }
+      .r-sub-row {
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .r-items-count .r-pieces-count {
+        color: #000 !important;
+        font-weight: 800 !important;
+      }
+      .r-total-label {
+        color: #333 !important;
+      }
+      .r-total-val {
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .r-grand-total-box {
+        border-color: #000 !important;
+        background: #000 !important;
+      }
+      .r-grand-total-box::before {
+        border-color: #666 !important;
+      }
+      .r-grand-label {
+        color: #fff !important;
+      }
+      .r-grand-value {
+        color: #fff !important;
+      }
+      .r-amount-words {
+        background: #eee !important;
+        border-color: #999 !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+      }
+      .r-notes {
+        background: #f5f5f5 !important;
+        border-color: #999 !important;
+        color: #000 !important;
+      }
+      .r-cancel {
+        background: #f0f0f0 !important;
+        border-color: #999 !important;
+        color: #000 !important;
+      }
+      .r-sig-label {
+        color: #000 !important;
+        font-weight: 800 !important;
+      }
+      .r-sig-name {
+        color: #333 !important;
+      }
+      .r-footer {
+        border-top-color: #000 !important;
+      }
+      .r-footer-msg {
+        color: #333 !important;
+      }
+      .r-footer-brand {
+        color: #666 !important;
+      }
+      .r-bottom-bar {
+        background: #000 !important;
+      }
     }
   </style>
 </head>

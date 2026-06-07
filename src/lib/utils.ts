@@ -31,6 +31,12 @@ export function generateReturnNumber(lastNumber: number, year: number): string {
   return `RET-${year}-${padded}`;
 }
 
+export function generatePaymentNumber(lastNumber: number, year: number): string {
+  const nextNum = lastNumber + 1;
+  const padded = nextNum.toString().padStart(4, '0');
+  return `PAY-${year}-${padded}`;
+}
+
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     active: 'نشطة',

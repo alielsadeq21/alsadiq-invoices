@@ -109,6 +109,27 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface Payment {
+  id: string;
+  payment_number: string;
+  branch_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: 'cash' | 'bank_transfer' | 'cheque';
+  notes: string | null;
+  created_at: string;
+  branch?: Branch;
+}
+
+export interface BranchAccount {
+  branch_id: string;
+  branch_name: string;
+  total_invoiced: number;
+  total_returned: number;
+  total_paid: number;
+  balance: number;
+}
+
 export interface InvoiceFormItem {
   item_name: string;
   quantity: number;
