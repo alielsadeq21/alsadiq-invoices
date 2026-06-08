@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Wallet,
   Banknote,
+  CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +39,7 @@ const navItems = [
   { id: 'branch-accounts', label: 'كشف الحسابات', icon: Wallet },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },
   { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList },
+  { id: 'payment-methods', label: 'طرق الدفع', icon: CreditCard },
   { id: 'settings', label: 'الإعدادات', icon: Settings },
 ];
 

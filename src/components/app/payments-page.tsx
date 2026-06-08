@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import type { Payment, Branch } from '@/lib/types';
+import type { Payment, Branch, PaymentMethod } from '@/lib/types';
 import { formatCurrency, formatDate, generatePaymentNumber, getCurrentYear } from '@/lib/utils';
 import { generatePaymentReceiptDocument, generateThermalPaymentReceiptDocument } from '@/lib/payment-receipt-template';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,13 +49,13 @@ import { toast } from 'sonner';
 
 const PAGE_SIZE = 10;
 
-const paymentMethodLabels: Record<string, string> = {
+const defaultMethodLabels: Record<string, string> = {
   cash: 'كاش',
   bank_transfer: 'تحويل بنكي',
   cheque: 'شيك',
 };
 
-const paymentMethodColors: Record<string, string> = {
+const defaultMethodColors: Record<string, string> = {
   cash: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
   bank_transfer: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   cheque: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
@@ -78,11 +78,13 @@ export default function PaymentsPage() {
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer' | 'cheque'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [notes, setNotes] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     loadBranches();
+    loadPaymentMethods();
   }, []);
 
   useEffect(() => {
@@ -92,6 +94,38 @@ export default function PaymentsPage() {
   const loadBranches = async () => {
     const { data } = await supabase.from('branches').select('*').eq('is_active', true).order('name');
     if (data) setBranches(data as Branch[]);
+  };
+
+  const loadPaymentMethods = async () => {
+    try {
+      const { data, error } = await supabase.from('payment_methods').select('*').order('sort_order');
+      if (!error && data && data.length > 0) {
+        setPaymentMethods(data as PaymentMethod[]);
+      } else {
+        setPaymentMethods([
+          { id: 'cash', name: 'كاش', is_default: true, sort_order: 1, created_at: '' },
+          { id: 'bank_transfer', name: 'تحويل بنكي', is_default: false, sort_order: 2, created_at: '' },
+          { id: 'cheque', name: 'شيك', is_default: false, sort_order: 3, created_at: '' },
+        ]);
+      }
+    } catch {
+      setPaymentMethods([
+        { id: 'cash', name: 'كاش', is_default: true, sort_order: 1, created_at: '' },
+        { id: 'bank_transfer', name: 'تحويل بنكي', is_default: false, sort_order: 2, created_at: '' },
+        { id: 'cheque', name: 'شيك', is_default: false, sort_order: 3, created_at: '' },
+      ]);
+    }
+  };
+
+  const getMethodLabel = (method: string): string => {
+    const found = paymentMethods.find(m => m.id === method || m.name === method);
+    if (found) return found.name;
+    return defaultMethodLabels[method] || method;
+  };
+
+  const getMethodColor = (method: string): string => {
+    if (defaultMethodColors[method]) return defaultMethodColors[method];
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
   };
 
   const loadPayments = async () => {
@@ -142,7 +176,8 @@ export default function PaymentsPage() {
     setSelectedBranchId('');
     setAmount('');
     setPaymentDate(new Date().toISOString().split('T')[0]);
-    setPaymentMethod('cash');
+    const defaultMethod = paymentMethods.find(m => m.is_default);
+    setPaymentMethod(defaultMethod?.id || 'cash');
     setNotes('');
     setDialogOpen(true);
   };
@@ -429,8 +464,8 @@ export default function PaymentsPage() {
                         <TableCell className="hidden sm:table-cell">{formatDate(payment.payment_date)}</TableCell>
                         <TableCell className="font-semibold text-primary">{formatCurrency(payment.amount)}</TableCell>
                         <TableCell className="text-center hidden md:table-cell">
-                          <Badge variant="secondary" className={`text-[10px] ${paymentMethodColors[payment.payment_method] || ''}`}>
-                            {paymentMethodLabels[payment.payment_method] || payment.payment_method}
+                          <Badge variant="secondary" className={`text-[10px] ${getMethodColor(payment.payment_method)}`}>
+                            {getMethodLabel(payment.payment_method)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -555,14 +590,14 @@ export default function PaymentsPage() {
               </div>
               <div className="space-y-2">
                 <Label>طريقة الدفع</Label>
-                <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cash">كاش</SelectItem>
-                    <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
-                    <SelectItem value="cheque">شيك</SelectItem>
+                    {paymentMethods.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

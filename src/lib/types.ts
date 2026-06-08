@@ -115,10 +115,18 @@ export interface Payment {
   branch_id: string;
   amount: number;
   payment_date: string;
-  payment_method: 'cash' | 'bank_transfer' | 'cheque';
+  payment_method: string;
   notes: string | null;
   created_at: string;
   branch?: Branch;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  is_default: boolean;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface BranchAccount {

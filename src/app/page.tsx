@@ -16,6 +16,7 @@ import SettingsPage from '@/components/app/settings-page';
 import ActivityLogPage from '@/components/app/activity-log-page';
 import PaymentsPage from '@/components/app/payments-page';
 import BranchAccountsPage from '@/components/app/branch-accounts-page';
+import PaymentMethodsPage from '@/components/app/payment-methods-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth } = useAppStore();
@@ -54,6 +55,8 @@ export default function Home() {
         return <PaymentsPage />;
       case 'branch-accounts':
         return <BranchAccountsPage />;
+      case 'payment-methods':
+        return <PaymentMethodsPage />;
       default:
         return <DashboardPage />;
     }
