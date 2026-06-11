@@ -32,6 +32,9 @@ import {
   Receipt,
   BookOpen,
   Tags,
+  ArrowRightLeft,
+  ClipboardCheck,
+  BookOpenCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,10 +47,14 @@ const allNavItems = [
   { id: 'returns', label: 'المرتجعات', icon: RotateCcw },
   { id: 'payments', label: 'القبض', icon: Banknote },
   { id: 'inventory', label: 'المخزون', icon: Warehouse },
+  { id: 'inventory-transfers', label: 'التصبين والتحويلات', icon: ArrowRightLeft },
+  { id: 'inventory-counts', label: 'جرد المخزون', icon: ClipboardCheck },
   { id: 'expenses', label: 'المصروفات', icon: Receipt },
   { id: 'branch-accounts', label: 'كشف الحسابات', icon: Wallet },
   { id: 'account-statement', label: 'كشف حساب مفصل', icon: ScrollText },
-  { id: 'accounting', label: 'المحاسبة', icon: BookOpen },
+  { id: 'accounting', label: 'القيود المحاسبية', icon: BookOpen },
+  { id: 'chart-of-accounts', label: 'شجرة الحسابات', icon: BookOpenCheck },
+  { id: 'accounting-reports', label: 'التقارير المحاسبية', icon: BookOpen },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },
   { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList },
   { id: 'payment-methods', label: 'طرق الدفع', icon: CreditCard },

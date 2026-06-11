@@ -465,13 +465,83 @@ export default function InvoiceFormPage() {
           await supabase.from('inventory_transactions').insert({
             product_id: productId,
             branch_id: branchId,
-            transaction_type: 'out',
+            transaction_type: 'sale',
             quantity: -totalPieces,
             reference_type: 'invoice',
             reference_id: id,
             notes: `فاتورة صرف: ${invoiceNumber}`,
             created_by: user?.id || null,
           });
+        }
+
+        // ===== قيد محاسبي تلقائي للفاتورة =====
+        try {
+          const year = new Date().getFullYear();
+          const { data: lastJe } = await supabase
+            .from('journal_entries')
+            .select('entry_number')
+            .like('entry_number', `JE-${year}-%`)
+            .order('entry_number', { ascending: false })
+            .limit(1);
+          let lastJeNum = 0;
+          if (lastJe && lastJe.length > 0) {
+            const parts = lastJe[0].entry_number.split('-');
+            lastJeNum = parseInt(parts[parts.length - 1]) || 0;
+          }
+          const jeNum = `JE-${year}-${(lastJeNum + 1).toString().padStart(4, '0')}`;
+
+          const jeLines: { account_name: string; debit: number; credit: number; description: string }[] = [];
+          // مدين: العميل أو الصندوق
+          const customerOrCash = customerId ? 'العملاء' : 'الصندوق (كاش)';
+          jeLines.push({
+            account_name: customerOrCash,
+            debit: total,
+            credit: 0,
+            description: `فاتورة صرف رقم ${invoiceNumber}`,
+          });
+          // دائن: المبيعات
+          jeLines.push({
+            account_name: 'مبيعات الفروع',
+            debit: 0,
+            credit: subtotal,
+            description: `فاتورة صرف رقم ${invoiceNumber}`,
+          });
+          // دائن: الضريبة (لو فيها ضريبة)
+          if (taxAmount > 0) {
+            jeLines.push({
+              account_name: 'الضريبة',
+              debit: 0,
+              credit: taxAmount,
+              description: `ضريبة فاتورة رقم ${invoiceNumber}`,
+            });
+          }
+
+          const { data: jeData } = await supabase
+            .from('journal_entries')
+            .insert({
+              entry_number: jeNum,
+              entry_date: invoiceDate,
+              description: `قيد تلقائي - فاتورة صرف رقم ${invoiceNumber}`,
+              total_debit: total,
+              total_credit: subtotal + taxAmount,
+              is_posted: true,
+              source_type: 'invoice',
+              source_id: id,
+              created_by: user?.id || null,
+            })
+            .select('id')
+            .single();
+
+          if (jeData) {
+            await supabase.from('journal_entry_lines').insert(
+              jeLines.map((line) => ({
+                ...line,
+                journal_entry_id: jeData.id,
+              }))
+            );
+          }
+        } catch (jeErr) {
+          console.error('Auto journal entry error:', jeErr);
         }
 
         toast.success('تم تحديث الفاتورة بنجاح');
@@ -537,13 +607,80 @@ export default function InvoiceFormPage() {
           await supabase.from('inventory_transactions').insert({
             product_id: productId,
             branch_id: branchId,
-            transaction_type: 'out',
+            transaction_type: 'sale',
             quantity: -totalPieces,
             reference_type: 'invoice',
             reference_id: invData.id,
             notes: `فاتورة صرف: ${invoiceNumber}`,
             created_by: user?.id || null,
           });
+        }
+
+        // ===== قيد محاسبي تلقائي للفاتورة الجديدة =====
+        try {
+          const year = new Date().getFullYear();
+          const { data: lastJe } = await supabase
+            .from('journal_entries')
+            .select('entry_number')
+            .like('entry_number', `JE-${year}-%`)
+            .order('entry_number', { ascending: false })
+            .limit(1);
+          let lastJeNum = 0;
+          if (lastJe && lastJe.length > 0) {
+            const parts = lastJe[0].entry_number.split('-');
+            lastJeNum = parseInt(parts[parts.length - 1]) || 0;
+          }
+          const jeNum = `JE-${year}-${(lastJeNum + 1).toString().padStart(4, '0')}`;
+
+          const jeLines: { account_name: string; debit: number; credit: number; description: string }[] = [];
+          const customerOrCash = customerId ? 'العملاء' : 'الصندوق (كاش)';
+          jeLines.push({
+            account_name: customerOrCash,
+            debit: total,
+            credit: 0,
+            description: `فاتورة صرف رقم ${invoiceNumber}`,
+          });
+          jeLines.push({
+            account_name: 'مبيعات الفروع',
+            debit: 0,
+            credit: subtotal,
+            description: `فاتورة صرف رقم ${invoiceNumber}`,
+          });
+          if (taxAmount > 0) {
+            jeLines.push({
+              account_name: 'الضريبة',
+              debit: 0,
+              credit: taxAmount,
+              description: `ضريبة فاتورة رقم ${invoiceNumber}`,
+            });
+          }
+
+          const { data: jeData } = await supabase
+            .from('journal_entries')
+            .insert({
+              entry_number: jeNum,
+              entry_date: invoiceDate,
+              description: `قيد تلقائي - فاتورة صرف رقم ${invoiceNumber}`,
+              total_debit: total,
+              total_credit: subtotal + taxAmount,
+              is_posted: true,
+              source_type: 'invoice',
+              source_id: invData.id,
+              created_by: user?.id || null,
+            })
+            .select('id')
+            .single();
+
+          if (jeData) {
+            await supabase.from('journal_entry_lines').insert(
+              jeLines.map((line) => ({
+                ...line,
+                journal_entry_id: jeData.id,
+              }))
+            );
+          }
+        } catch (jeErr) {
+          console.error('Auto journal entry error:', jeErr);
         }
 
         toast.success('تم حفظ الفاتورة بنجاح');

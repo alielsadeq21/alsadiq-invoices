@@ -47,6 +47,10 @@ export interface Permissions {
   customers?: PagePermissions;
   payment_methods?: PagePermissions;
   expense_categories?: PagePermissions;
+  chart_of_accounts?: PagePermissions;
+  inventory_transfers?: PagePermissions;
+  inventory_counts?: PagePermissions;
+  accounting_reports?: PagePermissions;
 }
 
 export interface Role {
@@ -276,6 +280,87 @@ export interface Expense {
   expense_categories?: ExpenseCategory;
 }
 
+// Phase 3 Types
+
+export interface ChartOfAccount {
+  id: string;
+  code: string;
+  name: string;
+  name_en: string | null;
+  parent_id: string | null;
+  account_type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  is_active: boolean;
+  is_system: boolean;
+  balance: number;
+  created_at: string;
+  updated_at: string;
+  children?: ChartOfAccount[];
+  parent?: { name: string } | null;
+}
+
+export interface InventoryTransfer {
+  id: string;
+  transfer_number: string;
+  from_branch_id: string;
+  to_branch_id: string;
+  transfer_date: string;
+  total_amount: number;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  notes: string | null;
+  created_by: string | null;
+  journal_entry_id: string | null;
+  created_at: string;
+  updated_at: string;
+  from_branch?: Branch;
+  to_branch?: Branch;
+  items?: InventoryTransferItem[];
+}
+
+export interface InventoryTransferItem {
+  id: string;
+  transfer_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at: string;
+  products?: Product;
+}
+
+export interface InventoryCount {
+  id: string;
+  count_number: string;
+  branch_id: string;
+  count_date: string;
+  status: 'draft' | 'confirmed' | 'cancelled';
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  branches?: Branch;
+  items?: InventoryCountItem[];
+}
+
+export interface InventoryCountItem {
+  id: string;
+  count_id: string;
+  product_id: string;
+  system_quantity: number;
+  actual_quantity: number;
+  difference: number;
+  notes: string | null;
+  created_at: string;
+  products?: Product;
+}
+
+export interface BranchDebt {
+  branch_id: string;
+  branch_name: string;
+  total_transferred: number;
+  total_paid: number;
+  remaining_debt: number;
+}
+
 export interface Inventory {
   id: string;
   product_id: string;
@@ -348,6 +433,10 @@ export const DEFAULT_ADMIN_PERMISSIONS: Permissions = {
   customers: { view: true, create: true, edit: true, delete: true },
   payment_methods: { view: true, create: true, edit: true, delete: true },
   expense_categories: { view: true, create: true, edit: true, delete: true },
+  chart_of_accounts: { view: true, create: true, edit: true, delete: true },
+  inventory_transfers: { view: true, create: true, edit: true },
+  inventory_counts: { view: true, create: true, edit: true },
+  accounting_reports: { view: true, export: true },
 };
 
 export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {

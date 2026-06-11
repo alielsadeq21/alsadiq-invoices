@@ -236,6 +236,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       'payment-methods': 'payment_methods',
       'expense-categories': 'expense_categories',
       'customers': 'customers',
+      'chart-of-accounts': 'chart_of_accounts',
+      'inventory-transfers': 'inventory_transfers',
+      'inventory-counts': 'inventory_counts',
+      'accounting-reports': 'accounting_reports',
     };
 
     const permKey = pagePermissionMap[pageId];

@@ -165,3 +165,37 @@ export function getCurrentYear(): number {
 export function getTodayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
+
+export function generateTransferNumber(lastNumber: number, year: number): string {
+  const nextNum = lastNumber + 1;
+  const padded = nextNum.toString().padStart(4, '0');
+  return `TR-${year}-${padded}`;
+}
+
+export function generateCountNumber(lastNumber: number, year: number): string {
+  const nextNum = lastNumber + 1;
+  const padded = nextNum.toString().padStart(4, '0');
+  return `IC-${year}-${padded}`;
+}
+
+export function getAccountTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    asset: 'أصول',
+    liability: 'خصوم',
+    equity: 'حقوق ملكية',
+    revenue: 'إيرادات',
+    expense: 'مصروفات',
+  };
+  return labels[type] || type;
+}
+
+export function getAccountTypeColor(type: string): string {
+  const colors: Record<string, string> = {
+    asset: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    liability: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    equity: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    revenue: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+    expense: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  };
+  return colors[type] || '';
+}

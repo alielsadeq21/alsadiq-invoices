@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/utils';
+import type { Invoice, Return, Payment, Expense, Inventory, InventoryTransaction, Branch, Product } from '@/lib/types';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -17,6 +18,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Package,
+  Wallet,
+  Download,
+  Search,
+  Calendar,
+  ArrowUpDown,
+  FileText,
+  ArrowUpRight,
+  ArrowDownRight,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 import {
   BarChart,
   Bar,
@@ -25,945 +44,962 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  Legend,
 } from 'recharts';
-import {
-  FileSpreadsheet,
-  FileText,
-  Calendar,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Package,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
+// ─── Helper: date range ────────────────────────────────────────────────────────
+const getStartDate = (period: string): string => {
+  const now = new Date();
+  switch (period) {
+    case 'today':
+      return now.toISOString().split('T')[0];
+    case 'week': {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      return d.toISOString().split('T')[0];
+    }
+    case 'month': {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - 1);
+      return d.toISOString().split('T')[0];
+    }
+    case 'year': {
+      const d = new Date(now);
+      d.setFullYear(d.getFullYear() - 1);
+      return d.toISOString().split('T')[0];
+    }
+    default:
+      return '';
+  }
+};
+
+const CHART_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+// ─── CSV Export ─────────────────────────────────────────────────────────────────
+function exportCSV(filename: string, headers: string[], rows: string[][]) {
+  const BOM = '\uFEFF';
+  const csvContent =
+    BOM +
+    [headers.join(','), ...rows.map((r) => r.map((c) => `"${c}"`).join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  toast.success('تم تصدير ملف CSV');
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
   const { user, isAdmin, hasPermission } = useAppStore();
-  const [activeTab, setActiveTab] = useState('daily');
+  const canExport = hasPermission('reports', 'export');
 
-  // Daily report
-  const [dailyDate, setDailyDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dailyData, setDailyData] = useState({
-    invoiceCount: 0,
-    totalSpending: 0,
+  // ── Shared state ──────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState('sales');
+  const [period, setPeriod] = useState('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // ── Sales state ───────────────────────────────────────────────────────────────
+  const [salesData, setSalesData] = useState({
+    totalSales: 0,
     totalReturns: 0,
-    netSpending: 0,
+    netSales: 0,
+    avgInvoice: 0,
+    invoiceCount: 0,
+    byBranch: [] as { name: string; total: number }[],
+    byProduct: [] as { name: string; qty: number; total: number }[],
     invoices: [] as any[],
   });
 
-  // Monthly report
-  const [monthlyMonth, setMonthlyMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [monthlyData, setMonthlyData] = useState({
-    invoiceCount: 0,
-    totalSpending: 0,
-    totalReturns: 0,
-    netSpending: 0,
-    prevMonthTotal: 0,
-    change: 0,
-    dailyBreakdown: [] as any[],
+  // ── Inventory state ───────────────────────────────────────────────────────────
+  const [invMovements, setInvMovements] = useState({
+    inCount: 0,
+    outCount: 0,
+    adjustCount: 0,
+    transferCount: 0,
+    inValue: 0,
+    outValue: 0,
+    movements: [] as any[],
   });
-
-  // Branch report
-  const [branchMonth, setBranchMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [branchData, setBranchData] = useState<any[]>([]);
-
-  // Expenses report
-  const [expMonth, setExpMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [expData, setExpData] = useState({
-    totalExpenses: 0,
-    count: 0,
-    byCategory: [] as { name: string; total: number; count: number }[],
-    byBranch: [] as { name: string; total: number; count: number }[],
-    dailyBreakdown: [] as { day: string; total: number }[],
-  });
-
-  // Inventory report
-  const [invData, setInvData] = useState({
-    totalProducts: 0,
+  const [invBalances, setInvBalances] = useState({
+    totalItems: 0,
     totalValue: 0,
-    lowStockCount: 0,
-    outOfStockCount: 0,
     byBranch: [] as { name: string; count: number; value: number }[],
-    lowStockItems: [] as { product_name: string; branch_name: string; quantity: number; min_quantity: number }[],
+    lowStock: [] as { product_name: string; branch_name: string; quantity: number; min_quantity: number }[],
+  });
+  const [branchDebts, setBranchDebts] = useState<
+    { branch_name: string; total_transferred: number; total_paid: number; remaining: number }[]
+  >([]);
+
+  // ── Financial state ───────────────────────────────────────────────────────────
+  const [finData, setFinData] = useState({
+    totalRevenue: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    outstandingDebts: 0,
+    cashFlow: 0,
+    paymentsReceived: 0,
+    expensesPaid: 0,
+    monthlyTrend: [] as { month: string; revenue: number; expenses: number }[],
+    customerDebts: [] as { customer_name: string; total_unpaid: number; invoice_count: number }[],
+    finBranchDebts: [] as { branch_name: string; remaining: number }[],
   });
 
-  // Permission checks
-  const canExport = hasPermission('reports', 'export');
+  // ── General state ─────────────────────────────────────────────────────────────
+  const [generalData, setGeneralData] = useState({
+    totalInvoices: 0,
+    totalReturns: 0,
+    totalPayments: 0,
+    totalExpenses: 0,
+    totalTransfers: 0,
+    totalRevenue: 0,
+    totalExpenseAmount: 0,
+    netProfit: 0,
+    branchPerformance: [] as { name: string; invoices: number; revenue: number; returns: number; expenses: number }[],
+    topProducts: [] as { name: string; qty: number; total: number }[],
+  });
 
-  useEffect(() => {
-    loadDailyReport();
-  }, [dailyDate]);
+  // ── Derived date range ────────────────────────────────────────────────────────
+  const dateFrom = useMemo(() => {
+    if (period === 'custom') return customFrom;
+    return getStartDate(period);
+  }, [period, customFrom]);
 
-  useEffect(() => {
-    loadMonthlyReport();
-  }, [monthlyMonth]);
+  const dateTo = useMemo(() => {
+    if (period === 'custom') return customTo || new Date().toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
+  }, [period, customTo]);
 
-  useEffect(() => {
-    loadBranchReport();
-  }, [branchMonth]);
-
-  useEffect(() => {
-    loadExpensesReport();
-  }, [expMonth]);
-
-  useEffect(() => {
-    loadInventoryReport();
-  }, []);
-
-  const loadDailyReport = async () => {
+  // ── Load Sales ────────────────────────────────────────────────────────────────
+  const loadSales = async () => {
+    if (!dateFrom && !dateTo) return;
+    setLoading(true);
     try {
-      let invoiceQuery = supabase
+      let invQ = supabase
         .from('invoices')
-        .select('*, branches(name), items:invoice_items(*)')
-        .eq('invoice_date', dailyDate)
+        .select('id, total, branch_id, invoice_date, branches(name), items:invoice_items(item_name, quantity, total_price)')
         .eq('status', 'active');
 
-      // Filter by branch for non-admin users
-      if (!isAdmin && user?.branch_id) {
-        invoiceQuery = invoiceQuery.eq('branch_id', user.branch_id);
-      }
+      if (dateFrom) invQ = invQ.gte('invoice_date', dateFrom);
+      if (dateTo) invQ = invQ.lte('invoice_date', dateTo);
+      if (!isAdmin && user?.branch_id) invQ = invQ.eq('branch_id', user.branch_id);
 
-      const { data: invoices } = await invoiceQuery;
+      const { data: invoices } = await invQ;
 
-      let returnQuery = supabase
-        .from('returns')
-        .select('total')
-        .eq('return_date', dailyDate);
+      let retQ = supabase.from('returns').select('total, branch_id');
+      if (dateFrom) retQ = retQ.gte('return_date', dateFrom);
+      if (dateTo) retQ = retQ.lte('return_date', dateTo);
+      if (!isAdmin && user?.branch_id) retQ = retQ.eq('branch_id', user.branch_id);
 
-      // Filter returns by branch for non-admin users
-      if (!isAdmin && user?.branch_id) {
-        returnQuery = returnQuery.eq('branch_id', user.branch_id);
-      }
+      const { data: returns } = await retQ;
 
-      const { data: returns } = await returnQuery;
-
-      const totalSpending = (invoices || []).reduce((s, i) => s + Number(i.total), 0);
-      const totalReturns = (returns || []).reduce((s, r) => s + Number(r.total), 0);
-
-      setDailyData({
-        invoiceCount: invoices?.length || 0,
-        totalSpending,
-        totalReturns,
-        netSpending: totalSpending - totalReturns,
-        invoices: invoices || [],
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const loadMonthlyReport = async () => {
-    try {
-      const [year, month] = monthlyMonth.split('-');
-      const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const monthStart = startOfMonth(monthDate).toISOString().split('T')[0];
-      const monthEnd = endOfMonth(monthDate).toISOString().split('T')[0];
-
-      let invoiceQuery = supabase
-        .from('invoices')
-        .select('total, invoice_date')
-        .gte('invoice_date', monthStart)
-        .lte('invoice_date', monthEnd)
-        .eq('status', 'active');
-
-      if (!isAdmin && user?.branch_id) {
-        invoiceQuery = invoiceQuery.eq('branch_id', user.branch_id);
-      }
-
-      const { data: invoices } = await invoiceQuery;
-
-      let returnQuery = supabase
-        .from('returns')
-        .select('total')
-        .gte('return_date', monthStart)
-        .lte('return_date', monthEnd);
-
-      if (!isAdmin && user?.branch_id) {
-        returnQuery = returnQuery.eq('branch_id', user.branch_id);
-      }
-
-      const { data: returns } = await returnQuery;
-
-      const totalSpending = (invoices || []).reduce((s, i) => s + Number(i.total), 0);
-      const totalReturns = (returns || []).reduce((s, r) => s + Number(r.total), 0);
-
-      // Previous month
-      const prevMonth = subMonths(monthDate, 1);
-      const prevStart = startOfMonth(prevMonth).toISOString().split('T')[0];
-      const prevEnd = endOfMonth(prevMonth).toISOString().split('T')[0];
-
-      let prevInvoiceQuery = supabase
-        .from('invoices')
-        .select('total')
-        .gte('invoice_date', prevStart)
-        .lte('invoice_date', prevEnd)
-        .eq('status', 'active');
-
-      if (!isAdmin && user?.branch_id) {
-        prevInvoiceQuery = prevInvoiceQuery.eq('branch_id', user.branch_id);
-      }
-
-      const { data: prevInvoices } = await prevInvoiceQuery;
-
-      const prevTotal = (prevInvoices || []).reduce((s, i) => s + Number(i.total), 0);
-      const change = prevTotal > 0 ? ((totalSpending - prevTotal) / prevTotal) * 100 : 0;
-
-      // Daily breakdown
-      const dailyMap: Record<string, number> = {};
-      (invoices || []).forEach((inv) => {
-        const day = inv.invoice_date;
-        dailyMap[day] = (dailyMap[day] || 0) + Number(inv.total);
-      });
-
-      const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const dailyBreakdown: { day: string; total: number }[] = [];
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dayStr = `${year}-${month}-${d.toString().padStart(2, '0')}`;
-        dailyBreakdown.push({
-          day: d.toString(),
-          total: dailyMap[dayStr] || 0,
-        });
-      }
-
-      setMonthlyData({
-        invoiceCount: invoices?.length || 0,
-        totalSpending,
-        totalReturns,
-        netSpending: totalSpending - totalReturns,
-        prevMonthTotal: prevTotal,
-        change,
-        dailyBreakdown,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const loadBranchReport = async () => {
-    try {
-      const [year, month] = branchMonth.split('-');
-      const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const monthStart = startOfMonth(monthDate).toISOString().split('T')[0];
-      const monthEnd = endOfMonth(monthDate).toISOString().split('T')[0];
-
-      let invoiceQuery = supabase
-        .from('invoices')
-        .select('branch_id, total, branches(name)')
-        .gte('invoice_date', monthStart)
-        .lte('invoice_date', monthEnd)
-        .eq('status', 'active');
-
-      // For non-admin users, only show their branch
-      if (!isAdmin && user?.branch_id) {
-        invoiceQuery = invoiceQuery.eq('branch_id', user.branch_id);
-      }
-
-      const { data: invoices } = await invoiceQuery;
-
-      const branchMap: Record<string, { name: string; total: number; count: number }> = {};
-      (invoices || []).forEach((inv: any) => {
-        const bName = inv.branches?.name || 'غير معروف';
-        if (!branchMap[inv.branch_id]) {
-          branchMap[inv.branch_id] = { name: bName, total: 0, count: 0 };
-        }
-        branchMap[inv.branch_id].total += Number(inv.total);
-        branchMap[inv.branch_id].count += 1;
-      });
-
-      const branchList = Object.entries(branchMap)
-        .map(([id, data]) => ({ id, ...data }))
-        .sort((a, b) => b.total - a.total);
-
-      setBranchData(branchList);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const loadExpensesReport = async () => {
-    try {
-      const [year, month] = expMonth.split('-');
-      const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const monthStart = startOfMonth(monthDate).toISOString().split('T')[0];
-      const monthEnd = endOfMonth(monthDate).toISOString().split('T')[0];
-
-      let query = supabase
-        .from('expenses')
-        .select('amount, category_id, branch_id, expense_date, expense_categories(name), branches(name)')
-        .gte('expense_date', monthStart)
-        .lte('expense_date', monthEnd);
-
-      if (!isAdmin && user?.branch_id) {
-        query = query.eq('branch_id', user.branch_id);
-      }
-
-      const { data } = await query;
-      const expenses = data || [];
-
-      const totalExpenses = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
-
-      // By category
-      const catMap: Record<string, { name: string; total: number; count: number }> = {};
-      expenses.forEach((e: any) => {
-        const catName = e.expense_categories?.name || 'غير مصنف';
-        if (!catMap[catName]) catMap[catName] = { name: catName, total: 0, count: 0 };
-        catMap[catName].total += Number(e.amount);
-        catMap[catName].count += 1;
-      });
-      const byCategory = Object.values(catMap).sort((a, b) => b.total - a.total);
+      const invList: any[] = invoices || [];
+      const retList: any[] = returns || [];
+      const totalSales = invList.reduce((s, i) => s + Number(i.total), 0);
+      const totalReturns = retList.reduce((s, r) => s + Number(r.total), 0);
+      const invoiceCount = invList.length;
 
       // By branch
-      const brMap: Record<string, { name: string; total: number; count: number }> = {};
-      expenses.forEach((e: any) => {
-        const brName = e.branches?.name || 'غير معروف';
-        if (!brMap[brName]) brMap[brName] = { name: brName, total: 0, count: 0 };
-        brMap[brName].total += Number(e.amount);
-        brMap[brName].count += 1;
+      const branchMap: Record<string, { name: string; total: number }> = {};
+      invList.forEach((inv) => {
+        const bName = (inv.branches as any)?.name || 'غير معروف';
+        if (!branchMap[inv.branch_id]) branchMap[inv.branch_id] = { name: bName, total: 0 };
+        branchMap[inv.branch_id].total += Number(inv.total);
       });
-      const byBranch = Object.values(brMap).sort((a, b) => b.total - a.total);
+      const byBranch = Object.values(branchMap).sort((a, b) => b.total - a.total);
 
-      // Daily breakdown
-      const dailyMap: Record<string, number> = {};
-      expenses.forEach((e: any) => {
-        dailyMap[e.expense_date] = (dailyMap[e.expense_date] || 0) + Number(e.amount);
+      // By product
+      const productMap: Record<string, { name: string; qty: number; total: number }> = {};
+      invList.forEach((inv) => {
+        (inv.items || []).forEach((item: any) => {
+          const name = item.item_name || 'غير معروف';
+          if (!productMap[name]) productMap[name] = { name, qty: 0, total: 0 };
+          productMap[name].qty += Number(item.quantity || 0);
+          productMap[name].total += Number(item.total_price || 0);
+        });
       });
-      const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const dailyBreakdown: { day: string; total: number }[] = [];
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dayStr = `${year}-${month}-${d.toString().padStart(2, '0')}`;
-        dailyBreakdown.push({ day: d.toString(), total: dailyMap[dayStr] || 0 });
-      }
+      const byProduct = Object.values(productMap).sort((a, b) => b.total - a.total);
 
-      setExpData({ totalExpenses, count: expenses.length, byCategory, byBranch, dailyBreakdown });
+      setSalesData({
+        totalSales,
+        totalReturns,
+        netSales: totalSales - totalReturns,
+        avgInvoice: invoiceCount > 0 ? totalSales / invoiceCount : 0,
+        invoiceCount,
+        byBranch,
+        byProduct,
+        invoices: invList,
+      });
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadInventoryReport = async () => {
+  // ── Load Inventory ────────────────────────────────────────────────────────────
+  const loadInventory = async () => {
+    setLoading(true);
     try {
+      // Movements
+      let movQ = supabase
+        .from('inventory_transactions')
+        .select('transaction_type, quantity, products(name), branches(name)');
+
+      if (dateFrom) movQ = movQ.gte('created_at', dateFrom);
+      if (dateTo) movQ = movQ.lte('created_at', dateTo + 'T23:59:59');
+      if (!isAdmin && user?.branch_id) movQ = movQ.eq('branch_id', user.branch_id);
+
+      const { data: movements } = await movQ;
+      const movList: any[] = movements || [];
+
+      const inMov = movList.filter((m) => m.transaction_type === 'in');
+      const outMov = movList.filter((m) => m.transaction_type === 'out');
+      const adjustMov = movList.filter((m) => m.transaction_type === 'adjust');
+      const transferMov = movList.filter((m) => m.transaction_type === 'transfer');
+
+      setInvMovements({
+        inCount: inMov.length,
+        outCount: outMov.length,
+        adjustCount: adjustMov.length,
+        transferCount: transferMov.length,
+        inValue: inMov.reduce((s, m) => s + Number(m.quantity), 0),
+        outValue: outMov.reduce((s, m) => s + Number(m.quantity), 0),
+        movements: movList,
+      });
+
+      // Balances
       const { data: invData } = await supabase
         .from('inventory')
         .select('quantity, min_quantity, product_id, branch_id, products(name, unit_price), branches(name)');
 
       let items: any[] = invData || [];
-      if (!isAdmin && user?.branch_id) {
-        items = items.filter((i: any) => i.branch_id === user.branch_id);
-      }
+      if (!isAdmin && user?.branch_id) items = items.filter((i) => i.branch_id === user.branch_id);
 
-      const totalProducts = items.length;
-      const totalValue = items.reduce((s: number, i: any) => s + (Number(i.quantity) * Number(i.products?.unit_price || 0)), 0);
-      const lowStockItems = items.filter((i: any) => Number(i.quantity) <= Number(i.min_quantity || 0) && Number(i.quantity) > 0);
-      const outOfStockItems = items.filter((i: any) => Number(i.quantity) <= 0);
+      const totalItems = items.length;
+      const totalValue = items.reduce((s, i) => s + Number(i.quantity) * Number(i.products?.unit_price || 0), 0);
 
-      // By branch
       const brMap: Record<string, { name: string; count: number; value: number }> = {};
-      items.forEach((i: any) => {
+      items.forEach((i) => {
         const brName = i.branches?.name || 'غير معروف';
         if (!brMap[brName]) brMap[brName] = { name: brName, count: 0, value: 0 };
         brMap[brName].count += 1;
         brMap[brName].value += Number(i.quantity) * Number(i.products?.unit_price || 0);
       });
-      const byBranch = Object.values(brMap);
 
-      const lowStockList = [...lowStockItems, ...outOfStockItems].map((i: any) => ({
-        product_name: i.products?.name || 'غير معروف',
-        branch_name: i.branches?.name || 'غير معروف',
-        quantity: Number(i.quantity),
-        min_quantity: Number(i.min_quantity || 0),
+      const lowStock = items
+        .filter((i) => Number(i.quantity) <= Number(i.min_quantity || 0))
+        .map((i) => ({
+          product_name: i.products?.name || 'غير معروف',
+          branch_name: i.branches?.name || 'غير معروف',
+          quantity: Number(i.quantity),
+          min_quantity: Number(i.min_quantity || 0),
+        }));
+
+      setInvBalances({ totalItems, totalValue, byBranch: Object.values(brMap), lowStock });
+
+      // Branch debts from inventory_transfers
+      const { data: transfers } = await supabase
+        .from('inventory_transfers')
+        .select('to_branch_id, total_amount, to_branch:branches!inventory_transfers_to_branch_id_fkey(name)')
+        .eq('status', 'confirmed');
+
+      const { data: transferPayments } = await supabase
+        .from('payments')
+        .select('branch_id, amount');
+
+      const debtMap: Record<string, { branch_name: string; total_transferred: number; total_paid: number }> = {};
+      (transfers || []).forEach((t: any) => {
+        const bName = t.to_branch?.name || 'غير معروف';
+        if (!debtMap[t.to_branch_id]) debtMap[t.to_branch_id] = { branch_name: bName, total_transferred: 0, total_paid: 0 };
+        debtMap[t.to_branch_id].total_transferred += Number(t.total_amount);
+      });
+
+      (transferPayments || []).forEach((p: any) => {
+        if (debtMap[p.branch_id]) {
+          debtMap[p.branch_id].total_paid += Number(p.amount);
+        }
+      });
+
+      const debts = Object.values(debtMap).map((d) => ({
+        ...d,
+        remaining: d.total_transferred - d.total_paid,
       }));
+      setBranchDebts(debts);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setInvData({
-        totalProducts,
-        totalValue,
-        lowStockCount: lowStockItems.length,
-        outOfStockCount: outOfStockItems.length,
-        byBranch,
-        lowStockItems: lowStockList,
+  // ── Load Financial ────────────────────────────────────────────────────────────
+  const loadFinancial = async () => {
+    if (!dateFrom && !dateTo) return;
+    setLoading(true);
+    try {
+      // Revenue (invoices)
+      let invQ = supabase.from('invoices').select('total, invoice_date').eq('status', 'active');
+      if (dateFrom) invQ = invQ.gte('invoice_date', dateFrom);
+      if (dateTo) invQ = invQ.lte('invoice_date', dateTo);
+      if (!isAdmin && user?.branch_id) invQ = invQ.eq('branch_id', user.branch_id);
+      const { data: invoices } = await invQ;
+
+      // Expenses
+      let expQ = supabase.from('expenses').select('amount, expense_date');
+      if (dateFrom) expQ = expQ.gte('expense_date', dateFrom);
+      if (dateTo) expQ = expQ.lte('expense_date', dateTo);
+      if (!isAdmin && user?.branch_id) expQ = expQ.eq('branch_id', user.branch_id);
+      const { data: expenses } = await expQ;
+
+      // Payments
+      let payQ = supabase.from('payments').select('amount, payment_date');
+      if (dateFrom) payQ = payQ.gte('payment_date', dateFrom);
+      if (dateTo) payQ = payQ.lte('payment_date', dateTo);
+      if (!isAdmin && user?.branch_id) payQ = payQ.eq('branch_id', user.branch_id);
+      const { data: payments } = await payQ;
+
+      const invList: any[] = invoices || [];
+      const expList: any[] = expenses || [];
+      const payList: any[] = payments || [];
+
+      const totalRevenue = invList.reduce((s, i) => s + Number(i.total), 0);
+      const totalExpenses = expList.reduce((s, e) => s + Number(e.amount), 0);
+      const paymentsReceived = payList.reduce((s, p) => s + Number(p.amount), 0);
+      const netProfit = totalRevenue - totalExpenses;
+      const cashFlow = paymentsReceived - totalExpenses;
+
+      // Monthly trend (last 6 months)
+      const monthlyTrend: { month: string; revenue: number; expenses: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const mStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+        const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+        const monthLabel = d.toLocaleDateString('ar-EG', { month: 'short', year: 'numeric' });
+
+        const rev = invList
+          .filter((inv) => inv.invoice_date >= mStart && inv.invoice_date <= mEnd)
+          .reduce((s, inv) => s + Number(inv.total), 0);
+        const exp = expList
+          .filter((e) => e.expense_date >= mStart && e.expense_date <= mEnd)
+          .reduce((s, e) => s + Number(e.amount), 0);
+
+        monthlyTrend.push({ month: monthLabel, revenue: rev, expenses: exp });
+      }
+
+      // Customer debts: invoices with no payments
+      const { data: unpaidInvoices } = await supabase
+        .from('invoices')
+        .select('customer_id, total, customers(name)')
+        .eq('status', 'active');
+
+      const custDebtMap: Record<string, { customer_name: string; total_unpaid: number; invoice_count: number }> = {};
+      (unpaidInvoices || []).forEach((inv: any) => {
+        if (!inv.customer_id) return;
+        const cName = inv.customers?.name || 'غير معروف';
+        if (!custDebtMap[inv.customer_id]) custDebtMap[inv.customer_id] = { customer_name: cName, total_unpaid: 0, invoice_count: 0 };
+        custDebtMap[inv.customer_id].total_unpaid += Number(inv.total);
+        custDebtMap[inv.customer_id].invoice_count += 1;
+      });
+      const customerDebts = Object.values(custDebtMap)
+        .filter((c) => c.total_unpaid > 0)
+        .sort((a, b) => b.total_unpaid - a.total_unpaid);
+
+      // Branch debts from transfers
+      const { data: transfers } = await supabase
+        .from('inventory_transfers')
+        .select('to_branch_id, total_amount, to_branch:branches!inventory_transfers_to_branch_id_fkey(name)')
+        .eq('status', 'confirmed');
+
+      const { data: transferPayments } = await supabase.from('payments').select('branch_id, amount');
+
+      const finDebtMap: Record<string, { branch_name: string; remaining: number }> = {};
+      (transfers || []).forEach((t: any) => {
+        const bName = t.to_branch?.name || 'غير معروف';
+        if (!finDebtMap[t.to_branch_id]) finDebtMap[t.to_branch_id] = { branch_name: bName, remaining: 0 };
+        finDebtMap[t.to_branch_id].remaining += Number(t.total_amount);
+      });
+      (transferPayments || []).forEach((p: any) => {
+        if (finDebtMap[p.branch_id]) finDebtMap[p.branch_id].remaining -= Number(p.amount);
+      });
+      const finBranchDebts = Object.values(finDebtMap).filter((d) => d.remaining > 0);
+
+      const outstandingDebts = customerDebts.reduce((s, c) => s + c.total_unpaid, 0) + finBranchDebts.reduce((s, d) => s + d.remaining, 0);
+
+      setFinData({
+        totalRevenue,
+        totalExpenses,
+        netProfit,
+        outstandingDebts,
+        cashFlow,
+        paymentsReceived,
+        expensesPaid: totalExpenses,
+        monthlyTrend,
+        customerDebts,
+        finBranchDebts,
       });
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const exportExcel = async () => {
+  // ── Load General ──────────────────────────────────────────────────────────────
+  const loadGeneral = async () => {
+    setLoading(true);
     try {
-      const XLSX = await import('xlsx');
-      const wb = XLSX.utils.book_new();
+      const today = new Date().toISOString().split('T')[0];
 
-      if (activeTab === 'daily') {
-        const wsData = [
-          ['تقرير يومي', dailyDate],
-          [],
-          ['عدد الفواتير', dailyData.invoiceCount],
-          ['إجمالي الصرف', dailyData.totalSpending],
-          ['إجمالي المرتجعات', dailyData.totalReturns],
-          ['صافي الصرف', dailyData.netSpending],
-          [],
-          ['رقم الفاتورة', 'الفرع', 'الإجمالي', 'الحالة'],
-          ...dailyData.invoices.map((inv: any) => [
-            inv.invoice_number,
-            inv.branches?.name || '',
-            inv.total,
-            inv.status,
-          ]),
-        ];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, 'تقرير يومي');
-      } else if (activeTab === 'monthly') {
-        const wsData = [
-          ['تقرير شهري', monthlyMonth],
-          [],
-          ['عدد الفواتير', monthlyData.invoiceCount],
-          ['إجمالي الصرف', monthlyData.totalSpending],
-          ['إجمالي المرتجعات', monthlyData.totalReturns],
-          ['صافي الصرف', monthlyData.netSpending],
-          ['صرف الشهر السابق', monthlyData.prevMonthTotal],
-          ['نسبة التغيير', `${monthlyData.change.toFixed(1)}%`],
-        ];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, 'تقرير شهري');
-      } else if (activeTab === 'branch') {
-        const wsData = [
-          ['تقرير الفروع', branchMonth],
-          [],
-          ['الفرع', 'عدد الفواتير', 'الإجمالي'],
-          ...branchData.map((b) => [b.name, b.count, b.total]),
-        ];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, 'تقرير الفروع');
-      } else if (activeTab === 'expenses') {
-        const wsData = [
-          ['تقرير المصروفات', expMonth],
-          [],
-          ['عدد المصروفات', expData.count],
-          ['إجمالي المصروفات', expData.totalExpenses],
-          [],
-          ['التصنيف', 'العدد', 'الإجمالي'],
-          ...expData.byCategory.map((c) => [c.name, c.count, c.total]),
-        ];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, 'تقرير المصروفات');
-      } else if (activeTab === 'inventory') {
-        const wsData = [
-          ['تقرير المخزون'],
-          [],
-          ['إجمالي الأصناف', invData.totalProducts],
-          ['إجمالي القيمة', invData.totalValue],
-          ['مخزون منخفض', invData.lowStockCount],
-          ['نفد المخزون', invData.outOfStockCount],
-          [],
-          ['المنتج', 'الفرع', 'الكمية', 'الحد الأدنى'],
-          ...invData.lowStockItems.map((i) => [i.product_name, i.branch_name, i.quantity, i.min_quantity]),
-        ];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, 'تقرير المخزون');
-      }
+      // Counts
+      const { count: invoiceCount } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
 
-      XLSX.writeFile(wb, `تقرير_${activeTab}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-      toast.success('تم تصدير ملف Excel');
+      const { count: returnCount } = await supabase
+        .from('returns')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: paymentCount } = await supabase
+        .from('payments')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: expenseCount } = await supabase
+        .from('expenses')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: transferCount } = await supabase
+        .from('inventory_transfers')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'confirmed');
+
+      // Totals
+      let invQ = supabase.from('invoices').select('total').eq('status', 'active');
+      if (!isAdmin && user?.branch_id) invQ = invQ.eq('branch_id', user.branch_id);
+      const { data: invData } = await invQ;
+      const totalRevenue = (invData || []).reduce((s, i) => s + Number(i.total), 0);
+
+      let expQ = supabase.from('expenses').select('amount');
+      if (!isAdmin && user?.branch_id) expQ = expQ.eq('branch_id', user.branch_id);
+      const { data: expData } = await expQ;
+      const totalExpenseAmount = (expData || []).reduce((s, e) => s + Number(e.amount), 0);
+
+      // Branch performance
+      let branchInvQ = supabase
+        .from('invoices')
+        .select('branch_id, total, branches(name)')
+        .eq('status', 'active');
+      if (!isAdmin && user?.branch_id) branchInvQ = branchInvQ.eq('branch_id', user.branch_id);
+      const { data: branchInvData } = await branchInvQ;
+
+      let branchRetQ = supabase.from('returns').select('branch_id, total, branches(name)');
+      if (!isAdmin && user?.branch_id) branchRetQ = branchRetQ.eq('branch_id', user.branch_id);
+      const { data: branchRetData } = await branchRetQ;
+
+      let branchExpQ = supabase.from('expenses').select('branch_id, amount, branches(name)');
+      if (!isAdmin && user?.branch_id) branchExpQ = branchExpQ.eq('branch_id', user.branch_id);
+      const { data: branchExpData } = await branchExpQ;
+
+      const perfMap: Record<string, { name: string; invoices: number; revenue: number; returns: number; expenses: number }> = {};
+      (branchInvData || []).forEach((inv: any) => {
+        const bName = inv.branches?.name || 'غير معروف';
+        if (!perfMap[inv.branch_id]) perfMap[inv.branch_id] = { name: bName, invoices: 0, revenue: 0, returns: 0, expenses: 0 };
+        perfMap[inv.branch_id].invoices += 1;
+        perfMap[inv.branch_id].revenue += Number(inv.total);
+      });
+      (branchRetData || []).forEach((ret: any) => {
+        const bName = ret.branches?.name || 'غير معروف';
+        if (!perfMap[ret.branch_id]) perfMap[ret.branch_id] = { name: bName, invoices: 0, revenue: 0, returns: 0, expenses: 0 };
+        perfMap[ret.branch_id].returns += Number(ret.total);
+      });
+      (branchExpData || []).forEach((exp: any) => {
+        const bName = exp.branches?.name || 'غير معروف';
+        if (!perfMap[exp.branch_id]) perfMap[exp.branch_id] = { name: bName, invoices: 0, revenue: 0, returns: 0, expenses: 0 };
+        perfMap[exp.branch_id].expenses += Number(exp.amount);
+      });
+      const branchPerformance = Object.values(perfMap).sort((a, b) => b.revenue - a.revenue);
+
+      // Top products
+      const { data: itemsData } = await supabase
+        .from('invoice_items')
+        .select('item_name, quantity, total_price');
+
+      const prodMap: Record<string, { name: string; qty: number; total: number }> = {};
+      (itemsData || []).forEach((item: any) => {
+        const name = item.item_name || 'غير معروف';
+        if (!prodMap[name]) prodMap[name] = { name, qty: 0, total: 0 };
+        prodMap[name].qty += Number(item.quantity || 0);
+        prodMap[name].total += Number(item.total_price || 0);
+      });
+      const topProducts = Object.values(prodMap).sort((a, b) => b.total - a.total).slice(0, 10);
+
+      setGeneralData({
+        totalInvoices: invoiceCount || 0,
+        totalReturns: returnCount || 0,
+        totalPayments: paymentCount || 0,
+        totalExpenses: expenseCount || 0,
+        totalTransfers: transferCount || 0,
+        totalRevenue,
+        totalExpenseAmount,
+        netProfit: totalRevenue - totalExpenseAmount,
+        branchPerformance,
+        topProducts,
+      });
     } catch (err) {
       console.error(err);
-      toast.error('حدث خطأ في التصدير');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const exportPDF = async () => {
-    toast.info('جاري إنشاء ملف PDF...');
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const jsPDF = (await import('jspdf')).default;
+  // ── Effects ───────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab === 'sales') loadSales();
+  }, [activeTab, period, customFrom, customTo]);
 
-      const reportEl = document.getElementById(`report-${activeTab}`);
-      if (!reportEl) return;
+  useEffect(() => {
+    if (activeTab === 'inventory') loadInventory();
+  }, [activeTab]);
 
-      const canvas = await html2canvas(reportEl, { scale: 2, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+  useEffect(() => {
+    if (activeTab === 'financial') loadFinancial();
+  }, [activeTab, period, customFrom, customTo]);
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`تقرير_${activeTab}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-      toast.success('تم تحميل ملف PDF');
-    } catch (err) {
-      console.error(err);
-      toast.error('حدث خطأ في إنشاء PDF');
-    }
+  useEffect(() => {
+    if (activeTab === 'general') loadGeneral();
+  }, [activeTab]);
+
+  // ── Export handlers ───────────────────────────────────────────────────────────
+  const handleExportSales = () => {
+    exportCSV(
+      'تقارير_المبيعات',
+      ['المنتج', 'الكمية المباعة', 'الإجمالي'],
+      salesData.byProduct.map((p) => [p.name, p.qty.toString(), p.total.toFixed(2)])
+    );
   };
 
+  const handleExportInventory = () => {
+    exportCSV(
+      'تقارير_المخزون',
+      ['المنتج', 'الفرع', 'الكمية', 'الحد الأدنى'],
+      invBalances.lowStock.map((i) => [i.product_name, i.branch_name, i.quantity.toString(), i.min_quantity.toString()])
+    );
+  };
+
+  const handleExportFinancial = () => {
+    const rows: string[][] = [];
+    rows.push(['إجمالي الإيرادات', finData.totalRevenue.toFixed(2)]);
+    rows.push(['إجمالي المصروفات', finData.totalExpenses.toFixed(2)]);
+    rows.push([finData.netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة', Math.abs(finData.netProfit).toFixed(2)]);
+    rows.push(['التدفقات النقدية', finData.cashFlow.toFixed(2)]);
+    rows.push(['المديونيات المستحقة', finData.outstandingDebts.toFixed(2)]);
+    rows.push([]);
+    rows.push(['العميل', 'المبلغ المستحق', 'عدد الفواتير']);
+    finData.customerDebts.forEach((c) => rows.push([c.customer_name, c.total_unpaid.toFixed(2), c.invoice_count.toString()]));
+    exportCSV('تقارير_مالية', ['البند', 'القيمة'], rows);
+  };
+
+  const handleExportGeneral = () => {
+    const rows: string[][] = [];
+    rows.push(['عدد الفواتير', generalData.totalInvoices.toString()]);
+    rows.push(['عدد المرتجعات', generalData.totalReturns.toString()]);
+    rows.push(['عدد المدفوعات', generalData.totalPayments.toString()]);
+    rows.push(['عدد المصروفات', generalData.totalExpenses.toString()]);
+    rows.push(['عدد التحويلات', generalData.totalTransfers.toString()]);
+    rows.push(['إجمالي الإيرادات', generalData.totalRevenue.toFixed(2)]);
+    rows.push(['إجمالي المصروفات', generalData.totalExpenseAmount.toFixed(2)]);
+    rows.push([generalData.netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة', Math.abs(generalData.netProfit).toFixed(2)]);
+    rows.push([]);
+    rows.push(['الفرع', 'عدد الفواتير', 'الإيرادات', 'المرتجعات', 'المصروفات']);
+    generalData.branchPerformance.forEach((b) =>
+      rows.push([b.name, b.invoices.toString(), b.revenue.toFixed(2), b.returns.toFixed(2), b.expenses.toFixed(2)])
+    );
+    exportCSV('تقرير_عام', ['البند', 'القيمة'], rows);
+  };
+
+  // ── Period Selector ───────────────────────────────────────────────────────────
+  const PeriodSelector = () => (
+    <Card className="border-0 shadow-md">
+      <CardContent className="p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Calendar className="w-5 h-5 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">فترة التقرير</span>
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">اليوم</SelectItem>
+              <SelectItem value="week">هذا الأسبوع</SelectItem>
+              <SelectItem value="month">هذا الشهر</SelectItem>
+              <SelectItem value="year">هذا العام</SelectItem>
+              <SelectItem value="custom">مخصص</SelectItem>
+            </SelectContent>
+          </Select>
+          {period === 'custom' && (
+            <>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="w-40"
+                placeholder="من"
+              />
+              <span className="text-muted-foreground text-sm">إلى</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="w-40"
+                placeholder="إلى"
+              />
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // ── Stat Card ─────────────────────────────────────────────────────────────────
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    color,
+    bgColor,
+    index = 0,
+  }: {
+    title: string;
+    value: string | number;
+    icon: React.ElementType;
+    color: string;
+    bgColor: string;
+    index?: number;
+  }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.08 }}
+    >
+      <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">{title}</p>
+              <p className={`text-xl font-bold mt-1 ${color}`}>{value}</p>
+            </div>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgColor}`}>
+              <Icon className={`w-5 h-5 ${color}`} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  // ── Recharts Tooltip style ────────────────────────────────────────────────────
+  const tooltipStyle = {
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    direction: 'rtl' as const,
+    fontSize: 12,
+  };
+
+  // ── RENDER ────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">التقارير</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <BarChart3 className="w-7 h-7 text-primary" />
+            التقارير المتقدمة
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            تقارير الصرف والمرتجعات
+            تقارير شاملة عن المبيعات والمخزون والمالية
             {!isAdmin && user?.branch_name && ` - فرع ${user.branch_name}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {canExport && (
-            <>
-              <Button variant="outline" onClick={exportExcel} className="gap-2">
-                <FileSpreadsheet className="w-4 h-4" />
-                Excel
-              </Button>
-              <Button variant="outline" onClick={exportPDF} className="gap-2">
-                <FileText className="w-4 h-4" />
-                PDF
-              </Button>
-            </>
-          )}
-        </div>
       </div>
 
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="daily" className="gap-1">
-            <Calendar className="w-4 h-4" />
-            يومي
-          </TabsTrigger>
-          <TabsTrigger value="monthly" className="gap-1">
-            <BarChart3 className="w-4 h-4" />
-            شهري
-          </TabsTrigger>
-          <TabsTrigger value="branch" className="gap-1">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="sales" className="gap-1.5 text-xs sm:text-sm">
             <TrendingUp className="w-4 h-4" />
-            حسب الفرع
+            <span className="hidden sm:inline">تقارير</span> المبيعات
           </TabsTrigger>
-          <TabsTrigger value="expenses" className="gap-1">
-            <TrendingDown className="w-4 h-4" />
-            مصروفات
-          </TabsTrigger>
-          <TabsTrigger value="inventory" className="gap-1">
+          <TabsTrigger value="inventory" className="gap-1.5 text-xs sm:text-sm">
             <Package className="w-4 h-4" />
-            مخزون
+            <span className="hidden sm:inline">تقارير</span> المخزون
+          </TabsTrigger>
+          <TabsTrigger value="financial" className="gap-1.5 text-xs sm:text-sm">
+            <Wallet className="w-4 h-4" />
+            <span className="hidden sm:inline">تقارير</span> مالية
+          </TabsTrigger>
+          <TabsTrigger value="general" className="gap-1.5 text-xs sm:text-sm">
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">تقارير</span> عامة
           </TabsTrigger>
         </TabsList>
 
-        {/* Daily Report */}
-        <TabsContent value="daily" className="space-y-4 mt-4">
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Label>تاريخ التقرير</Label>
-                <Input
-                  type="date"
-                  value={dailyDate}
-                  onChange={(e) => setDailyDate(e.target.value)}
-                  className="w-48"
-                />
-              </div>
-            </CardContent>
-          </Card>
+        {/* ═══════════════════════ SALES TAB ═══════════════════════ */}
+        <TabsContent value="sales" className="space-y-4 mt-4">
+          <PeriodSelector />
 
-          <div id="report-daily" className="space-y-4 bg-white p-4 rounded-lg">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">عدد الفواتير</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{dailyData.invoiceCount}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي الصرف</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(dailyData.totalSpending)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي المرتجعات</p>
-                  <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(dailyData.totalReturns)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm bg-primary/5">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">صافي الصرف</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(dailyData.netSpending)}</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {dailyData.invoices.length > 0 && (
-              <Card className="border shadow-sm">
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">رقم الفاتورة</TableHead>
-                        <TableHead className="text-right">الفرع</TableHead>
-                        <TableHead className="text-right">الإجمالي</TableHead>
-                        <TableHead className="text-center">عدد الأصناف</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dailyData.invoices.map((inv: any) => (
-                        <TableRow key={inv.id}>
-                          <TableCell className="font-medium">{inv.invoice_number}</TableCell>
-                          <TableCell>{inv.branches?.name || '—'}</TableCell>
-                          <TableCell className="font-semibold">{formatCurrency(inv.total)}</TableCell>
-                          <TableCell className="text-center">{inv.items?.length || 0}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="إجمالي المبيعات"
+              value={formatCurrency(salesData.totalSales)}
+              icon={TrendingUp}
+              color="text-emerald-600"
+              bgColor="bg-emerald-50 dark:bg-emerald-900/20"
+              index={0}
+            />
+            <StatCard
+              title="إجمالي المرتجعات"
+              value={formatCurrency(salesData.totalReturns)}
+              icon={TrendingDown}
+              color="text-red-600"
+              bgColor="bg-red-50 dark:bg-red-900/20"
+              index={1}
+            />
+            <StatCard
+              title="صافي المبيعات"
+              value={formatCurrency(salesData.netSales)}
+              icon={BarChart3}
+              color="text-blue-600"
+              bgColor="bg-blue-50 dark:bg-blue-900/20"
+              index={2}
+            />
+            <StatCard
+              title="متوسط قيمة الفاتورة"
+              value={formatCurrency(salesData.avgInvoice)}
+              icon={ArrowUpDown}
+              color="text-amber-600"
+              bgColor="bg-amber-50 dark:bg-amber-900/20"
+              index={3}
+            />
           </div>
-        </TabsContent>
 
-        {/* Monthly Report */}
-        <TabsContent value="monthly" className="space-y-4 mt-4">
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Label>الشهر</Label>
-                <Input
-                  type="month"
-                  value={monthlyMonth}
-                  onChange={(e) => setMonthlyMonth(e.target.value)}
-                  className="w-48"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div id="report-monthly" className="space-y-4 bg-white p-4 rounded-lg">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">عدد الفواتير</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{monthlyData.invoiceCount}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي الصرف</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(monthlyData.totalSpending)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">صرف الشهر السابق</p>
-                  <p className="text-2xl font-bold text-gray-500 mt-1">{formatCurrency(monthlyData.prevMonthTotal)}</p>
-                </CardContent>
-              </Card>
-              <Card className={`border shadow-sm ${monthlyData.change >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">نسبة التغيير</p>
-                  <div className="flex items-center justify-center gap-1 mt-1">
-                    {monthlyData.change >= 0 ? (
-                      <TrendingUp className="w-5 h-5 text-emerald-600" />
-                    ) : (
-                      <TrendingDown className="w-5 h-5 text-red-600" />
-                    )}
-                    <p className={`text-2xl font-bold ${monthlyData.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {Math.abs(monthlyData.change).toFixed(1)}%
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Daily Chart */}
-            <Card className="border shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">الصرف اليومي خلال الشهر</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData.dailyBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Bar dataKey="total" name="الصرف" fill="oklch(0.52 0.11 172)" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Branch Report */}
-        <TabsContent value="branch" className="space-y-4 mt-4">
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Label>الشهر</Label>
-                <Input
-                  type="month"
-                  value={branchMonth}
-                  onChange={(e) => setBranchMonth(e.target.value)}
-                  className="w-48"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div id="report-branch" className="space-y-4 bg-white p-4 rounded-lg">
-            {branchData.length > 0 && (
-              <>
-                <Card className="border shadow-sm">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">صرف الفروع هذا الشهر</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={branchData} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                          <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                          <Bar dataKey="total" name="الصرف" fill="oklch(0.52 0.11 172)" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border shadow-sm">
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">الفرع</TableHead>
-                          <TableHead className="text-center">عدد الفواتير</TableHead>
-                          <TableHead className="text-right">الإجمالي</TableHead>
-                          <TableHead className="text-right">النسبة</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {branchData.map((branch) => {
-                          const grandTotal = branchData.reduce((s: number, b: any) => s + b.total, 0);
-                          const percentage = grandTotal > 0 ? (branch.total / grandTotal) * 100 : 0;
-                          return (
-                            <TableRow key={branch.id}>
-                              <TableCell className="font-medium">{branch.name}</TableCell>
-                              <TableCell className="text-center">{branch.count}</TableCell>
-                              <TableCell className="font-semibold">{formatCurrency(branch.total)}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden max-w-[100px]">
-                                    <div
-                                      className="h-full bg-primary rounded-full"
-                                      style={{ width: `${percentage}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">{percentage.toFixed(1)}%</span>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {branchData.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
-                <p>لا توجد بيانات لهذا الشهر</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        {/* Expenses Report */}
-        <TabsContent value="expenses" className="space-y-4 mt-4">
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Label>الشهر</Label>
-                <Input
-                  type="month"
-                  value={expMonth}
-                  onChange={(e) => setExpMonth(e.target.value)}
-                  className="w-48"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div id="report-expenses" className="space-y-4 bg-white p-4 rounded-lg">
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">عدد المصروفات</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{expData.count}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي المصروفات</p>
-                  <p className="text-2xl font-bold text-purple-600 mt-1">{formatCurrency(expData.totalExpenses)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">متوسط المصروف</p>
-                  <p className="text-2xl font-bold text-amber-600 mt-1">{formatCurrency(expData.count > 0 ? expData.totalExpenses / expData.count : 0)}</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Daily Chart */}
-            <Card className="border shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">المصروفات اليومية خلال الشهر</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={expData.dailyBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Bar dataKey="total" name="المصروفات" fill="oklch(0.55 0.2 300)" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* By Category */}
-            {expData.byCategory.length > 0 && (
-              <Card className="border shadow-sm">
+          {/* Sales by Branch Chart */}
+          {salesData.byBranch.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <Card className="border-0 shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">حسب التصنيف</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">التصنيف</TableHead>
-                        <TableHead className="text-center">العدد</TableHead>
-                        <TableHead className="text-right">الإجمالي</TableHead>
-                        <TableHead className="text-right">النسبة</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {expData.byCategory.map((cat, i) => {
-                        const pct = expData.totalExpenses > 0 ? (cat.total / expData.totalExpenses) * 100 : 0;
-                        return (
-                          <TableRow key={i}>
-                            <TableCell className="font-medium">{cat.name}</TableCell>
-                            <TableCell className="text-center">{cat.count}</TableCell>
-                            <TableCell className="font-semibold">{formatCurrency(cat.total)}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden max-w-[100px]">
-                                  <div className="h-full bg-purple-600 rounded-full" style={{ width: `${pct}%` }} />
-                                </div>
-                                <span className="text-xs text-muted-foreground">{pct.toFixed(1)}%</span>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Inventory Report */}
-        <TabsContent value="inventory" className="space-y-4 mt-4">
-          <div id="report-inventory" className="space-y-4 bg-white p-4 rounded-lg">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي الأصناف</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{invData.totalProducts}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي القيمة</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(invData.totalValue)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">مخزون منخفض</p>
-                  <p className="text-2xl font-bold text-amber-600 mt-1">{invData.lowStockCount}</p>
-                </CardContent>
-              </Card>
-              <Card className="border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">نفد المخزون</p>
-                  <p className="text-2xl font-bold text-red-600 mt-1">{invData.outOfStockCount}</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* By Branch */}
-            {invData.byBranch.length > 0 && (
-              <Card className="border shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">المخزون حسب الفرع</CardTitle>
+                  <CardTitle className="text-base">المبيعات حسب الفرع</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64">
+                  <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={invData.byBranch} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => formatCurrency(v)} />
+                      <BarChart data={salesData.byBranch} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        <Bar dataKey="value" name="القيمة" fill="oklch(0.52 0.11 172)" radius={[0, 4, 4, 0]} />
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={tooltipStyle} />
+                        <Bar dataKey="total" name="المبيعات" fill="#10b981" radius={[0, 6, 6, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
-            )}
+            </motion.div>
+          )}
 
-            {/* Low Stock Items */}
-            {invData.lowStockItems.length > 0 && (
-              <Card className="border shadow-sm">
+          {/* Sales by Product Table */}
+          {salesData.byProduct.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="pb-2 flex-row items-center justify-between">
+                  <CardTitle className="text-base">المبيعات حسب المنتج</CardTitle>
+                  {canExport && (
+                    <Button variant="outline" size="sm" onClick={handleExportSales} className="gap-1.5">
+                      <Download className="w-4 h-4" />
+                      تصدير CSV
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="max-h-96">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">#</TableHead>
+                          <TableHead className="text-right">المنتج</TableHead>
+                          <TableHead className="text-center">الكمية المباعة</TableHead>
+                          <TableHead className="text-right">الإجمالي</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {salesData.byProduct.map((p, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+                            <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {salesData.byBranch.length === 0 && salesData.byProduct.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <BarChart3 className="w-14 h-14 mb-4 opacity-40" />
+              <p className="text-lg">لا توجد بيانات مبيعات للفترة المحددة</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ═══════════════════════ INVENTORY TAB ═══════════════════════ */}
+        <TabsContent value="inventory" className="space-y-4 mt-4">
+          {/* Inventory Movement */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="border-0 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ArrowUpDown className="w-5 h-5 text-blue-600" />
+                  حركة المخزون
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+                    <p className="text-sm text-muted-foreground">وارد</p>
+                    <p className="text-2xl font-bold text-emerald-600 mt-1">{invMovements.inCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{invMovements.inValue.toLocaleString('ar-EG')} وحدة</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-red-50 dark:bg-red-900/20">
+                    <p className="text-sm text-muted-foreground">صادر</p>
+                    <p className="text-2xl font-bold text-red-600 mt-1">{invMovements.outCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{invMovements.outValue.toLocaleString('ar-EG')} وحدة</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                    <p className="text-sm text-muted-foreground">تسوية</p>
+                    <p className="text-2xl font-bold text-amber-600 mt-1">{invMovements.adjustCount}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20">
+                    <p className="text-sm text-muted-foreground">تحويل</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">{invMovements.transferCount}</p>
+                  </div>
+                </div>
+                {/* Movement chart */}
+                {((invMovements.inCount + invMovements.outCount + invMovements.adjustCount + invMovements.transferCount) > 0) && (
+                  <div className="h-64 mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'وارد', value: invMovements.inCount },
+                            { name: 'صادر', value: invMovements.outCount },
+                            { name: 'تسوية', value: invMovements.adjustCount },
+                            { name: 'تحويل', value: invMovements.transferCount },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={90}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {CHART_COLORS.map((color, i) => (
+                            <Cell key={i} fill={color} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={tooltipStyle} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Current Balances */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="border-0 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="w-5 h-5 text-emerald-600" />
+                  أرصدة المخزون
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div className="text-center p-3 rounded-xl bg-primary/5">
+                    <p className="text-sm text-muted-foreground">إجمالي الأصناف</p>
+                    <p className="text-2xl font-bold text-primary mt-1">{invBalances.totalItems}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+                    <p className="text-sm text-muted-foreground">إجمالي القيمة</p>
+                    <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(invBalances.totalValue)}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                    <p className="text-sm text-muted-foreground">مخزون منخفض</p>
+                    <p className="text-2xl font-bold text-amber-600 mt-1">{invBalances.lowStock.length}</p>
+                  </div>
+                </div>
+
+                {invBalances.byBranch.length > 0 && (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={invBalances.byBranch} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v)} />
+                        <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={tooltipStyle} />
+                        <Bar dataKey="value" name="القيمة" fill="#10b981" radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Branch Debts */}
+          {branchDebts.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <Card className="border-0 shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">أصناف منخفضة / نفدت</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-red-600" />
+                    مديونيات الفروع
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-right">المنتج</TableHead>
                         <TableHead className="text-right">الفرع</TableHead>
-                        <TableHead className="text-center">الكمية الحالية</TableHead>
-                        <TableHead className="text-center">الحد الأدنى</TableHead>
-                        <TableHead className="text-center">الحالة</TableHead>
+                        <TableHead className="text-right">إجمالي التحويلات</TableHead>
+                        <TableHead className="text-right">إجمالي المدفوعات</TableHead>
+                        <TableHead className="text-right">المبلغ المتبقي</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {invData.lowStockItems.map((item, i) => (
+                      {branchDebts.map((d, i) => (
                         <TableRow key={i}>
-                          <TableCell className="font-medium">{item.product_name}</TableCell>
-                          <TableCell>{item.branch_name}</TableCell>
-                          <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
-                          <TableCell className="text-center">{item.min_quantity}</TableCell>
-                          <TableCell className="text-center">
-                            <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium ${
-                              item.quantity <= 0
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {item.quantity <= 0 ? 'نفد' : 'منخفض'}
-                            </span>
+                          <TableCell className="font-medium">{d.branch_name}</TableCell>
+                          <TableCell>{formatCurrency(d.total_transferred)}</TableCell>
+                          <TableCell className="text-emerald-600">{formatCurrency(d.total_paid)}</TableCell>
+                          <TableCell className={`font-semibold ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                            {formatCurrency(d.remaining)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -971,15 +1007,441 @@ export default function ReportsPage() {
                   </Table>
                 </CardContent>
               </Card>
-            )}
+            </motion.div>
+          )}
 
-            {invData.lowStockItems.length === 0 && invData.totalProducts > 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Package className="w-12 h-12 mb-3 opacity-50" />
-                <p>جميع الأصناف بمستوى مخزون جيد</p>
-              </div>
-            )}
+          {/* Low Stock */}
+          {invBalances.lowStock.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="pb-2 flex-row items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2 text-amber-600">
+                    <TrendingDown className="w-5 h-5" />
+                    مخزون منخفض
+                  </CardTitle>
+                  {canExport && (
+                    <Button variant="outline" size="sm" onClick={handleExportInventory} className="gap-1.5">
+                      <Download className="w-4 h-4" />
+                      تصدير CSV
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="max-h-96">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">المنتج</TableHead>
+                          <TableHead className="text-right">الفرع</TableHead>
+                          <TableHead className="text-center">الكمية الحالية</TableHead>
+                          <TableHead className="text-center">الحد الأدنى</TableHead>
+                          <TableHead className="text-center">الحالة</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invBalances.lowStock.map((item, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{item.product_name}</TableCell>
+                            <TableCell>{item.branch_name}</TableCell>
+                            <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
+                            <TableCell className="text-center">{item.min_quantity}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge
+                                variant="secondary"
+                                className={
+                                  item.quantity <= 0
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                                }
+                              >
+                                {item.quantity <= 0 ? 'نفد' : 'منخفض'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {invBalances.totalItems === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Package className="w-14 h-14 mb-4 opacity-40" />
+              <p className="text-lg">لا توجد بيانات مخزون</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ═══════════════════════ FINANCIAL TAB ═══════════════════════ */}
+        <TabsContent value="financial" className="space-y-4 mt-4">
+          <PeriodSelector />
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="الإيرادات"
+              value={formatCurrency(finData.totalRevenue)}
+              icon={ArrowUpRight}
+              color="text-emerald-600"
+              bgColor="bg-emerald-50 dark:bg-emerald-900/20"
+              index={0}
+            />
+            <StatCard
+              title="المصروفات"
+              value={formatCurrency(finData.totalExpenses)}
+              icon={ArrowDownRight}
+              color="text-red-600"
+              bgColor="bg-red-50 dark:bg-red-900/20"
+              index={1}
+            />
+            <StatCard
+              title={finData.netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+              value={formatCurrency(Math.abs(finData.netProfit))}
+              icon={finData.netProfit >= 0 ? TrendingUp : TrendingDown}
+              color={finData.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}
+              bgColor={finData.netProfit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'}
+              index={2}
+            />
+            <StatCard
+              title="المديونيات المستحقة"
+              value={formatCurrency(finData.outstandingDebts)}
+              icon={Wallet}
+              color="text-amber-600"
+              bgColor="bg-amber-50 dark:bg-amber-900/20"
+              index={3}
+            />
           </div>
+
+          {/* Revenue vs Expenses Bar Chart */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Card className="border-0 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">الإيرادات مقابل المصروفات</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        {
+                          name: finData.netProfit >= 0 ? 'ربح' : 'خسارة',
+                          الإيرادات: finData.totalRevenue,
+                          المصروفات: finData.totalExpenses,
+                        },
+                      ]}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={tooltipStyle} />
+                      <Legend />
+                      <Bar dataKey="الإيرادات" fill="#10b981" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="المصروفات" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Monthly Trend Line Chart */}
+          {finData.monthlyTrend.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">اتجاه الإيرادات والمصروفات الشهرية</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={finData.monthlyTrend} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={tooltipStyle} />
+                        <Legend />
+                        <Line type="monotone" dataKey="revenue" name="الإيرادات" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="expenses" name="المصروفات" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Cash Flow & Debts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Cash Flow */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+              <Card className="border-0 shadow-md h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">التدفقات النقدية</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+                      <span className="text-sm">المدفوعات المستلمة</span>
+                    </div>
+                    <span className="font-semibold text-emerald-600">{formatCurrency(finData.paymentsReceived)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
+                    <div className="flex items-center gap-2">
+                      <ArrowDownRight className="w-4 h-4 text-red-600" />
+                      <span className="text-sm">المصروفات المدفوعة</span>
+                    </div>
+                    <span className="font-semibold text-red-600">{formatCurrency(finData.expensesPaid)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">صافي التدفق النقدي</span>
+                    </div>
+                    <span className={`font-bold ${finData.cashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {formatCurrency(finData.cashFlow)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Branch Debts */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+              <Card className="border-0 shadow-md h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">مديونيات الفروع للمصنع</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {finData.finBranchDebts.length === 0 ? (
+                    <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                      لا توجد مديونيات
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {finData.finBranchDebts.map((d, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
+                          <div>
+                            <p className="font-medium">{d.branch_name}</p>
+                          </div>
+                          <span className="font-semibold text-red-600">{formatCurrency(d.remaining)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Customer Debts */}
+          {finData.customerDebts.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="pb-2 flex-row items-center justify-between">
+                  <CardTitle className="text-base">مديونيات العملاء</CardTitle>
+                  {canExport && (
+                    <Button variant="outline" size="sm" onClick={handleExportFinancial} className="gap-1.5">
+                      <Download className="w-4 h-4" />
+                      تصدير CSV
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="max-h-96">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">العميل</TableHead>
+                          <TableHead className="text-center">عدد الفواتير</TableHead>
+                          <TableHead className="text-right">المبلغ المستحق</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {finData.customerDebts.map((c, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{c.customer_name}</TableCell>
+                            <TableCell className="text-center">{c.invoice_count}</TableCell>
+                            <TableCell className="font-semibold text-red-600">{formatCurrency(c.total_unpaid)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {finData.totalRevenue === 0 && finData.totalExpenses === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Wallet className="w-14 h-14 mb-4 opacity-40" />
+              <p className="text-lg">لا توجد بيانات مالية للفترة المحددة</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ═══════════════════════ GENERAL TAB ═══════════════════════ */}
+        <TabsContent value="general" className="space-y-4 mt-4">
+          {/* Summary Dashboard */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="border-0 shadow-md bg-gradient-to-l from-primary to-emerald-700 text-primary-foreground">
+              <CardContent className="p-6">
+                <h2 className="text-lg font-bold mb-4">ملخص عام</h2>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-primary-foreground/70">إجمالي الإيرادات</p>
+                    <p className="text-2xl font-bold mt-1">{formatCurrency(generalData.totalRevenue)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-primary-foreground/70">إجمالي المصروفات</p>
+                    <p className="text-2xl font-bold mt-1">{formatCurrency(generalData.totalExpenseAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-primary-foreground/70">
+                      {generalData.netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+                    </p>
+                    <p className="text-2xl font-bold mt-1">{formatCurrency(Math.abs(generalData.netProfit))}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Activity Summary */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="border-0 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">ملخص النشاط</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <div className="text-center p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+                    <TrendingUp className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-emerald-600">{generalData.totalInvoices}</p>
+                    <p className="text-xs text-muted-foreground">فواتير</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-red-50 dark:bg-red-900/20">
+                    <TrendingDown className="w-6 h-6 text-red-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-red-600">{generalData.totalReturns}</p>
+                    <p className="text-xs text-muted-foreground">مرتجعات</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20">
+                    <Wallet className="w-6 h-6 text-blue-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-blue-600">{generalData.totalPayments}</p>
+                    <p className="text-xs text-muted-foreground">مدفوعات</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                    <ArrowDownRight className="w-6 h-6 text-amber-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-amber-600">{generalData.totalExpenses}</p>
+                    <p className="text-xs text-muted-foreground">مصروفات</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20">
+                    <ArrowUpDown className="w-6 h-6 text-purple-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-purple-600">{generalData.totalTransfers}</p>
+                    <p className="text-xs text-muted-foreground">تحويلات</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Branch Performance Table */}
+          {generalData.branchPerformance.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">أداء الفروع</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="max-h-96">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-right">الفرع</TableHead>
+                          <TableHead className="text-center">الفواتير</TableHead>
+                          <TableHead className="text-right">الإيرادات</TableHead>
+                          <TableHead className="text-right">المرتجعات</TableHead>
+                          <TableHead className="text-right">المصروفات</TableHead>
+                          <TableHead className="text-right">صافي</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {generalData.branchPerformance.map((b, i) => {
+                          const net = b.revenue - b.returns - b.expenses;
+                          return (
+                            <TableRow key={i}>
+                              <TableCell className="font-medium">{b.name}</TableCell>
+                              <TableCell className="text-center">{b.invoices}</TableCell>
+                              <TableCell className="text-emerald-600">{formatCurrency(b.revenue)}</TableCell>
+                              <TableCell className="text-red-600">{formatCurrency(b.returns)}</TableCell>
+                              <TableCell className="text-amber-600">{formatCurrency(b.expenses)}</TableCell>
+                              <TableCell className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {formatCurrency(net)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Top Products */}
+          {generalData.topProducts.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="pb-2 flex-row items-center justify-between">
+                  <CardTitle className="text-base">أكثر المنتجات مبيعاً</CardTitle>
+                  {canExport && (
+                    <Button variant="outline" size="sm" onClick={handleExportGeneral} className="gap-1.5">
+                      <Download className="w-4 h-4" />
+                      تصدير CSV
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right">#</TableHead>
+                        <TableHead className="text-right">المنتج</TableHead>
+                        <TableHead className="text-center">الكمية</TableHead>
+                        <TableHead className="text-right">الإجمالي</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {generalData.topProducts.map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-muted-foreground">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                              {i + 1}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+                          <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {generalData.totalInvoices === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <FileText className="w-14 h-14 mb-4 opacity-40" />
+              <p className="text-lg">لا توجد بيانات</p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

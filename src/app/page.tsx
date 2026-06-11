@@ -26,6 +26,10 @@ import ExpensesPage from '@/components/app/expenses-page';
 import ExpenseCategoriesPage from '@/components/app/expense-categories-page';
 import AccountingPage from '@/components/app/accounting-page';
 import CustomersPage from '@/components/app/customers-page';
+import ChartOfAccountsPage from '@/components/app/chart-of-accounts-page';
+import InventoryTransfersPage from '@/components/app/inventory-transfers-page';
+import InventoryCountsPage from '@/components/app/inventory-counts-page';
+import AccountingReportsPage from '@/components/app/accounting-reports-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo, forceChangePassword } = useAppStore();
@@ -91,6 +95,14 @@ export default function Home() {
         return <AccountingPage />;
       case 'customers':
         return <CustomersPage />;
+      case 'chart-of-accounts':
+        return <ChartOfAccountsPage />;
+      case 'inventory-transfers':
+        return <InventoryTransfersPage />;
+      case 'inventory-counts':
+        return <InventoryCountsPage />;
+      case 'accounting-reports':
+        return <AccountingReportsPage />;
       default:
         return <DashboardPage />;
     }
