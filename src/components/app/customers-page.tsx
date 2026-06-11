@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import { formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import type { Customer } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,6 +86,78 @@ export default function CustomersPage() {
   // Toggle active confirmation
   const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
   const [togglingCustomer, setTogglingCustomer] = useState<Customer | null>(null);
+
+  // Customer account statement
+  const [statementDialogOpen, setStatementDialogOpen] = useState(false);
+  const [statementCustomer, setStatementCustomer] = useState<Customer | null>(null);
+  const [statementData, setStatementData] = useState<{
+    invoices: any[];
+    payments: any[];
+    returns: any[];
+    totalInvoiced: number;
+    totalPaid: number;
+    totalReturned: number;
+    balance: number;
+  }>({ invoices: [], payments: [], returns: [], totalInvoiced: 0, totalPaid: 0, totalReturned: 0, balance: 0 });
+  const [loadingStatement, setLoadingStatement] = useState(false);
+
+  const openStatement = async (customer: Customer) => {
+    setStatementCustomer(customer);
+    setStatementDialogOpen(true);
+    setLoadingStatement(true);
+    try {
+      // Load invoices for this customer
+      const { data: invoices } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, invoice_date, total, status, branches(name)')
+        .eq('customer_id', customer.id)
+        .order('invoice_date', { ascending: false });
+
+      // Load payments related to this customer's invoices
+      // Since payments table doesn't have customer_id, we need to get invoice IDs first
+      const invoiceIds = (invoices || []).map((inv: any) => inv.id);
+
+      let payments: any[] = [];
+      if (invoiceIds.length > 0) {
+        const { data: payData } = await supabase
+          .from('payments')
+          .select('id, payment_number, payment_date, amount, payment_method, branch_id, branches(name)')
+          .in('branch_id', (invoices || []).map((inv: any) => inv.branch_id))
+          .order('payment_date', { ascending: false });
+        payments = payData || [];
+      }
+
+      // Load returns for this customer's invoices
+      let returns: any[] = [];
+      if (invoiceIds.length > 0) {
+        const { data: retData } = await supabase
+          .from('returns')
+          .select('id, return_number, return_date, total, branches(name)')
+          .in('original_invoice_id', invoiceIds)
+          .order('return_date', { ascending: false });
+        returns = retData || [];
+      }
+
+      const totalInvoiced = (invoices || []).filter((inv: any) => inv.status === 'active' || inv.status === 'partially_returned').reduce((s: number, inv: any) => s + Number(inv.total), 0);
+      const totalReturned = (returns || []).reduce((s: number, r: any) => s + Number(r.total), 0);
+      const totalPaid = payments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+
+      setStatementData({
+        invoices: invoices || [],
+        payments,
+        returns,
+        totalInvoiced,
+        totalPaid,
+        totalReturned,
+        balance: totalInvoiced - totalPaid - totalReturned,
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء تحميل كشف الحساب');
+    } finally {
+      setLoadingStatement(false);
+    }
+  };
 
   const canView = isAdmin || hasPermission('customers', 'view');
   const canCreate = isAdmin || hasPermission('customers', 'create');
@@ -425,6 +497,15 @@ export default function CustomersPage() {
                                 {c.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openStatement(c)}
+                              title="كشف حساب"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -548,6 +629,124 @@ export default function CustomersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Customer Account Statement Dialog */}
+      <Dialog open={statementDialogOpen} onOpenChange={setStatementDialogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              كشف حساب: {statementCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+            {loadingStatement ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-6 py-4">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">إجمالي الفواتير</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(statementData.totalInvoiced)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-600 dark:text-blue-400">إجمالي المدفوعات</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{formatCurrency(statementData.totalPaid)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                    <p className="text-xs text-red-600 dark:text-red-400">إجمالي المرتجعات</p>
+                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{formatCurrency(statementData.totalReturned)}</p>
+                  </div>
+                  <div className={`p-3 rounded-lg border ${statementData.balance > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'}`}>
+                    <p className={`text-xs ${statementData.balance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>الرصيد المتبقي</p>
+                    <p className={`text-lg font-bold ${statementData.balance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>{formatCurrency(statementData.balance)}</p>
+                  </div>
+                </div>
+
+                {/* Invoices */}
+                {statementData.invoices.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">الفواتير ({statementData.invoices.length})</h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-right text-xs">رقم الفاتورة</TableHead>
+                            <TableHead className="text-right text-xs">الفرع</TableHead>
+                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+                            <TableHead className="text-center text-xs">الحالة</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statementData.invoices.map((inv: any) => (
+                            <TableRow key={inv.id}>
+                              <TableCell className="font-medium text-xs">{inv.invoice_number}</TableCell>
+                              <TableCell className="text-xs">{inv.branches?.name || '—'}</TableCell>
+                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(inv.invoice_date)}</TableCell>
+                              <TableCell className="font-semibold text-xs">{formatCurrency(Number(inv.total))}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="secondary" className={`text-[9px] ${
+                                  inv.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                                  inv.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  inv.status === 'fully_returned' ? 'bg-gray-100 text-gray-800' :
+                                  'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {inv.status === 'active' ? 'نشطة' :
+                                   inv.status === 'cancelled' ? 'ملغاة' :
+                                   inv.status === 'fully_returned' ? 'مرتجعة' : 'مرتجع جزئياً'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Returns */}
+                {statementData.returns.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">المرتجعات ({statementData.returns.length})</h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-right text-xs">رقم المرتجع</TableHead>
+                            <TableHead className="text-right text-xs hidden sm:table-cell">الفرع</TableHead>
+                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statementData.returns.map((ret: any) => (
+                            <TableRow key={ret.id}>
+                              <TableCell className="font-medium text-xs">{ret.return_number}</TableCell>
+                              <TableCell className="text-xs hidden sm:table-cell">{ret.branches?.name || '—'}</TableCell>
+                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(ret.return_date)}</TableCell>
+                              <TableCell className="font-semibold text-xs text-red-600">{formatCurrency(Number(ret.total))}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {statementData.invoices.length === 0 && statementData.returns.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    لا توجد حركات لهذا العميل
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -40,6 +40,7 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [branchName, setBranchName] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Cancel dialog
@@ -84,6 +85,16 @@ export default function InvoiceDetailPage() {
         .eq('id', inv.branch_id)
         .single();
       if (branch) setBranchName(branch.name);
+
+      // Load customer name
+      if ((inv as any).customer_id) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('name')
+          .eq('id', (inv as any).customer_id)
+          .single();
+        if (customer) setCustomerName(customer.name);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -98,6 +109,7 @@ export default function InvoiceDetailPage() {
       invoice,
       items,
       branchName,
+      customerName,
       settings,
       userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
     });
@@ -124,6 +136,7 @@ export default function InvoiceDetailPage() {
       invoice,
       items,
       branchName,
+      customerName,
       settings,
       userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
     });
@@ -156,6 +169,7 @@ export default function InvoiceDetailPage() {
         invoice,
         items,
         branchName,
+        customerName,
         settings,
         userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
       });
@@ -392,10 +406,14 @@ export default function InvoiceDetailPage() {
           <div className="h-[3px] bg-gradient-to-l from-[#0D7C66] via-[#D4A843] to-[#0D7C66] mx-1 mt-4 rounded-full" />
 
           {/* === INVOICE INFO (NO STATUS - status only shown in UI, not on printed invoice) === */}
-          <div className="grid grid-cols-3 gap-0 border border-gray-200 rounded-lg overflow-hidden mx-1 mt-4">
+          <div className="grid grid-cols-4 gap-0 border border-gray-200 rounded-lg overflow-hidden mx-1 mt-4">
             <div className="px-4 py-3 border-l border-gray-200">
               <div className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">الفرع</div>
               <div className="text-[13px] font-semibold text-gray-800">{branchName}</div>
+            </div>
+            <div className="px-4 py-3 border-l border-gray-200">
+              <div className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">العميل</div>
+              <div className="text-[13px] font-semibold text-gray-800">{customerName || '—'}</div>
             </div>
             <div className="px-4 py-3 border-l border-gray-200">
               <div className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">المستلم</div>

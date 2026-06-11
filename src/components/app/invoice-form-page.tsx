@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import type { Branch, Invoice, InvoiceItem, InvoiceFormItem, Product } from '@/lib/types';
+import type { Branch, Customer, Invoice, InvoiceItem, InvoiceFormItem, Product } from '@/lib/types';
 import { formatCurrency, generateInvoiceNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ export default function InvoiceFormPage() {
   const id = pageParams.id;
 
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -56,6 +57,7 @@ export default function InvoiceFormPage() {
 
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [customerId, setCustomerId] = useState<string>('');
   const [invoiceDate, setInvoiceDate] = useState(getTodayISO());
   const [invoiceTime, setInvoiceTime] = useState(() => {
     const now = new Date();
@@ -86,6 +88,7 @@ export default function InvoiceFormPage() {
 
   // Wrapper for state setters that also marks form as changed
   const setBranchIdChanged = (v: string) => { setBranchId(v); markChanged(); };
+  const setCustomerIdChanged = (v: string) => { setCustomerId(v === 'none' ? '' : v); markChanged(); };
   const setInvoiceDateChanged = (v: string) => { setInvoiceDate(v); markChanged(); };
   const setInvoiceTimeChanged = (v: string) => { setInvoiceTime(v); markChanged(); };
   const setReceiverNameChanged = (v: string) => { setReceiverName(v); markChanged(); };
@@ -107,6 +110,7 @@ export default function InvoiceFormPage() {
 
   useEffect(() => {
     loadBranches();
+    loadCustomers();
     loadProducts();
     // Auto-select branch for non-admin users
     if (!isAdmin && user?.branch_id) {
@@ -147,6 +151,15 @@ export default function InvoiceFormPage() {
       .eq('is_active', true)
       .order('name');
     if (data) setProducts(data as Product[]);
+  };
+
+  const loadCustomers = async () => {
+    const { data } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    if (data) setCustomers(data as Customer[]);
   };
 
   const generateNewInvoiceNumber = async () => {
@@ -193,6 +206,7 @@ export default function InvoiceFormPage() {
 
       setInvoiceNumber(invoice.invoice_number);
       setBranchId(invoice.branch_id);
+      setCustomerId((invoice as any).customer_id || '');
       setInvoiceDate(invoice.invoice_date);
       setInvoiceTime(invoice.invoice_time || '');
       setReceiverName(invoice.receiver_name || '');
@@ -244,6 +258,7 @@ export default function InvoiceFormPage() {
       // Pre-fill form with source invoice data (new number, today's date/time)
       generateNewInvoiceNumber();
       setBranchId(source.branch_id);
+      setCustomerId((source as any).customer_id || '');
       setInvoiceDate(getTodayISO());
       setInvoiceTime(() => {
         const now = new Date();
@@ -327,6 +342,7 @@ export default function InvoiceFormPage() {
       const updated = [...prev];
       const item = { ...updated[index] };
       item.item_name = product.name;
+      (item as any).product_id = product.id;
       item.unit_price = product.unit_price;
       if (product.unit_count > 1) {
         item.unit_count = product.unit_count;
@@ -390,6 +406,7 @@ export default function InvoiceFormPage() {
           .from('invoices')
           .update({
             branch_id: branchId,
+            customer_id: customerId || null,
             invoice_date: invoiceDate,
             invoice_time: invoiceTime || null,
             receiver_name: receiverName || null,
@@ -410,6 +427,7 @@ export default function InvoiceFormPage() {
         const itemsData = items.map((item) => ({
           invoice_id: id,
           item_name: item.item_name,
+          product_id: (item as any).product_id || null,
           quantity: item.quantity,
           unit_count: item.unit_count,
           unit_price: item.unit_price,
@@ -418,6 +436,44 @@ export default function InvoiceFormPage() {
         const { error: itemsError } = await supabase.from('invoice_items').insert(itemsData);
         if (itemsError) throw itemsError;
 
+        // ===== ربط المخزون بالفواتير: خصم من المخزون =====
+        for (const item of items) {
+          const productId = (item as any).product_id;
+          if (!productId) continue;
+          const totalPieces = item.quantity * item.unit_count;
+
+          // Check if inventory record exists for this product+branch
+          const { data: invRecord } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('product_id', productId)
+            .eq('branch_id', branchId)
+            .single();
+
+          if (invRecord) {
+            const newQty = invRecord.quantity - totalPieces;
+            await supabase
+              .from('inventory')
+              .update({
+                quantity: Math.max(0, newQty),
+                last_updated: new Date().toISOString(),
+              })
+              .eq('id', invRecord.id);
+          }
+
+          // Log inventory transaction
+          await supabase.from('inventory_transactions').insert({
+            product_id: productId,
+            branch_id: branchId,
+            transaction_type: 'out',
+            quantity: -totalPieces,
+            reference_type: 'invoice',
+            reference_id: id,
+            notes: `فاتورة صرف: ${invoiceNumber}`,
+            created_by: user?.id || null,
+          });
+        }
+
         toast.success('تم تحديث الفاتورة بنجاح');
       } else {
         const { data: invData, error: invError } = await supabase
@@ -425,6 +481,7 @@ export default function InvoiceFormPage() {
           .insert({
             invoice_number: invoiceNumber,
             branch_id: branchId,
+            customer_id: customerId || null,
             invoice_date: invoiceDate,
             invoice_time: invoiceTime || null,
             receiver_name: receiverName || null,
@@ -444,6 +501,7 @@ export default function InvoiceFormPage() {
         const itemsData = items.map((item) => ({
           invoice_id: invData.id,
           item_name: item.item_name,
+          product_id: (item as any).product_id || null,
           quantity: item.quantity,
           unit_count: item.unit_count,
           unit_price: item.unit_price,
@@ -451,6 +509,42 @@ export default function InvoiceFormPage() {
         }));
         const { error: itemsError } = await supabase.from('invoice_items').insert(itemsData);
         if (itemsError) throw itemsError;
+
+        // ===== ربط المخزون بالفواتير: خصم من المخزون =====
+        for (const item of items) {
+          const productId = (item as any).product_id;
+          if (!productId) continue;
+          const totalPieces = item.quantity * item.unit_count;
+
+          const { data: invRecord } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('product_id', productId)
+            .eq('branch_id', branchId)
+            .single();
+
+          if (invRecord) {
+            const newQty = invRecord.quantity - totalPieces;
+            await supabase
+              .from('inventory')
+              .update({
+                quantity: Math.max(0, newQty),
+                last_updated: new Date().toISOString(),
+              })
+              .eq('id', invRecord.id);
+          }
+
+          await supabase.from('inventory_transactions').insert({
+            product_id: productId,
+            branch_id: branchId,
+            transaction_type: 'out',
+            quantity: -totalPieces,
+            reference_type: 'invoice',
+            reference_id: invData.id,
+            notes: `فاتورة صرف: ${invoiceNumber}`,
+            created_by: user?.id || null,
+          });
+        }
 
         toast.success('تم حفظ الفاتورة بنجاح');
         setHasChanges(false);
@@ -563,7 +657,7 @@ export default function InvoiceFormPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <Label>رقم الفاتورة</Label>
                 <Input value={invoiceNumber} disabled className="bg-muted" />
@@ -578,6 +672,22 @@ export default function InvoiceFormPage() {
                     {branches.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
                         {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>العميل</Label>
+                <Select value={customerId || 'none'} onValueChange={setCustomerIdChanged}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر العميل (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">بدون عميل</SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}{customer.phone ? ` - ${customer.phone}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

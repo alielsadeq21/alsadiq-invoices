@@ -224,15 +224,27 @@ export default function ReturnsPage() {
 
       if (error) throw error;
 
-      // Insert return items with unit_count
-      const itemsData = checkedItems.map((item) => ({
-        return_id: retData.id,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        unit_count: item.unit_count,
-        unit_price: item.unit_price,
-        total_price: item.total_price,
-      }));
+      // Insert return items with unit_count and product_id
+      const itemsData: any[] = [];
+      for (const item of checkedItems) {
+        const { data: origItem } = await supabase
+          .from('invoice_items')
+          .select('product_id')
+          .eq('invoice_id', selectedInvoiceId)
+          .eq('item_name', item.item_name)
+          .limit(1)
+          .single();
+
+        itemsData.push({
+          return_id: retData.id,
+          item_name: item.item_name,
+          product_id: origItem?.product_id || null,
+          quantity: item.quantity,
+          unit_count: item.unit_count,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+        });
+      }
       await supabase.from('return_items').insert(itemsData);
 
       // Log activity
@@ -252,6 +264,50 @@ export default function ReturnsPage() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', selectedInvoiceId);
+
+      // ===== ربط المخزون بالمرتجعات: إرجاع للمخزون =====
+      for (const retItem of checkedItems) {
+        // Try to find product_id from original invoice items
+        const { data: origItem } = await supabase
+          .from('invoice_items')
+          .select('product_id')
+          .eq('invoice_id', selectedInvoiceId)
+          .eq('item_name', retItem.item_name)
+          .limit(1)
+          .single();
+
+        const productId = origItem?.product_id;
+        if (!productId) continue;
+        const totalPieces = retItem.quantity * retItem.unit_count;
+
+        const { data: invRecord } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('branch_id', returnBranchId)
+          .single();
+
+        if (invRecord) {
+          await supabase
+            .from('inventory')
+            .update({
+              quantity: invRecord.quantity + totalPieces,
+              last_updated: new Date().toISOString(),
+            })
+            .eq('id', invRecord.id);
+        }
+
+        await supabase.from('inventory_transactions').insert({
+          product_id: productId,
+          branch_id: returnBranchId,
+          transaction_type: 'in',
+          quantity: totalPieces,
+          reference_type: 'return',
+          reference_id: retData.id,
+          notes: `مرتجع من فاتورة: ${returnNumber}`,
+          created_by: user?.id || null,
+        });
+      }
 
       toast.success('تم إنشاء المرتجع بنجاح');
       setDialogOpen(false);

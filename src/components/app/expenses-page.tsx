@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Expense, ExpenseCategory, Branch, PaymentMethod } from '@/lib/types';
-import { formatCurrency, formatDate, generateExpenseNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
+import { formatCurrency, formatDate, generateExpenseNumber, generateJournalEntryNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -330,7 +330,77 @@ export default function ExpensesPage() {
           details: { expense_number: formData.expense_number, amount: Number(formData.amount), branch_id: formData.branch_id },
         });
 
-        toast.success('تم تسجيل المصروف بنجاح');
+        // ===== ربط المصروفات بالقيود المحاسبية: إنشاء قيد تلقائي =====
+        try {
+          const year = getCurrentYear();
+          const { data: lastEntry } = await supabase
+            .from('journal_entries')
+            .select('entry_number')
+            .like('entry_number', `JE-${year}-%`)
+            .order('entry_number', { ascending: false })
+            .limit(1);
+
+          let lastNum = 0;
+          if (lastEntry && lastEntry.length > 0) {
+            const parts = lastEntry[0].entry_number.split('-');
+            lastNum = parseInt(parts[parts.length - 1]) || 0;
+          }
+
+          const categoryName = categories.find(c => c.id === formData.category_id)?.name || 'مصروفات عامة';
+          const entryNumber = generateJournalEntryNumber(lastNum, year);
+          const amount = Number(formData.amount);
+
+          // Create journal entry: debit the expense account, credit the cash/bank account
+          const { data: newEntry, error: jeError } = await supabase
+            .from('journal_entries')
+            .insert({
+              entry_number: entryNumber,
+              entry_date: formData.expense_date,
+              description: `قيد مصروف: ${formData.description} (${categoryName})`,
+              total_debit: amount,
+              total_credit: amount,
+              is_posted: true,
+              notes: `قيد تلقائي من مصروف رقم ${formData.expense_number}`,
+              created_by: user?.id || null,
+            })
+            .select('id')
+            .single();
+
+          if (!jeError && newEntry) {
+            // Create journal entry lines
+            const methodLabel = formData.payment_method === 'cash' ? 'الصندوق' :
+                              formData.payment_method === 'bank_transfer' ? 'البنك' : 'الشيكات';
+            await supabase.from('journal_entry_lines').insert([
+              {
+                journal_entry_id: newEntry.id,
+                account_name: categoryName,
+                debit: amount,
+                credit: 0,
+                description: formData.description,
+              },
+              {
+                journal_entry_id: newEntry.id,
+                account_name: methodLabel,
+                debit: 0,
+                credit: amount,
+                description: `مقابل مصروف: ${formData.description}`,
+              },
+            ]);
+
+            // Link expense to journal entry
+            await supabase
+              .from('expenses')
+              .update({ journal_entry_id: newEntry.id })
+              .eq('id', (await supabase.from('expenses').select('id').eq('expense_number', formData.expense_number).single()).data?.id);
+
+            toast.success('تم تسجيل المصروف وإنشاء القيد المحاسبي تلقائياً');
+          } else {
+            toast.success('تم تسجيل المصروف (لم يتم إنشاء قيد محاسبي)');
+          }
+        } catch (jeErr) {
+          console.error('Journal entry error:', jeErr);
+          toast.success('تم تسجيل المصروف (خطأ في إنشاء القيد المحاسبي)');
+        }
       }
 
       setDialogOpen(false);

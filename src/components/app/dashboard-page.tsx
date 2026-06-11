@@ -16,6 +16,8 @@ import {
   Plus,
   ArrowUpLeft,
   Activity,
+  Receipt,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart,
@@ -44,6 +46,8 @@ export default function DashboardPage() {
   const [branchSpending, setBranchSpending] = useState<BranchSpending[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [topItems, setTopItems] = useState<{ name: string; count: number; total: number }[]>([]);
+  const [todayExpenses, setTodayExpenses] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const userBranchId = user?.branch_id || null;
@@ -99,8 +103,29 @@ export default function DashboardPage() {
         netSpending: todayTotal - todayReturnsTotal,
       });
 
+      // Today's expenses
+      let todayExpensesQuery = supabase
+        .from('expenses')
+        .select('amount')
+        .eq('expense_date', today);
+      if (userBranchId && !isAdmin) todayExpensesQuery = todayExpensesQuery.eq('branch_id', userBranchId);
+      const { data: todayExpensesData } = await todayExpensesQuery;
+      const todayExpTotal = (todayExpensesData || []).reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+      setTodayExpenses(todayExpTotal);
+
+      // Low stock count
+      const { data: allInventory } = await supabase
+        .from('inventory')
+        .select('quantity, min_quantity, branch_id');
+      let relevantInv: any[] = allInventory || [];
+      if (userBranchId && !isAdmin) {
+        relevantInv = relevantInv.filter((item: any) => item.branch_id === userBranchId);
+      }
+      const lowStock = relevantInv.filter((item: any) => Number(item.quantity) <= Number(item.min_quantity || 0)).length;
+      setLowStockCount(lowStock);
+
       // Monthly chart data (last 6 months)
-      const monthlyPromises: Promise<{ month: string; total: number; returns: number; net: number }>[] = [];
+      const monthlyPromises: Promise<{ month: string; total: number; returns: number; expenses: number; net: number }>[] = [];
       for (let i = 5; i >= 0; i--) {
         const date = subMonths(new Date(), i);
         const monthStart = startOfMonth(date).toISOString().split('T')[0];
@@ -128,13 +153,24 @@ export default function DashboardPage() {
               if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
               return q;
             })(),
-          ]).then(([invRes, retRes]) => {
+            (() => {
+              let q = supabase
+                .from('expenses')
+                .select('amount')
+                .gte('expense_date', monthStart)
+                .lte('expense_date', monthEnd);
+              if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
+              return q;
+            })(),
+          ]).then(([invRes, retRes, expRes]) => {
             const total = (invRes.data || []).reduce((s, i) => s + Number(i.total), 0);
             const returns = (retRes.data || []).reduce((s, r) => s + Number(r.total), 0);
+            const expenses = (expRes.data || []).reduce((s: number, e: any) => s + Number(e.amount), 0);
             return {
               month: monthLabel,
               total,
               returns,
+              expenses,
               net: total - returns,
             };
           })
@@ -240,6 +276,20 @@ export default function DashboardPage() {
       color: 'text-blue-600 dark:text-blue-400',
       bg: 'bg-blue-50 dark:bg-blue-900/20',
     },
+    {
+      title: 'مصروفات اليوم',
+      value: formatCurrency(todayExpenses),
+      icon: Receipt,
+      color: 'text-purple-600 dark:text-purple-400',
+      bg: 'bg-purple-50 dark:bg-purple-900/20',
+    },
+    {
+      title: 'مخزون منخفض',
+      value: lowStockCount,
+      icon: AlertTriangle,
+      color: 'text-orange-600 dark:text-orange-400',
+      bg: 'bg-orange-50 dark:bg-orange-900/20',
+    },
   ];
 
   if (loading) {
@@ -247,8 +297,8 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-pulse space-y-4 w-full max-w-4xl">
           <div className="h-8 bg-muted rounded w-48" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="h-32 bg-muted rounded-xl" />
             ))}
           </div>
@@ -280,7 +330,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {statCards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -367,6 +417,7 @@ export default function DashboardPage() {
                     <Legend />
                     <Bar dataKey="total" name="الصرف" fill="oklch(0.52 0.11 172)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="returns" name="المرتجعات" fill="oklch(0.65 0.2 25)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" name="المصروفات" fill="oklch(0.55 0.2 300)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

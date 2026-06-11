@@ -91,7 +91,7 @@ export default function InvoicesPage() {
     try {
       let query = supabase
         .from('invoices')
-        .select('*, branches(name)', { count: 'exact' })
+        .select('*, branches(name), customers(name)', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (search) {
@@ -242,10 +242,22 @@ export default function InvoicesPage() {
 
       const { settings } = useAppStore.getState();
 
+      // Load customer name if invoice has customer_id
+      let quickCustomerName = '';
+      if ((invoice as any).customer_id) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('name')
+          .eq('id', (invoice as any).customer_id)
+          .single();
+        if (customer) quickCustomerName = customer.name;
+      }
+
       const docData = {
         invoice,
         items: items || [],
         branchName: branch?.name || '',
+        customerName: quickCustomerName,
         settings,
         userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
       };
@@ -392,6 +404,7 @@ export default function InvoicesPage() {
                     <TableRow>
                       <TableHead className="text-right">رقم الفاتورة</TableHead>
                       <TableHead className="text-right hidden sm:table-cell">الفرع</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">العميل</TableHead>
                       <TableHead className="text-right hidden md:table-cell">التاريخ</TableHead>
                       <TableHead className="text-right">الإجمالي</TableHead>
                       <TableHead className="text-center">الحالة</TableHead>
@@ -405,6 +418,9 @@ export default function InvoicesPage() {
                         <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                         <TableCell className="hidden sm:table-cell">
                           {(invoice as { branches?: { name: string } }).branches?.name || '—'}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {(invoice as any).customers?.name || '—'}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{formatDate(invoice.invoice_date)}</TableCell>
                         <TableCell className="font-semibold">{formatCurrency(invoice.total)}</TableCell>

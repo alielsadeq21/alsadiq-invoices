@@ -90,6 +90,7 @@ export interface Invoice {
   id: string;
   invoice_number: string;
   branch_id: string;
+  customer_id: string | null;
   invoice_date: string;
   invoice_time: string | null;
   receiver_name: string | null;
@@ -106,12 +107,14 @@ export interface Invoice {
   updated_at: string;
   branch?: Branch;
   items?: InvoiceItem[];
+  customers?: { name: string; phone: string | null } | null;
 }
 
 export interface InvoiceItem {
   id: string;
   invoice_id: string;
   item_name: string;
+  product_id: string | null;
   quantity: number;
   unit_count: number;
   unit_price: number;
@@ -138,6 +141,7 @@ export interface ReturnItem {
   id: string;
   return_id: string;
   item_name: string;
+  product_id: string | null;
   quantity: number;
   unit_count: number;
   unit_price: number;
@@ -212,6 +216,7 @@ export interface MonthlyData {
   month: string;
   total: number;
   returns: number;
+  expenses: number;
   net: number;
 }
 
@@ -264,6 +269,7 @@ export interface Expense {
   payment_method: string;
   notes: string | null;
   created_by: string | null;
+  journal_entry_id: string | null;
   created_at: string;
   updated_at: string;
   branches?: Branch;

@@ -11,6 +11,7 @@ interface InvoiceDocumentData {
   invoice: Invoice;
   items: InvoiceItem[];
   branchName: string;
+  customerName?: string;
   settings: Settings | null;
   userFullName: string;
 }
@@ -674,7 +675,7 @@ function getInvoiceCSS(showUnitCount: boolean): string {
 }
 
 export function generateInvoiceDocument(data: InvoiceDocumentData): string {
-  const { invoice, items, branchName, settings, userFullName } = data;
+  const { invoice, items, branchName, customerName, settings, userFullName } = data;
 
   const invoiceTime = formatTime(invoice.invoice_time);
   const factoryName = settings?.factory_name || 'مصنع الصادق';
@@ -765,10 +766,14 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
     <div class="gold-divider"></div>
 
     <!-- INVOICE INFO (No status - only shown in app UI, not on printed invoice) -->
-    <div class="inv-info-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="inv-info-grid" style="grid-template-columns: repeat(4, 1fr);">
       <div class="inv-info-cell">
         <div class="label">الفرع</div>
         <div class="value">${branchName}</div>
+      </div>
+      <div class="inv-info-cell">
+        <div class="label">العميل</div>
+        <div class="value">${customerName || '—'}</div>
       </div>
       <div class="inv-info-cell">
         <div class="label">المستلم</div>
@@ -876,7 +881,7 @@ export function extractInvoiceParts(htmlDoc: string): { css: string; body: strin
  * Features: brand header, items table, decorative separators, signatures.
  */
 export function generateThermalDocument(data: InvoiceDocumentData): string {
-  const { invoice, items, branchName, settings, userFullName } = data;
+  const { invoice, items, branchName, customerName, settings, userFullName } = data;
 
   const invoiceTime = formatTime(invoice.invoice_time);
   const factoryName = settings?.factory_name || 'مصنع الصادق';
@@ -1569,6 +1574,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
         <td class="r-info-label">الفرع</td>
         <td class="r-info-value">${branchName}</td>
       </tr>
+      ${customerName ? `<tr><td class="r-info-label">العميل</td><td class="r-info-value">${customerName}</td></tr>` : ''}
       ${invoice.receiver_name ? `<tr><td class="r-info-label">المستلم</td><td class="r-info-value">${invoice.receiver_name}</td></tr>` : ''}
       ${invoice.driver_name ? `<tr><td class="r-info-label">السائق</td><td class="r-info-value">${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</td></tr>` : ''}
     </table>
