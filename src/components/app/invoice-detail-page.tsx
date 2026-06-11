@@ -33,7 +33,7 @@ import {
 import { toast } from 'sonner';
 
 export default function InvoiceDetailPage() {
-  const { navigateTo, pageParams, settings } = useAppStore();
+  const { navigateTo, pageParams, settings, hasPermission } = useAppStore();
   const invoiceId = pageParams.id;
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -298,34 +298,42 @@ export default function InvoiceDetailPage() {
           </Badge>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handlePrint} className="gap-2">
-            <Printer className="w-4 h-4" />
-            طباعة A4
-          </Button>
-          <Button variant="outline" onClick={handlePrintThermal} className="gap-2">
-            <Receipt className="w-4 h-4" />
-            حرارية
-          </Button>
-          <Button variant="outline" onClick={handleExportPDF} className="gap-2">
-            <Download className="w-4 h-4" />
-            PDF
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigateTo('invoice-form', { duplicate: invoice.id })}
-            className="gap-2"
-          >
-            <Copy className="w-4 h-4" />
-            تكرار
-          </Button>
+          {hasPermission('invoices', 'print') && (
+            <Button variant="outline" onClick={handlePrint} className="gap-2">
+              <Printer className="w-4 h-4" />
+              طباعة A4
+            </Button>
+          )}
+          {hasPermission('invoices', 'print') && (
+            <Button variant="outline" onClick={handlePrintThermal} className="gap-2">
+              <Receipt className="w-4 h-4" />
+              حرارية
+            </Button>
+          )}
+          {hasPermission('invoices', 'export') && (
+            <Button variant="outline" onClick={handleExportPDF} className="gap-2">
+              <Download className="w-4 h-4" />
+              PDF
+            </Button>
+          )}
+          {hasPermission('invoices', 'create') && (
+            <Button
+              variant="outline"
+              onClick={() => navigateTo('invoice-form', { duplicate: invoice.id })}
+              className="gap-2"
+            >
+              <Copy className="w-4 h-4" />
+              تكرار
+            </Button>
+          )}
           {/* Locked indicator for finalized invoices */}
-          {isActive && (
+          {isActive && !hasPermission('invoices', 'delete') && (
             <div className="flex items-center gap-1 text-sm text-muted-foreground px-2">
               <Lock className="w-3.5 h-3.5" />
               <span>فاتورة نهائية</span>
             </div>
           )}
-          {canCancel && (
+          {canCancel && hasPermission('invoices', 'delete') && (
             <Button
               variant="destructive"
               onClick={() => setCancelDialogOpen(true)}

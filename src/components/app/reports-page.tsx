@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,7 @@ import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 export default function ReportsPage() {
+  const { user, isAdmin, hasPermission } = useAppStore();
   const [activeTab, setActiveTab] = useState('daily');
 
   // Daily report
@@ -65,6 +67,9 @@ export default function ReportsPage() {
   const [branchMonth, setBranchMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [branchData, setBranchData] = useState<any[]>([]);
 
+  // Permission checks
+  const canExport = hasPermission('reports', 'export');
+
   useEffect(() => {
     loadDailyReport();
   }, [dailyDate]);
@@ -79,16 +84,30 @@ export default function ReportsPage() {
 
   const loadDailyReport = async () => {
     try {
-      const { data: invoices } = await supabase
+      let invoiceQuery = supabase
         .from('invoices')
         .select('*, branches(name), items:invoice_items(*)')
         .eq('invoice_date', dailyDate)
         .eq('status', 'active');
 
-      const { data: returns } = await supabase
+      // Filter by branch for non-admin users
+      if (!isAdmin && user?.branch_id) {
+        invoiceQuery = invoiceQuery.eq('branch_id', user.branch_id);
+      }
+
+      const { data: invoices } = await invoiceQuery;
+
+      let returnQuery = supabase
         .from('returns')
         .select('total')
         .eq('return_date', dailyDate);
+
+      // Filter returns by branch for non-admin users
+      if (!isAdmin && user?.branch_id) {
+        returnQuery = returnQuery.eq('branch_id', user.branch_id);
+      }
+
+      const { data: returns } = await returnQuery;
 
       const totalSpending = (invoices || []).reduce((s, i) => s + Number(i.total), 0);
       const totalReturns = (returns || []).reduce((s, r) => s + Number(r.total), 0);
@@ -112,18 +131,30 @@ export default function ReportsPage() {
       const monthStart = startOfMonth(monthDate).toISOString().split('T')[0];
       const monthEnd = endOfMonth(monthDate).toISOString().split('T')[0];
 
-      const { data: invoices } = await supabase
+      let invoiceQuery = supabase
         .from('invoices')
         .select('total, invoice_date')
         .gte('invoice_date', monthStart)
         .lte('invoice_date', monthEnd)
         .eq('status', 'active');
 
-      const { data: returns } = await supabase
+      if (!isAdmin && user?.branch_id) {
+        invoiceQuery = invoiceQuery.eq('branch_id', user.branch_id);
+      }
+
+      const { data: invoices } = await invoiceQuery;
+
+      let returnQuery = supabase
         .from('returns')
         .select('total')
         .gte('return_date', monthStart)
         .lte('return_date', monthEnd);
+
+      if (!isAdmin && user?.branch_id) {
+        returnQuery = returnQuery.eq('branch_id', user.branch_id);
+      }
+
+      const { data: returns } = await returnQuery;
 
       const totalSpending = (invoices || []).reduce((s, i) => s + Number(i.total), 0);
       const totalReturns = (returns || []).reduce((s, r) => s + Number(r.total), 0);
@@ -133,12 +164,18 @@ export default function ReportsPage() {
       const prevStart = startOfMonth(prevMonth).toISOString().split('T')[0];
       const prevEnd = endOfMonth(prevMonth).toISOString().split('T')[0];
 
-      const { data: prevInvoices } = await supabase
+      let prevInvoiceQuery = supabase
         .from('invoices')
         .select('total')
         .gte('invoice_date', prevStart)
         .lte('invoice_date', prevEnd)
         .eq('status', 'active');
+
+      if (!isAdmin && user?.branch_id) {
+        prevInvoiceQuery = prevInvoiceQuery.eq('branch_id', user.branch_id);
+      }
+
+      const { data: prevInvoices } = await prevInvoiceQuery;
 
       const prevTotal = (prevInvoices || []).reduce((s, i) => s + Number(i.total), 0);
       const change = prevTotal > 0 ? ((totalSpending - prevTotal) / prevTotal) * 100 : 0;
@@ -181,12 +218,19 @@ export default function ReportsPage() {
       const monthStart = startOfMonth(monthDate).toISOString().split('T')[0];
       const monthEnd = endOfMonth(monthDate).toISOString().split('T')[0];
 
-      const { data: invoices } = await supabase
+      let invoiceQuery = supabase
         .from('invoices')
         .select('branch_id, total, branches(name)')
         .gte('invoice_date', monthStart)
         .lte('invoice_date', monthEnd)
         .eq('status', 'active');
+
+      // For non-admin users, only show their branch
+      if (!isAdmin && user?.branch_id) {
+        invoiceQuery = invoiceQuery.eq('branch_id', user.branch_id);
+      }
+
+      const { data: invoices } = await invoiceQuery;
 
       const branchMap: Record<string, { name: string; total: number; count: number }> = {};
       (invoices || []).forEach((inv: any) => {
@@ -294,17 +338,24 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">التقارير</h1>
-          <p className="text-muted-foreground text-sm mt-1">تقارير الصرف والمرتجعات</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            تقارير الصرف والمرتجعات
+            {!isAdmin && user?.branch_name && ` - فرع ${user.branch_name}`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={exportExcel} className="gap-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
-          </Button>
-          <Button variant="outline" onClick={exportPDF} className="gap-2">
-            <FileText className="w-4 h-4" />
-            PDF
-          </Button>
+          {canExport && (
+            <>
+              <Button variant="outline" onClick={exportExcel} className="gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                Excel
+              </Button>
+              <Button variant="outline" onClick={exportPDF} className="gap-2">
+                <FileText className="w-4 h-4" />
+                PDF
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

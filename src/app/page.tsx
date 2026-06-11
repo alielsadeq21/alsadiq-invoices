@@ -20,9 +20,10 @@ import PaymentMethodsPage from '@/components/app/payment-methods-page';
 import UsersPage from '@/components/app/users-page';
 import RolesPage from '@/components/app/roles-page';
 import AccountStatementPage from '@/components/app/account-statement-page';
+import ForceChangePasswordDialog from '@/components/app/force-change-password-dialog';
 
 export default function Home() {
-  const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo } = useAppStore();
+  const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo, forceChangePassword } = useAppStore();
 
   useEffect(() => {
     checkAuth();
@@ -80,5 +81,10 @@ export default function Home() {
     }
   };
 
-  return <AppLayout>{renderPage()}</AppLayout>;
+  return (
+    <AppLayout>
+      {renderPage()}
+      {forceChangePassword && <ForceChangePasswordDialog />}
+    </AppLayout>
+  );
 }

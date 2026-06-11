@@ -21,6 +21,7 @@ interface AppState {
   user: AppUser | null;
   permissions: Permissions | null;
   isAdmin: boolean;
+  forceChangePassword: boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   autoLogout: (reason: string) => void;
@@ -30,6 +31,7 @@ interface AppState {
   hasPermission: (page: string, action: string) => boolean;
   canAccessPage: (pageId: string) => boolean;
   refreshPermissions: () => Promise<void>;
+  dismissForceChangePassword: () => void;
 
   // Navigation
   currentPage: string;
@@ -52,6 +54,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   permissions: null,
   isAdmin: false,
+  forceChangePassword: false,
   autoLogoutReason: null,
 
   login: async (username: string, password: string) => {
@@ -123,17 +126,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         must_change_password: data.must_change_password || false,
       };
 
+      // Check if must change password
+      const mustChange = data.must_change_password || false;
+
       set({
         isLoggedIn: true,
         user: appUser,
         permissions: effectivePermissions,
         isAdmin: isAdminUser,
+        forceChangePassword: mustChange,
       });
 
       localStorage.setItem('alsadeq_user', JSON.stringify({
         ...appUser,
         permissions: effectivePermissions,
         isAdmin: isAdminUser,
+        forceChangePassword: mustChange,
       }));
 
       return { success: true };
@@ -143,12 +151,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   logout: () => {
-    set({ isLoggedIn: false, user: null, permissions: null, isAdmin: false, currentPage: 'login' });
+    set({ isLoggedIn: false, user: null, permissions: null, isAdmin: false, forceChangePassword: false, currentPage: 'login' });
     localStorage.removeItem('alsadeq_user');
   },
 
   autoLogout: (reason: string) => {
-    set({ isLoggedIn: false, user: null, permissions: null, isAdmin: false, currentPage: 'login', autoLogoutReason: reason });
+    set({ isLoggedIn: false, user: null, permissions: null, isAdmin: false, forceChangePassword: false, currentPage: 'login', autoLogoutReason: reason });
     localStorage.removeItem('alsadeq_user');
   },
 
@@ -177,6 +185,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           user: appUser,
           permissions: parsed.permissions || null,
           isAdmin: parsed.isAdmin || false,
+          forceChangePassword: parsed.forceChangePassword || parsed.must_change_password || false,
           currentPage: 'dashboard',
         });
       } catch {
@@ -234,6 +243,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!pagePerms) return false;
 
     return (pagePerms as Record<string, boolean | undefined>).view === true;
+  },
+
+  dismissForceChangePassword: () => {
+    set({ forceChangePassword: false });
+    // Update localStorage too
+    const stored = localStorage.getItem('alsadeq_user');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        parsed.forceChangePassword = false;
+        parsed.must_change_password = false;
+        localStorage.setItem('alsadeq_user', JSON.stringify(parsed));
+      } catch {}
+    }
   },
 
   refreshPermissions: async () => {
