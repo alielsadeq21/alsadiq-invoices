@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Branch } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,6 +39,7 @@ import { Building2, Plus, Search, Edit, Trash2, Phone, MapPin } from 'lucide-rea
 import { toast } from 'sonner';
 
 export default function BranchesPage() {
+  const { isAdmin } = useAppStore();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -180,6 +182,20 @@ export default function BranchesPage() {
       (b.address && b.address.includes(search)) ||
       (b.phone && b.phone.includes(search))
   );
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
+          <Building2 className="w-12 h-12 text-destructive/60" />
+        </div>
+        <h2 className="text-xl font-bold">غير مسموح</h2>
+        <p className="text-muted-foreground text-sm text-center max-w-xs">
+          فقط المدير يمكنه إدارة الفروع
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

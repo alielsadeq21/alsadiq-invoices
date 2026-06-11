@@ -17,13 +17,25 @@ import ActivityLogPage from '@/components/app/activity-log-page';
 import PaymentsPage from '@/components/app/payments-page';
 import BranchAccountsPage from '@/components/app/branch-accounts-page';
 import PaymentMethodsPage from '@/components/app/payment-methods-page';
+import UsersPage from '@/components/app/users-page';
+import RolesPage from '@/components/app/roles-page';
+import AccountStatementPage from '@/components/app/account-statement-page';
 
 export default function Home() {
-  const { isLoggedIn, currentPage, checkAuth } = useAppStore();
+  const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo } = useAppStore();
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Redirect to dashboard if user doesn't have access to the current page
+  useEffect(() => {
+    if (isLoggedIn && currentPage !== 'login' && currentPage !== 'dashboard') {
+      if (!canAccessPage(currentPage)) {
+        navigateTo('dashboard');
+      }
+    }
+  }, [isLoggedIn, currentPage, canAccessPage, navigateTo]);
 
   if (!isLoggedIn) {
     return <LoginPage />;
@@ -55,8 +67,14 @@ export default function Home() {
         return <PaymentsPage />;
       case 'branch-accounts':
         return <BranchAccountsPage />;
+      case 'account-statement':
+        return <AccountStatementPage />;
       case 'payment-methods':
         return <PaymentMethodsPage />;
+      case 'users':
+        return <UsersPage />;
+      case 'roles':
+        return <RolesPage />;
       default:
         return <DashboardPage />;
     }

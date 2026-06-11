@@ -38,7 +38,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 export default function AccountStatementPage() {
-  const { settings } = useAppStore();
+  const { settings, user, isAdmin } = useAppStore();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -61,8 +61,16 @@ export default function AccountStatementPage() {
   }, []);
 
   const loadBranches = async () => {
-    const { data } = await supabase.from('branches').select('*').eq('is_active', true).order('name');
-    if (data) setBranches(data as Branch[]);
+    let query = supabase.from('branches').select('*').eq('is_active', true).order('name');
+    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+    const { data } = await query;
+    if (data) {
+      setBranches(data as Branch[]);
+      // Auto-select branch for non-admin users
+      if (!isAdmin && user?.branch_id && data.length > 0) {
+        setSelectedBranch(user.branch_id);
+      }
+    }
   };
 
   const generateStatement = useCallback(async () => {
@@ -465,7 +473,7 @@ export default function AccountStatementPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">الفرع *</Label>
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch} disabled={!isAdmin && !!user?.branch_id}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="اختر الفرع" />
                 </SelectTrigger>

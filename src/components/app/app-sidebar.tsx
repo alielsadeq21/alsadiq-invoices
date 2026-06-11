@@ -18,7 +18,6 @@ import {
   LogOut,
   Moon,
   Sun,
-  Factory,
   ChevronRight,
   Menu,
   Package,
@@ -26,10 +25,13 @@ import {
   Wallet,
   Banknote,
   CreditCard,
+  Users,
+  Shield,
+  ScrollText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+const allNavItems = [
   { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
   { id: 'branches', label: 'الفروع', icon: Building2 },
   { id: 'products', label: 'المنتجات', icon: Package },
@@ -37,15 +39,29 @@ const navItems = [
   { id: 'returns', label: 'المرتجعات', icon: RotateCcw },
   { id: 'payments', label: 'القبض', icon: Banknote },
   { id: 'branch-accounts', label: 'كشف الحسابات', icon: Wallet },
+  { id: 'account-statement', label: 'كشف حساب مفصل', icon: ScrollText },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },
   { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList },
   { id: 'payment-methods', label: 'طرق الدفع', icon: CreditCard },
+  { id: 'users', label: 'المستخدمين', icon: Users },
+  { id: 'roles', label: 'الأدوار', icon: Shield },
   { id: 'settings', label: 'الإعدادات', icon: Settings },
 ];
 
+// Role display names mapping
+const roleDisplayNames: Record<string, string> = {
+  admin: 'مدير النظام',
+  branch_manager: 'مدير فرع',
+  warehouse_keeper: 'أمين مخزن',
+  accountant: 'محاسب',
+};
+
 export default function AppSidebar() {
-  const { currentPage, navigateTo, user, logout, settings, sidebarOpen, setSidebarOpen } = useAppStore();
+  const { currentPage, navigateTo, user, logout, settings, sidebarOpen, setSidebarOpen, canAccessPage } = useAppStore();
   const { theme, setTheme } = useTheme();
+
+  // Filter nav items based on permissions
+  const navItems = allNavItems.filter(item => canAccessPage(item.id));
 
   return (
     <>
@@ -168,7 +184,9 @@ export default function AppSidebar() {
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{user?.full_name || 'علي محمد الصادق'}</p>
-              <p className="text-xs text-sidebar-foreground/50">محاسب</p>
+              <p className="text-xs text-sidebar-foreground/50">
+                {user?.role_name ? (roleDisplayNames[user.role_name] || user.role_name) : 'مدير النظام'}
+              </p>
             </div>
           </div>
 

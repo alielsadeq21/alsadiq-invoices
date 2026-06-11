@@ -47,6 +47,7 @@ const actionLabels: Record<string, { label: string; icon: typeof FileText; color
 };
 
 export default function ActivityLogPage() {
+  const { user, isAdmin } = useAppStore();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('all');
@@ -76,8 +77,22 @@ export default function ActivityLogPage() {
       const { data, count, error } = await query;
 
       if (!error && data) {
-        setLogs(data as AuditLog[]);
-        setTotalCount(count || 0);
+        let filteredData = data as AuditLog[];
+        // Branch filtering for non-admin users (client-side since audit_log details is JSON)
+        if (!isAdmin && user?.branch_id) {
+          filteredData = filteredData.filter((log) => {
+            if (!log.details) return true; // Keep entries without details
+            const details = log.details as Record<string, unknown>;
+            // If details has branch_id, check if it matches user's branch
+            if (details.branch_id) return details.branch_id === user.branch_id;
+            // If details has branch_name, keep it (backward compat)
+            if (details.branch_name) return true; // Branch-related entries
+            // Keep entries that don't relate to specific branches (e.g., settings changes)
+            return !['create_branch', 'update_settings'].includes(log.action);
+          });
+        }
+        setLogs(filteredData);
+        setTotalCount(!isAdmin && user?.branch_id ? filteredData.length : (count || 0));
       }
     } catch (err) {
       console.error(err);

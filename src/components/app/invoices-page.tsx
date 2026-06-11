@@ -54,7 +54,7 @@ import { Textarea } from '@/components/ui/textarea';
 const PAGE_SIZE = 10;
 
 export default function InvoicesPage() {
-  const { navigateTo } = useAppStore();
+  const { navigateTo, user, isAdmin, hasPermission } = useAppStore();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,9 @@ export default function InvoicesPage() {
   }, [page, search, dateFrom, dateTo, branchFilter, statusFilter]);
 
   const loadBranches = async () => {
-    const { data } = await supabase.from('branches').select('*').order('name');
+    let query = supabase.from('branches').select('*').order('name');
+    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+    const { data } = await query;
     if (data) setBranches(data as Branch[]);
   };
 
@@ -103,6 +105,10 @@ export default function InvoicesPage() {
       }
       if (branchFilter !== 'all') {
         query = query.eq('branch_id', branchFilter);
+      }
+      // Branch user: always filter by their branch
+      if (!isAdmin && user?.branch_id) {
+        query = query.eq('branch_id', user.branch_id);
       }
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
@@ -283,10 +289,12 @@ export default function InvoicesPage() {
             إجمالي: {totalCount} فاتورة
           </p>
         </div>
-        <Button onClick={() => navigateTo('invoice-form')} className="gap-2 shadow-md">
-          <Plus className="w-4 h-4" />
-          فاتورة جديدة
-        </Button>
+        {hasPermission('invoices', 'create') && (
+          <Button onClick={() => navigateTo('invoice-form')} className="gap-2 shadow-md">
+            <Plus className="w-4 h-4" />
+            فاتورة جديدة
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -320,20 +328,22 @@ export default function InvoicesPage() {
                 className="h-9"
               />
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">الفرع</Label>
-              <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">كل الفروع</SelectItem>
-                  {branches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isAdmin && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">الفرع</Label>
+                <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">كل الفروع</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">الحالة</Label>
               <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
@@ -420,47 +430,55 @@ export default function InvoicesPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleQuickPrint(invoice, 'a4')}
-                              title="طباعة A4"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleQuickPrint(invoice, 'thermal')}
-                              title="طباعة حرارية"
-                            >
-                              <Receipt className="w-4 h-4" />
-                            </Button>
-                            {invoice.status === 'active' && (
+                            {hasPermission('invoices', 'print') && (
                               <>
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={() => handleDuplicate(invoice)}
-                                  title="تكرار"
+                                  onClick={() => handleQuickPrint(invoice, 'a4')}
+                                  title="طباعة A4"
                                 >
-                                  <Copy className="w-4 h-4" />
+                                  <Printer className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-destructive"
-                                  onClick={() => {
-                                    setCancellingInvoice(invoice);
-                                    setCancelDialogOpen(true);
-                                  }}
-                                  title="إلغاء"
+                                  className="h-8 w-8"
+                                  onClick={() => handleQuickPrint(invoice, 'thermal')}
+                                  title="طباعة حرارية"
                                 >
-                                  <XCircle className="w-4 h-4" />
+                                  <Receipt className="w-4 h-4" />
                                 </Button>
+                              </>
+                            )}
+                            {invoice.status === 'active' && (
+                              <>
+                                {hasPermission('invoices', 'create') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => handleDuplicate(invoice)}
+                                    title="تكرار"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {hasPermission('invoices', 'delete') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive"
+                                    onClick={() => {
+                                      setCancellingInvoice(invoice);
+                                      setCancelDialogOpen(true);
+                                    }}
+                                    title="إلغاء"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </>
                             )}
                           </div>

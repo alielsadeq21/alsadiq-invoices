@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { PaymentMethod } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 export default function PaymentMethodsPage() {
+  const { isAdmin } = useAppStore();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,6 +54,7 @@ export default function PaymentMethodsPage() {
   }, []);
 
   const loadMethods = async () => {
+    if (!isAdmin) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -229,6 +232,17 @@ export default function PaymentMethodsPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {!isAdmin ? (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
+            <Wallet className="w-12 h-12 text-destructive/60" />
+          </div>
+          <h2 className="text-xl font-bold">غير مسموح</h2>
+          <p className="text-muted-foreground text-sm text-center max-w-xs">
+            فقط المدير يمكنه إدارة طرق الدفع
+          </p>
+        </div>
+      ) : (<>
       <div>
         <h1 className="text-2xl font-bold">طرق الدفع</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -384,6 +398,7 @@ export default function PaymentMethodsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>)}
     </div>
   );
 }

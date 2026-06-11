@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Factory, Lock, User, Loader2 } from 'lucide-react';
+import { Lock, User, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function LoginPage() {
@@ -44,9 +44,9 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const success = await login(username, password);
-      if (!success) {
-        toast.error('اسم المستخدم أو كلمة المرور غير صحيحة');
+      const result = await login(username, password);
+      if (!result.success) {
+        toast.error(result.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
       } else {
         clearAutoLogoutReason();
       }

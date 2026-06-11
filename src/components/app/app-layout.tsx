@@ -6,30 +6,39 @@ import AppSidebar from './app-sidebar';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 const WARNING_BEFORE = 60 * 1000; // 1 minute before logout
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { loadSettings, checkAuth, sidebarOpen, setSidebarOpen, autoLogout } = useAppStore();
+  const { loadSettings, checkAuth, sidebarOpen, setSidebarOpen, autoLogout, settings } = useAppStore();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warnedRef = useRef(false);
+
+  const getIdleTimeout = useCallback(() => {
+    const minutes = settings?.idle_timeout_minutes || 15;
+    return minutes * 60 * 1000;
+  }, [settings?.idle_timeout_minutes]);
 
   const resetTimers = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
     warnedRef.current = false;
 
+    const idleTimeout = getIdleTimeout();
+    const warningTime = Math.min(WARNING_BEFORE, idleTimeout - 1000);
+
     // Set warning timer (1 minute before logout)
     warningTimerRef.current = setTimeout(() => {
       warnedRef.current = true;
-    }, IDLE_TIMEOUT - WARNING_BEFORE);
+    }, idleTimeout - warningTime);
 
     // Set logout timer
+    const minutes = settings?.idle_timeout_minutes || 15;
     timerRef.current = setTimeout(() => {
-      autoLogout('تم تسجيل خروجك تلقائياً بسبب عدم النشاط لأكثر من 15 دقيقة');
-    }, IDLE_TIMEOUT);
-  }, [autoLogout]);
+      autoLogout(`تم تسجيل خروجك تلقائياً بسبب عدم النشاط لأكثر من ${minutes} دقيقة`);
+    }, idleTimeout);
+  }, [autoLogout, getIdleTimeout, settings?.idle_timeout_minutes]);
 
   useEffect(() => {
     checkAuth();
@@ -137,7 +146,7 @@ function IdleWarningBanner({ warnedRef }: { warnedRef: React.RefObject<boolean> 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-amber-500 text-white text-center py-3 px-4 shadow-lg">
       <p className="text-sm font-bold">
-        ⚠️ سيتم تسجيل خروجك تلقائياً خلال دقيقة واحدة بسبب عدم النشاط — اضغط أي مكان للمتابعة
+        سيتم تسجيل خروجك تلقائياً خلال دقيقة واحدة بسبب عدم النشاط — اضغط أي مكان للمتابعة
       </p>
     </div>
   );

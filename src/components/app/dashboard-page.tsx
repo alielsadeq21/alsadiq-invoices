@@ -32,7 +32,7 @@ import { ar } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 
 export default function DashboardPage() {
-  const { navigateTo, settings } = useAppStore();
+  const { navigateTo, settings, user, isAdmin, hasPermission } = useAppStore();
   const [stats, setStats] = useState<DashboardStats>({
     todayInvoices: 0,
     todayTotal: 0,
@@ -46,6 +46,8 @@ export default function DashboardPage() {
   const [topItems, setTopItems] = useState<{ name: string; count: number; total: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const userBranchId = user?.branch_id || null;
+
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -57,33 +59,43 @@ export default function DashboardPage() {
       const currentMonth = format(new Date(), 'yyyy-MM');
 
       // Today's invoices
-      const { data: todayInvoices } = await supabase
+      let todayInvoicesQuery = supabase
         .from('invoices')
         .select('total')
         .eq('invoice_date', today)
         .eq('status', 'active');
+      if (userBranchId && !isAdmin) todayInvoicesQuery = todayInvoicesQuery.eq('branch_id', userBranchId);
+      const { data: todayInvoices } = await todayInvoicesQuery;
 
       const todayTotal = (todayInvoices || []).reduce((sum, inv) => sum + Number(inv.total), 0);
 
       // Today's returns
-      const { data: todayReturns } = await supabase
+      let todayReturnsQuery = supabase
         .from('returns')
         .select('total')
         .eq('return_date', today);
+      if (userBranchId && !isAdmin) todayReturnsQuery = todayReturnsQuery.eq('branch_id', userBranchId);
+      const { data: todayReturns } = await todayReturnsQuery;
 
       const todayReturnsTotal = (todayReturns || []).reduce((sum, ret) => sum + Number(ret.total), 0);
 
       // Active branches
-      const { count: branchCount } = await supabase
-        .from('branches')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
+      let activeBranches = 0;
+      if (userBranchId && !isAdmin) {
+        activeBranches = 1; // Branch user only sees their own branch
+      } else {
+        const { count: branchCount } = await supabase
+          .from('branches')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true);
+        activeBranches = branchCount || 0;
+      }
 
       setStats({
         todayInvoices: todayInvoices?.length || 0,
         todayTotal,
         todayReturns: todayReturnsTotal,
-        activeBranches: branchCount || 0,
+        activeBranches,
         netSpending: todayTotal - todayReturnsTotal,
       });
 
@@ -97,17 +109,25 @@ export default function DashboardPage() {
 
         monthlyPromises.push(
           Promise.all([
-            supabase
-              .from('invoices')
-              .select('total')
-              .gte('invoice_date', monthStart)
-              .lte('invoice_date', monthEnd)
-              .eq('status', 'active'),
-            supabase
-              .from('returns')
-              .select('total')
-              .gte('return_date', monthStart)
-              .lte('return_date', monthEnd),
+            (() => {
+              let q = supabase
+                .from('invoices')
+                .select('total')
+                .gte('invoice_date', monthStart)
+                .lte('invoice_date', monthEnd)
+                .eq('status', 'active');
+              if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
+              return q;
+            })(),
+            (() => {
+              let q = supabase
+                .from('returns')
+                .select('total')
+                .gte('return_date', monthStart)
+                .lte('return_date', monthEnd);
+              if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
+              return q;
+            })(),
           ]).then(([invRes, retRes]) => {
             const total = (invRes.data || []).reduce((s, i) => s + Number(i.total), 0);
             const returns = (retRes.data || []).reduce((s, r) => s + Number(r.total), 0);
@@ -128,12 +148,14 @@ export default function DashboardPage() {
       const monthStart = startOfMonth(new Date()).toISOString().split('T')[0];
       const monthEnd = endOfMonth(new Date()).toISOString().split('T')[0];
 
-      const { data: branchInvoices } = await supabase
+      let branchInvoicesQuery = supabase
         .from('invoices')
         .select('branch_id, total, branches(name)')
         .gte('invoice_date', monthStart)
         .lte('invoice_date', monthEnd)
         .eq('status', 'active');
+      if (userBranchId && !isAdmin) branchInvoicesQuery = branchInvoicesQuery.eq('branch_id', userBranchId);
+      const { data: branchInvoices } = await branchInvoicesQuery;
 
       const branchMap: Record<string, { name: string; total: number; count: number }> = {};
       (branchInvoices || []).forEach((inv) => {
@@ -153,11 +175,13 @@ export default function DashboardPage() {
       setBranchSpending(branchList);
 
       // Recent invoices
-      const { data: recent } = await supabase
+      let recentInvoicesQuery = supabase
         .from('invoices')
         .select('*, branches(name)')
         .order('created_at', { ascending: false })
         .limit(5);
+      if (userBranchId && !isAdmin) recentInvoicesQuery = recentInvoicesQuery.eq('branch_id', userBranchId);
+      const { data: recent } = await recentInvoicesQuery;
 
       setRecentInvoices((recent as unknown as Invoice[]) || []);
 
@@ -244,13 +268,15 @@ export default function DashboardPage() {
             مرحباً، {useAppStore.getState().user?.full_name || 'علي محمد الصادق'}
           </p>
         </div>
-        <Button
-          onClick={() => navigateTo('invoice-form')}
-          className="gap-2 shadow-md"
-        >
-          <Plus className="w-4 h-4" />
-          فاتورة جديدة
-        </Button>
+        {hasPermission('invoices', 'create') && (
+          <Button
+            onClick={() => navigateTo('invoice-form')}
+            className="gap-2 shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            فاتورة جديدة
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}

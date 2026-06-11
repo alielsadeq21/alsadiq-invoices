@@ -62,7 +62,7 @@ const defaultMethodColors: Record<string, string> = {
 };
 
 export default function PaymentsPage() {
-  const { navigateTo, settings } = useAppStore();
+  const { navigateTo, settings, user, isAdmin, hasPermission } = useAppStore();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +92,9 @@ export default function PaymentsPage() {
   }, [page, search, branchFilter]);
 
   const loadBranches = async () => {
-    const { data } = await supabase.from('branches').select('*').eq('is_active', true).order('name');
+    let query = supabase.from('branches').select('*').eq('is_active', true).order('name');
+    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+    const { data } = await query;
     if (data) setBranches(data as Branch[]);
   };
 
@@ -142,6 +144,10 @@ export default function PaymentsPage() {
       if (branchFilter !== 'all') {
         query = query.eq('branch_id', branchFilter);
       }
+      // Branch user: always filter by their branch
+      if (!isAdmin && user?.branch_id) {
+        query = query.eq('branch_id', user.branch_id);
+      }
 
       const from = (page - 1) * PAGE_SIZE;
       query = query.range(from, from + PAGE_SIZE - 1);
@@ -173,7 +179,12 @@ export default function PaymentsPage() {
       lastNum = parseInt(parts[parts.length - 1]) || 0;
     }
     setPaymentNumber(generatePaymentNumber(lastNum, year));
-    setSelectedBranchId('');
+    // Auto-select branch for non-admin users
+    if (!isAdmin && user?.branch_id) {
+      setSelectedBranchId(user.branch_id);
+    } else {
+      setSelectedBranchId('');
+    }
     setAmount('');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     const defaultMethod = paymentMethods.find(m => m.is_default);
@@ -385,10 +396,12 @@ export default function PaymentsPage() {
             تسجيل دفعات الفروع ({totalCount} إيصال)
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2 shadow-md">
-          <Plus className="w-4 h-4" />
-          إيصال قبض جديد
-        </Button>
+        {hasPermission('payments', 'create') && (
+          <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+            <Plus className="w-4 h-4" />
+            إيصال قبض جديد
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -404,19 +417,21 @@ export default function PaymentsPage() {
                 className="pr-10"
               />
             </div>
-            <div>
-              <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="كل الفروع" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">كل الفروع</SelectItem>
-                  {branches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isAdmin && (
+              <div>
+                <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="كل الفروع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">كل الفروع</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -437,10 +452,12 @@ export default function PaymentsPage() {
               <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                 لم يتم تسجيل أي إيصالات قبض بعد. ابدأ بتسجيل أول دفعة من فرع.
               </p>
-              <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
-                <Plus className="w-5 h-5" />
-                تسجيل إيصال قبض
-              </Button>
+              {hasPermission('payments', 'create') && (
+                <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                  <Plus className="w-5 h-5" />
+                  تسجيل إيصال قبض
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -469,35 +486,39 @@ export default function PaymentsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handlePrintReceipt(payment)}
-                              title="طباعة A4"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handlePrintThermal(payment)}
-                              title="طباعة حرارية"
-                            >
-                              <Receipt className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleExportPDF(payment)}
-                              title="تحميل PDF"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
+                          {hasPermission('payments', 'print') ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handlePrintReceipt(payment)}
+                                title="طباعة A4"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handlePrintThermal(payment)}
+                                title="طباعة حرارية"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleExportPDF(payment)}
+                                title="تحميل PDF"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -554,7 +575,7 @@ export default function PaymentsPage() {
               </div>
               <div className="space-y-2">
                 <Label>الفرع *</Label>
-                <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+                <Select value={selectedBranchId} onValueChange={setSelectedBranchId} disabled={!isAdmin && !!user?.branch_id}>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الفرع" />
                   </SelectTrigger>

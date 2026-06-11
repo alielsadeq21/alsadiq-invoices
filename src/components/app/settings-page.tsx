@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
   Settings as SettingsIcon,
   Save,
@@ -24,7 +25,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 export default function SettingsPage() {
-  const { settings, loadSettings, updateSettings, user } = useAppStore();
+  const { settings, loadSettings, updateSettings, user, isAdmin } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +38,8 @@ export default function SettingsPage() {
     email: '',
     default_tax_rate: 0,
     invoice_footer: '',
+    bw_print: false,
+    idle_timeout_minutes: 0,
   });
 
   const [passwordForm, setPasswordForm] = useState({
@@ -58,6 +61,8 @@ export default function SettingsPage() {
         email: settings.email || '',
         default_tax_rate: settings.default_tax_rate || 0,
         invoice_footer: settings.invoice_footer || '',
+        bw_print: (settings as any).bw_print || false,
+        idle_timeout_minutes: (settings as any).idle_timeout_minutes || 0,
       });
       if (settings.logo_url) {
         setLogoPreview(settings.logo_url);
@@ -82,7 +87,9 @@ export default function SettingsPage() {
         email: form.email || null,
         default_tax_rate: form.default_tax_rate,
         invoice_footer: form.invoice_footer || null,
-      });
+        bw_print: form.bw_print,
+        idle_timeout_minutes: form.idle_timeout_minutes,
+      } as any);
       toast.success('تم حفظ الإعدادات بنجاح');
     } catch (err) {
       toast.error('حدث خطأ أثناء الحفظ');
@@ -187,7 +194,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm mt-1">إعدادات المصنع والنظام</p>
       </div>
 
-      {/* Factory Info */}
+      {isAdmin && (<>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-3">
@@ -281,6 +288,38 @@ export default function SettingsPage() {
 
             <Separator />
 
+            {/* B&W Print Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>طباعة أبيض وأسود</Label>
+                <p className="text-xs text-muted-foreground">تفعيل الطباعة بالأبيض والأسود فقط</p>
+              </div>
+              <Switch
+                checked={form.bw_print}
+                onCheckedChange={(checked) => setForm({ ...form, bw_print: checked })}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Idle Timeout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>مدة الخمول قبل تسجيل الخروج (دقائق)</Label>
+                <Input
+                  type="number"
+                  value={form.idle_timeout_minutes || ''}
+                  onChange={(e) => setForm({ ...form, idle_timeout_minutes: Number(e.target.value) || 0 })}
+                  placeholder="0 = معطل"
+                  min="0"
+                  max="120"
+                />
+                <p className="text-xs text-muted-foreground">0 يعني عدم تسجيل الخروج تلقائياً</p>
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Invoice Footer */}
             <div className="space-y-2">
               <Label htmlFor="invoice-footer" className="flex items-center gap-1">
@@ -357,6 +396,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </motion.div>
+      </>)}
 
       {/* Change Password */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>

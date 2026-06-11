@@ -40,7 +40,7 @@ import {
 import { toast } from 'sonner';
 
 export default function BranchAccountsPage() {
-  const { navigateTo, settings } = useAppStore();
+  const { navigateTo, settings, user, isAdmin } = useAppStore();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [accounts, setAccounts] = useState<BranchAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,10 +61,12 @@ export default function BranchAccountsPage() {
   const loadBranchAccounts = async () => {
     setLoading(true);
     try {
-      const { data: branchData } = await supabase
+      let branchQuery = supabase
         .from('branches')
         .select('*')
         .order('name');
+      if (!isAdmin && user?.branch_id) branchQuery = branchQuery.eq('id', user.branch_id);
+      const { data: branchData } = await branchQuery;
 
       if (!branchData) return;
       setBranches(branchData as Branch[]);

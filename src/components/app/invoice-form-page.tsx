@@ -45,7 +45,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 export default function InvoiceFormPage() {
-  const { navigateTo, pageParams, settings } = useAppStore();
+  const { navigateTo, pageParams, settings, user, isAdmin } = useAppStore();
   const id = pageParams.id;
 
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -108,6 +108,10 @@ export default function InvoiceFormPage() {
   useEffect(() => {
     loadBranches();
     loadProducts();
+    // Auto-select branch for non-admin users
+    if (!isAdmin && user?.branch_id) {
+      setBranchId(user.branch_id);
+    }
     if (id) {
       setIsEdit(true);
       loadInvoice(id);
@@ -126,11 +130,13 @@ export default function InvoiceFormPage() {
   }, [settings]);
 
   const loadBranches = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('branches')
       .select('*')
       .eq('is_active', true)
       .order('name');
+    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+    const { data } = await query;
     if (data) setBranches(data as Branch[]);
   };
 
@@ -564,7 +570,7 @@ export default function InvoiceFormPage() {
               </div>
               <div className="space-y-2">
                 <Label>الفرع *</Label>
-                <Select value={branchId} onValueChange={setBranchIdChanged}>
+                <Select value={branchId} onValueChange={setBranchIdChanged} disabled={!isAdmin && !!user?.branch_id}>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الفرع" />
                   </SelectTrigger>

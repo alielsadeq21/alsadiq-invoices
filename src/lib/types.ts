@@ -9,8 +9,54 @@ export interface Settings {
   email: string | null;
   commercial_register: string | null;
   invoice_footer: string | null;
+  bw_print: boolean;
+  idle_timeout_minutes: number;
   created_at: string;
   updated_at: string;
+}
+
+// Permission types
+export interface PagePermissions {
+  view?: boolean;
+  create?: boolean;
+  edit?: boolean;
+  delete?: boolean;
+  print?: boolean;
+  export?: boolean;
+  adjust?: boolean;
+  transfer?: boolean;
+}
+
+export interface Permissions {
+  dashboard?: PagePermissions;
+  branches?: PagePermissions;
+  products?: PagePermissions;
+  invoices?: PagePermissions;
+  returns?: PagePermissions;
+  payments?: PagePermissions;
+  branch_accounts?: PagePermissions;
+  account_statement?: PagePermissions;
+  inventory?: PagePermissions;
+  expenses?: PagePermissions;
+  reports?: PagePermissions;
+  accounting?: PagePermissions;
+  users?: PagePermissions;
+  roles?: PagePermissions;
+  settings?: PagePermissions;
+  activity_log?: PagePermissions;
+  customers?: PagePermissions;
+  payment_methods?: PagePermissions;
+  expense_categories?: PagePermissions;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  permissions: Permissions;
+  is_system: boolean;
+  created_at: string;
 }
 
 export interface User {
@@ -18,8 +64,16 @@ export interface User {
   username: string;
   password_hash: string;
   full_name: string;
+  role_id: string | null;
+  branch_id: string | null;
+  is_active: boolean;
+  must_change_password: boolean;
+  last_login: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
+  role?: Role;
+  branch?: Branch;
 }
 
 export interface Branch {
@@ -167,3 +221,59 @@ export interface BranchSpending {
   total: number;
   invoice_count: number;
 }
+
+export interface AccountStatementEntry {
+  date: string;
+  description: string;
+  reference: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  type: 'invoice' | 'payment' | 'return';
+}
+
+// Default permissions for each role
+export const DEFAULT_ADMIN_PERMISSIONS: Permissions = {
+  dashboard: { view: true },
+  branches: { view: true, create: true, edit: true, delete: true },
+  products: { view: true, create: true, edit: true, delete: true },
+  invoices: { view: true, create: true, edit: true, delete: true, print: true, export: true },
+  returns: { view: true, create: true, print: true, export: true },
+  payments: { view: true, create: true, print: true, export: true },
+  branch_accounts: { view: true, export: true },
+  account_statement: { view: true, print: true, export: true },
+  inventory: { view: true, create: true, edit: true, adjust: true, transfer: true },
+  expenses: { view: true, create: true, edit: true, delete: true, print: true, export: true },
+  reports: { view: true, export: true },
+  accounting: { view: true, create: true, edit: true, export: true },
+  users: { view: true, create: true, edit: true, delete: true },
+  roles: { view: true, create: true, edit: true, delete: true },
+  settings: { view: true, edit: true },
+  activity_log: { view: true },
+  customers: { view: true, create: true, edit: true, delete: true },
+  payment_methods: { view: true, create: true, edit: true, delete: true },
+  expense_categories: { view: true, create: true, edit: true, delete: true },
+};
+
+export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
+  dashboard: { view: true },
+  invoices: { view: true, create: true, edit: true, print: true, export: true },
+  returns: { view: true, create: true, print: true, export: true },
+  payments: { view: true, create: true, print: true, export: true },
+  branch_accounts: { view: true },
+  account_statement: { view: true, print: true, export: true },
+  reports: { view: true, export: true },
+  settings: { view: true },
+};
+
+export const DEFAULT_WAREHOUSE_KEEPER_PERMISSIONS: Permissions = {
+  inventory: { view: true, create: true, edit: true, adjust: true },
+};
+
+export const DEFAULT_ACCOUNTANT_PERMISSIONS: Permissions = {
+  dashboard: { view: true },
+  reports: { view: true, export: true },
+  accounting: { view: true, create: true, edit: true, export: true },
+  branch_accounts: { view: true, export: true },
+  account_statement: { view: true, print: true, export: true },
+};

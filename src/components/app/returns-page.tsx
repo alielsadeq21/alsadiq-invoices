@@ -55,7 +55,7 @@ interface ReturnFormItem {
 const PAGE_SIZE = 10;
 
 export default function ReturnsPage() {
-  const { navigateTo } = useAppStore();
+  const { navigateTo, user, isAdmin, hasPermission } = useAppStore();
   const [returns, setReturns] = useState<Return[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -93,6 +93,11 @@ export default function ReturnsPage() {
         query = query.or(`return_number.ilike.%${search}%`);
       }
 
+      // Branch filtering for non-admin users
+      if (!isAdmin && user?.branch_id) {
+        query = query.eq('branch_id', user.branch_id);
+      }
+
       const from = (page - 1) * PAGE_SIZE;
       query = query.range(from, from + PAGE_SIZE - 1);
 
@@ -110,11 +115,15 @@ export default function ReturnsPage() {
 
   const openCreateDialog = async () => {
     // Load active invoices
-    const { data } = await supabase
+    let invoicesQuery = supabase
       .from('invoices')
       .select('id, invoice_number, branch_id, branches(name)')
       .in('status', ['active', 'partially_returned'])
       .order('created_at', { ascending: false });
+    if (!isAdmin && user?.branch_id) {
+      invoicesQuery = invoicesQuery.eq('branch_id', user.branch_id);
+    }
+    const { data } = await invoicesQuery;
 
     if (data) setInvoices(data as any);
 
@@ -277,10 +286,12 @@ export default function ReturnsPage() {
             إجمالي: {totalCount} مرتجع
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2 shadow-md">
-          <Plus className="w-4 h-4" />
-          مرتجع جديد
-        </Button>
+        {hasPermission('returns', 'create') && (
+          <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+            <Plus className="w-4 h-4" />
+            مرتجع جديد
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -314,10 +325,12 @@ export default function ReturnsPage() {
               <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                 لم يتم تسجيل أي مرتجعات بعد. يمكنك إنشاء مرتجع من أي فاتورة نشطة لإدارة الاسترجاعات.
               </p>
-              <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
-                <Plus className="w-5 h-5" />
-                إنشاء مرتجع جديد
-              </Button>
+              {hasPermission('returns', 'create') && (
+                <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                  <Plus className="w-5 h-5" />
+                  إنشاء مرتجع جديد
+                </Button>
+              )}
             </div>
           ) : (
             <>

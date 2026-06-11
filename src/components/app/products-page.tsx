@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Product } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -39,6 +40,7 @@ import { Package, Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ProductsPage() {
+  const { hasPermission } = useAppStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -201,10 +203,12 @@ export default function ProductsPage() {
             إجمالي المنتجات: {products.length} | نشطة: {products.filter((p) => p.is_active).length}
           </p>
         </div>
-        <Button onClick={openAddDialog} className="gap-2 shadow-md">
-          <Plus className="w-4 h-4" />
-          إضافة منتج
-        </Button>
+        {hasPermission('products', 'create') && (
+          <Button onClick={openAddDialog} className="gap-2 shadow-md">
+            <Plus className="w-4 h-4" />
+            إضافة منتج
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -238,10 +242,12 @@ export default function ProductsPage() {
               <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                 لم يتم إضافة أي منتجات بعد. أضف منتجات لتسهيل إنشاء الفواتير وتوفير الوقت.
               </p>
-              <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
-                <Plus className="w-5 h-5" />
-                إضافة منتج جديد
-              </Button>
+              {hasPermission('products', 'create') && (
+                <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
+                  <Plus className="w-5 h-5" />
+                  إضافة منتج جديد
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -301,25 +307,29 @@ export default function ProductsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(product)}
-                            className="h-8 w-8"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setDeletingProduct(product);
-                              setDeleteDialogOpen(true);
-                            }}
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {hasPermission('products', 'edit') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(product)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasPermission('products', 'delete') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setDeletingProduct(product);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
