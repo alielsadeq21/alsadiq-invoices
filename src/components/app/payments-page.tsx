@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import type { Payment, Branch, PaymentMethod } from '@/lib/types';
 import { formatCurrency, formatDate, generatePaymentNumber, getCurrentYear } from '@/lib/utils';
 import { generatePaymentReceiptDocument, generateThermalPaymentReceiptDocument } from '@/lib/payment-receipt-template';
+import { createPaymentJournalEntry } from '@/lib/accounting';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -209,14 +210,14 @@ export default function PaymentsPage() {
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('payments').insert({
+      const { data: newPayment, error } = await supabase.from('payments').insert({
         payment_number: paymentNumber,
         branch_id: selectedBranchId,
         amount: Number(amount),
         payment_date: paymentDate,
         payment_method: paymentMethod,
         notes: notes || null,
-      });
+      }).select('id').single();
 
       if (error) throw error;
 
@@ -226,7 +227,34 @@ export default function PaymentsPage() {
         details: { payment_number: paymentNumber, amount: Number(amount), branch_id: selectedBranchId },
       });
 
-      toast.success('تم تسجيل إيصال القبض بنجاح');
+      // ===== قيد تلقائي: قبض من فرع =====
+      try {
+        const jeResult = await createPaymentJournalEntry({
+          paymentId: newPayment.id,
+          paymentNumber: paymentNumber,
+          date: paymentDate,
+          amount: Number(amount),
+          paymentMethod: paymentMethod,
+          branchId: selectedBranchId,
+          createdBy: user?.id || null,
+        });
+
+        if (jeResult.success) {
+          // ربط القيد بالإيصال
+          await supabase
+            .from('payments')
+            .update({ journal_entry_id: jeResult.entryId } as any)
+            .eq('id', newPayment.id);
+
+          toast.success('تم تسجيل إيصال القبض وإنشاء القيد المحاسبي بنجاح');
+        } else {
+          toast.success('تم تسجيل إيصال القبض (لم يتم إنشاء القيد المحاسبي)');
+        }
+      } catch (jeErr) {
+        console.error('Journal entry error:', jeErr);
+        toast.success('تم تسجيل إيصال القبض (خطأ في إنشاء القيد المحاسبي)');
+      }
+
       setDialogOpen(false);
       loadPayments();
     } catch (err) {
