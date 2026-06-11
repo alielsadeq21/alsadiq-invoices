@@ -4,7 +4,6 @@ import { useAppStore } from '@/store/app-store';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -101,13 +100,24 @@ export default function AppSidebar() {
 
       {/* Sidebar */}
       <aside
+        style={{
+          position: 'fixed',
+          right: 0,
+          top: 0,
+          height: '100vh',
+          width: '18rem',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          zIndex: 50,
+        }}
         className={cn(
-          'fixed right-0 top-0 h-screen w-72 bg-sidebar text-sidebar-foreground z-50 shadow-2xl flex flex-col overflow-hidden transition-transform duration-300',
+          'bg-sidebar text-sidebar-foreground shadow-2xl transition-transform duration-300',
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        {/* Header */}
-        <div className="p-5 flex items-center gap-3">
+        {/* Header - fixed at top */}
+        <div style={{ flexShrink: 0 }} className="p-5 flex items-center gap-3">
           <div className="w-11 h-11 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-md flex-shrink-0 overflow-hidden">
             {settings?.logo_url ? (
               <img
@@ -137,8 +147,16 @@ export default function AppSidebar() {
 
         <Separator className="bg-sidebar-border" />
 
-        {/* Navigation */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
+        {/* Navigation - scrollable area */}
+        <div
+          style={{
+            flex: '1 1 0%',
+            minHeight: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+          className="px-3 py-4"
+        >
           <nav className="space-y-1">
             {navItems.map((item) => {
               const isActive = currentPage === item.id ||
@@ -168,8 +186,10 @@ export default function AppSidebar() {
           </nav>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 space-y-3">
+        <Separator className="bg-sidebar-border" />
+
+        {/* Footer - fixed at bottom */}
+        <div style={{ flexShrink: 0 }} className="p-4 space-y-3">
           {/* Theme toggle */}
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
