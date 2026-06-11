@@ -128,7 +128,7 @@ WHERE username = 'admin';
 UPDATE users SET
   role_id = (SELECT id FROM roles WHERE name = 'admin' LIMIT 1),
   is_active = true
-WHERE role_id IS NULL AND id = (SELECT MIN(id) FROM users);
+WHERE role_id IS NULL AND id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1);
 
 -- 5. تفعيل RLS على جدول الأدوار
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
