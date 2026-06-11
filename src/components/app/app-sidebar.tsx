@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/app-store';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -138,7 +138,7 @@ export default function AppSidebar() {
         <Separator className="bg-sidebar-border" />
 
         {/* Navigation */}
-        <ScrollArea className="flex-1 min-h-0 overflow-hidden px-3 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
           <nav className="space-y-1">
             {navItems.map((item) => {
               const isActive = currentPage === item.id ||
@@ -166,7 +166,7 @@ export default function AppSidebar() {
               );
             })}
           </nav>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="p-4 space-y-3">
