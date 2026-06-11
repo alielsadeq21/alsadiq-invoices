@@ -3,6 +3,8 @@ import { Cairo } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import QueryProvider from "@/components/providers/query-provider";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -51,8 +53,12 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          {children}
-          <Toaster position="top-left" richColors />
+          <QueryProvider>
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
+            <Toaster position="top-left" richColors />
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

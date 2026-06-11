@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import DataTablePagination from '@/components/ui/data-table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -70,6 +71,9 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Add/Edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -167,18 +171,34 @@ export default function CustomersPage() {
   useEffect(() => {
     if (!canView) return;
     loadData();
-  }, [canView]);
+  }, [canView, page, pageSize, search, statusFilter]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      if (search.trim()) {
+        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+      }
+      if (statusFilter === 'active') {
+        query = query.eq('is_active', true);
+      } else if (statusFilter === 'inactive') {
+        query = query.eq('is_active', false);
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
 
       if (error) throw error;
       if (data) setCustomers(data as Customer[]);
+      setTotalCount(count || 0);
     } catch (err) {
       console.error(err);
       toast.error('حدث خطأ أثناء تحميل البيانات');
@@ -313,17 +333,7 @@ export default function CustomersPage() {
     }
   };
 
-  // Filtering
-  const filteredCustomers = customers.filter((c) => {
-    const matchSearch =
-      c.name.includes(search) ||
-      (c.phone && c.phone.includes(search));
-    const matchStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && c.is_active) ||
-      (statusFilter === 'inactive' && !c.is_active);
-    return matchSearch && matchStatus;
-  });
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   if (!canView) {
     return (
@@ -350,7 +360,7 @@ export default function CustomersPage() {
               إدارة العملاء
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              إجمالي العملاء: {customers.length} | نشط: {customers.filter(c => c.is_active).length}
+              إجمالي العملاء: {totalCount}
             </p>
           </div>
           {canCreate && (
@@ -372,12 +382,12 @@ export default function CustomersPage() {
                 <Input
                   placeholder="بحث بالاسم أو رقم الهاتف..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                   className="pr-10"
                 />
               </div>
               <div className="flex gap-2">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
                   <SelectTrigger className="w-[130px]">
                     <Filter className="w-4 h-4 ml-1" />
                     <SelectValue placeholder="الحالة" />
@@ -402,7 +412,7 @@ export default function CustomersPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : filteredCustomers.length === 0 ? (
+            ) : customers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4">
                 <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
                   <Users className="w-12 h-12 text-primary/60" />
@@ -419,7 +429,8 @@ export default function CustomersPage() {
                 )}
               </div>
             ) : (
-              <ScrollArea className="max-h-[calc(100vh-320px)]">
+              <>
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -432,7 +443,7 @@ export default function CustomersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCustomers.map((c) => (
+                    {customers.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -512,7 +523,17 @@ export default function CustomersPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
+              <DataTablePagination
+                page={page}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                label="عميل"
+              />
+              </>
             )}
           </CardContent>
         </Card>

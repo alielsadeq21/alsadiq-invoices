@@ -37,6 +37,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Package, Plus, Search, Edit, Trash2 } from 'lucide-react';
+import DataTablePagination from '@/components/ui/data-table-pagination';
 import { toast } from 'sonner';
 
 export default function ProductsPage() {
@@ -44,6 +45,9 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -59,18 +63,29 @@ export default function ProductsPage() {
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [page, pageSize, search]);
 
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      if (search.trim()) {
+        query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%`);
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
 
       if (!error && data) {
         setProducts(data as Product[]);
+        setTotalCount(count || 0);
       }
     } catch (err) {
       console.error(err);
@@ -185,13 +200,7 @@ export default function ProductsPage() {
     }
   };
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(
-      (p) =>
-        p.name.includes(search) ||
-        (p.category && p.category.includes(search))
-    );
-  }, [products, search]);
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
     <div className="space-y-6">
@@ -200,7 +209,7 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-2xl font-bold">إدارة المنتجات</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            إجمالي المنتجات: {products.length} | نشطة: {products.filter((p) => p.is_active).length}
+            إجمالي المنتجات: {totalCount} | نشطة: {products.filter((p) => p.is_active).length}
           </p>
         </div>
         {hasPermission('products', 'create') && (
@@ -219,7 +228,7 @@ export default function ProductsPage() {
             <Input
               placeholder="بحث في المنتجات..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pr-10"
             />
           </div>
@@ -233,7 +242,7 @@ export default function ProductsPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4">
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
                 <Package className="w-12 h-12 text-primary/60" />
@@ -250,6 +259,7 @@ export default function ProductsPage() {
               )}
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -264,7 +274,7 @@ export default function ProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product) => (
+                  {products.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -336,7 +346,17 @@ export default function ProductsPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
+              <DataTablePagination
+                page={page}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                label="منتج"
+              />
+            </>
           )}
         </CardContent>
       </Card>

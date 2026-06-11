@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/app-store';
 import AppSidebar from './app-sidebar';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { setupGlobalErrorHandler } from '@/lib/error-handler';
 
 const DEFAULT_IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 const WARNING_BEFORE = 60 * 1000; // 1 minute before logout
@@ -43,6 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkAuth();
     loadSettings();
+    setupGlobalErrorHandler();
   }, [checkAuth, loadSettings]);
 
   useEffect(() => {

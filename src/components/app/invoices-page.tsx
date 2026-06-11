@@ -33,11 +33,10 @@ import {
   Copy,
   XCircle,
   FileText,
-  ChevronRight,
-  ChevronLeft,
   Printer,
   Receipt,
 } from 'lucide-react';
+import DataTablePagination from '@/components/ui/data-table-pagination';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -505,34 +504,14 @@ export default function InvoicesPage() {
                 </Table>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    صفحة {page} من {totalPages}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setPage(Math.max(1, page - 1))}
-                      disabled={page <= 1}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setPage(Math.min(totalPages, page + 1))}
-                      disabled={page >= totalPages}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <DataTablePagination
+                page={page}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                label="فاتورة"
+              />
             </>
           )}
         </CardContent>
