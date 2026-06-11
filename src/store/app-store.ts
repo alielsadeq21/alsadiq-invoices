@@ -234,6 +234,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       'settings': 'settings',
       'activity-log': 'activity_log',
       'payment-methods': 'payment_methods',
+      'expense-categories': 'expense_categories',
+      'customers': 'customers',
     };
 
     const permKey = pagePermissionMap[pageId];

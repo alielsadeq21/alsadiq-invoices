@@ -232,6 +232,95 @@ export interface AccountStatementEntry {
   type: 'invoice' | 'payment' | 'return';
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  tax_number: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Expense {
+  id: string;
+  expense_number: string;
+  branch_id: string;
+  category_id: string | null;
+  description: string;
+  amount: number;
+  expense_date: string;
+  payment_method: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  branches?: Branch;
+  expense_categories?: ExpenseCategory;
+}
+
+export interface Inventory {
+  id: string;
+  product_id: string;
+  branch_id: string;
+  quantity: number;
+  min_quantity: number;
+  last_updated: string;
+  products?: Product;
+  branches?: Branch;
+}
+
+export interface InventoryTransaction {
+  id: string;
+  product_id: string;
+  branch_id: string;
+  transaction_type: 'in' | 'out' | 'adjust' | 'transfer';
+  quantity: number;
+  reference_type: string | null;
+  reference_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  products?: Product;
+  branches?: Branch;
+}
+
+export interface JournalEntry {
+  id: string;
+  entry_number: string;
+  entry_date: string;
+  description: string;
+  total_debit: number;
+  total_credit: number;
+  is_posted: boolean;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  lines?: JournalEntryLine[];
+}
+
+export interface JournalEntryLine {
+  id: string;
+  journal_entry_id: string;
+  account_name: string;
+  debit: number;
+  credit: number;
+  description: string | null;
+  created_at: string;
+}
+
 // Default permissions for each role
 export const DEFAULT_ADMIN_PERMISSIONS: Permissions = {
   dashboard: { view: true },

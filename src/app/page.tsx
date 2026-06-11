@@ -21,6 +21,11 @@ import UsersPage from '@/components/app/users-page';
 import RolesPage from '@/components/app/roles-page';
 import AccountStatementPage from '@/components/app/account-statement-page';
 import ForceChangePasswordDialog from '@/components/app/force-change-password-dialog';
+import InventoryPage from '@/components/app/inventory-page';
+import ExpensesPage from '@/components/app/expenses-page';
+import ExpenseCategoriesPage from '@/components/app/expense-categories-page';
+import AccountingPage from '@/components/app/accounting-page';
+import CustomersPage from '@/components/app/customers-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo, forceChangePassword } = useAppStore();
@@ -76,6 +81,16 @@ export default function Home() {
         return <UsersPage />;
       case 'roles':
         return <RolesPage />;
+      case 'inventory':
+        return <InventoryPage />;
+      case 'expenses':
+        return <ExpensesPage />;
+      case 'expense-categories':
+        return <ExpenseCategoriesPage />;
+      case 'accounting':
+        return <AccountingPage />;
+      case 'customers':
+        return <CustomersPage />;
       default:
         return <DashboardPage />;
     }

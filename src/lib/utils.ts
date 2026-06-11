@@ -37,6 +37,18 @@ export function generatePaymentNumber(lastNumber: number, year: number): string 
   return `PAY-${year}-${padded}`;
 }
 
+export function generateExpenseNumber(lastNumber: number, year: number): string {
+  const nextNum = lastNumber + 1;
+  const padded = nextNum.toString().padStart(4, '0');
+  return `EXP-${year}-${padded}`;
+}
+
+export function generateJournalEntryNumber(lastNumber: number, year: number): string {
+  const nextNum = lastNumber + 1;
+  const padded = nextNum.toString().padStart(4, '0');
+  return `JE-${year}-${padded}`;
+}
+
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     active: 'نشطة',
