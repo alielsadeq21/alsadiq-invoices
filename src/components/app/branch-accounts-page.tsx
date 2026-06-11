@@ -389,60 +389,60 @@ export default function BranchAccountsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">كشف حساب الفروع</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold">كشف حساب الفروع</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
             متابعة أرصدة الفروع والديون المستحقة
           </p>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card className="border-0 shadow-md">
-          <CardContent className="p-4 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-              <p className="text-sm text-muted-foreground">إجمالي الفواتير</p>
+          <CardContent className="p-3 sm:p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+              <p className="text-[10px] sm:text-sm text-muted-foreground">إجمالي الفواتير</p>
             </div>
-            <p className="text-xl font-bold text-emerald-600">{formatCurrency(totalInvoiced)}</p>
+            <p className="text-base sm:text-xl font-bold text-emerald-600">{formatCurrency(totalInvoiced)}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-md">
-          <CardContent className="p-4 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <TrendingDown className="w-4 h-4 text-red-600" />
-              <p className="text-sm text-muted-foreground">إجمالي المرتجعات</p>
+          <CardContent className="p-3 sm:p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600" />
+              <p className="text-[10px] sm:text-sm text-muted-foreground">إجمالي المرتجعات</p>
             </div>
-            <p className="text-xl font-bold text-red-600">{formatCurrency(totalReturned)}</p>
+            <p className="text-base sm:text-xl font-bold text-red-600">{formatCurrency(totalReturned)}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-md">
-          <CardContent className="p-4 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Wallet className="w-4 h-4 text-blue-600" />
-              <p className="text-sm text-muted-foreground">إجمالي المدفوعات</p>
+          <CardContent className="p-3 sm:p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+              <p className="text-[10px] sm:text-sm text-muted-foreground">إجمالي المدفوعات</p>
             </div>
-            <p className="text-xl font-bold text-blue-600">{formatCurrency(totalPaid)}</p>
+            <p className="text-base sm:text-xl font-bold text-blue-600">{formatCurrency(totalPaid)}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-md bg-gradient-to-l from-primary to-emerald-700 text-primary-foreground">
-          <CardContent className="p-4 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <FileText className="w-4 h-4 text-primary-foreground/80" />
-              <p className="text-sm text-primary-foreground/80">إجمالي المتبقي</p>
+          <CardContent className="p-3 sm:p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-foreground/80" />
+              <p className="text-[10px] sm:text-sm text-primary-foreground/80">إجمالي المتبقي</p>
             </div>
-            <p className="text-xl font-bold">{formatCurrency(totalBalance)}</p>
+            <p className="text-base sm:text-xl font-bold">{formatCurrency(totalBalance)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Search */}
       <Card className="border-0 shadow-md">
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -455,14 +455,18 @@ export default function BranchAccountsPage() {
         </CardContent>
       </Card>
 
-      {/* Branches Table */}
-      <Card className="border-0 shadow-md">
-        <CardContent className="p-0">
-          {loading ? (
+      {/* Branches List */}
+      {loading ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div className="flex items-center justify-center py-12">
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
-          ) : filteredAccounts.length === 0 ? (
+          </CardContent>
+        </Card>
+      ) : filteredAccounts.length === 0 ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center py-20 px-4">
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
                 <Wallet className="w-12 h-12 text-primary/60" />
@@ -472,70 +476,123 @@ export default function BranchAccountsPage() {
                 لم يتم تسجيل أي فواتير أو دفعات بعد.
               </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">الفرع</TableHead>
-                    <TableHead className="text-right">إجمالي الفواتير</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">إجمالي المرتجعات</TableHead>
-                    <TableHead className="text-right hidden md:table-cell">إجمالي المدفوعات</TableHead>
-                    <TableHead className="text-right">المتبقي</TableHead>
-                    <TableHead className="text-center">كشف حساب</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAccounts.map((account) => (
-                    <TableRow key={account.branch_id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
-                      const branch = branches.find(b => b.id === account.branch_id);
-                      if (branch) openBranchDetail(branch);
-                    }}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Building2 className="w-4 h-4 text-primary" />
-                          </div>
-                          <span className="font-medium">{account.branch_name}</span>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile Card Layout */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {filteredAccounts.map((account) => {
+              const branch = branches.find(b => b.id === account.branch_id);
+              return (
+                <Card
+                  key={account.branch_id}
+                  className="border-0 shadow-md cursor-pointer active:scale-[0.98] transition-transform"
+                  onClick={() => { if (branch) openBranchDetail(branch); }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Building2 className="w-4 h-4 text-primary" />
                         </div>
-                      </TableCell>
-                      <TableCell className="font-semibold">{formatCurrency(account.total_invoiced)}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-red-600">{formatCurrency(account.total_returned)}</TableCell>
-                      <TableCell className="hidden md:table-cell text-blue-600">{formatCurrency(account.total_paid)}</TableCell>
-                      <TableCell>
-                        <span className={`font-bold ${account.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        <h3 className="font-bold text-sm">{account.branch_name}</h3>
+                      </div>
+                      <ArrowUpLeft className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-2 text-center">
+                        <p className="text-[10px] text-muted-foreground">الفواتير</p>
+                        <p className="font-bold text-emerald-600 text-sm">{formatCurrency(account.total_invoiced)}</p>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2 text-center">
+                        <p className="text-[10px] text-muted-foreground">المرتجعات</p>
+                        <p className="font-bold text-red-600 text-sm">{formatCurrency(account.total_returned)}</p>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 text-center">
+                        <p className="text-[10px] text-muted-foreground">المدفوعات</p>
+                        <p className="font-bold text-blue-600 text-sm">{formatCurrency(account.total_paid)}</p>
+                      </div>
+                      <div className={`rounded-lg p-2 text-center ${account.balance > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
+                        <p className="text-[10px] text-muted-foreground">المتبقي</p>
+                        <p className={`font-bold text-sm ${account.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                           {formatCurrency(account.balance)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const branch = branches.find(b => b.id === account.branch_id);
-                            if (branch) openBranchDetail(branch);
-                          }}
-                          title="كشف حساب مفصل"
-                        >
-                          <ArrowUpLeft className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table Layout */}
+          <Card className="border-0 shadow-md hidden sm:block">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">الفرع</TableHead>
+                      <TableHead className="text-right">إجمالي الفواتير</TableHead>
+                      <TableHead className="text-right hidden sm:table-cell">إجمالي المرتجعات</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">إجمالي المدفوعات</TableHead>
+                      <TableHead className="text-right">المتبقي</TableHead>
+                      <TableHead className="text-center">كشف حساب</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAccounts.map((account) => (
+                      <TableRow key={account.branch_id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
+                        const branch = branches.find(b => b.id === account.branch_id);
+                        if (branch) openBranchDetail(branch);
+                      }}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Building2 className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="font-medium">{account.branch_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(account.total_invoiced)}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-red-600">{formatCurrency(account.total_returned)}</TableCell>
+                        <TableCell className="hidden md:table-cell text-blue-600">{formatCurrency(account.total_paid)}</TableCell>
+                        <TableCell>
+                          <span className={`font-bold ${account.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {formatCurrency(account.balance)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const branch = branches.find(b => b.id === account.branch_id);
+                              if (branch) openBranchDetail(branch);
+                            }}
+                            title="كشف حساب مفصل"
+                          >
+                            <ArrowUpLeft className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Branch Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Wallet className="w-5 h-5 text-primary" />
               كشف حساب: {selectedBranch?.name}
             </DialogTitle>
@@ -543,22 +600,22 @@ export default function BranchAccountsPage() {
 
           {/* Summary Cards */}
           {selectedAccount && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground">الفواتير</p>
-                <p className="text-sm font-bold text-emerald-600">{formatCurrency(detailTotalInvoiced)}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+              <div className="p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-center">
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground">الفواتير</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-600">{formatCurrency(detailTotalInvoiced)}</p>
               </div>
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground">المرتجعات</p>
-                <p className="text-sm font-bold text-red-600">{formatCurrency(detailTotalReturned)}</p>
+              <div className="p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground">المرتجعات</p>
+                <p className="text-xs sm:text-sm font-bold text-red-600">{formatCurrency(detailTotalReturned)}</p>
               </div>
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
-                <p className="text-[10px] text-muted-foreground">المدفوعات</p>
-                <p className="text-sm font-bold text-blue-600">{formatCurrency(detailTotalPaid)}</p>
+              <div className="p-2 sm:p-3 bg-blue-50 dark:bg-red-900/20 rounded-lg text-center">
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground">المدفوعات</p>
+                <p className="text-xs sm:text-sm font-bold text-blue-600">{formatCurrency(detailTotalPaid)}</p>
               </div>
-              <div className={`p-3 rounded-lg text-center ${detailBalance > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
-                <p className="text-[10px] text-muted-foreground">المتبقي</p>
-                <p className={`text-sm font-bold ${detailBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              <div className={`p-2 sm:p-3 rounded-lg text-center ${detailBalance > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground">المتبقي</p>
+                <p className={`text-xs sm:text-sm font-bold ${detailBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                   {formatCurrency(detailBalance)}
                 </p>
               </div>
@@ -566,35 +623,35 @@ export default function BranchAccountsPage() {
           )}
 
           {/* Date Filter & Actions */}
-          <div className="flex flex-col sm:flex-row items-end gap-3 mb-4 p-3 bg-muted/50 rounded-lg">
-            <div className="flex-1 grid grid-cols-2 gap-2 w-full">
+          <div className="flex flex-col gap-2 sm:gap-3 mb-4 p-2 sm:p-3 bg-muted/50 rounded-lg">
+            <div className="grid grid-cols-2 gap-2 w-full">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">من تاريخ</label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" />
+                <label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">من تاريخ</label>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 sm:h-9 text-xs sm:text-sm" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" />
+                <label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">إلى تاريخ</label>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 sm:h-9 text-xs sm:text-sm" />
               </div>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" onClick={applyDateFilter} className="gap-1 flex-1 sm:flex-none">
-                <Calendar className="w-3.5 h-3.5" />
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={applyDateFilter} className="gap-1 text-xs h-8">
+                <Calendar className="w-3 h-3" />
                 تطبيق
               </Button>
-              <Button variant="ghost" size="sm" onClick={clearDateFilter} className="flex-1 sm:flex-none">
+              <Button variant="ghost" size="sm" onClick={clearDateFilter} className="text-xs h-8">
                 مسح
               </Button>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" onClick={handlePrintStatement} className="gap-1 flex-1 sm:flex-none">
-                <Printer className="w-3.5 h-3.5" />
-                طباعة
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1 flex-1 sm:flex-none">
-                <Download className="w-3.5 h-3.5" />
-                PDF
-              </Button>
+              <div className="flex gap-2 mr-auto">
+                <Button variant="outline" size="sm" onClick={handlePrintStatement} className="gap-1 text-xs h-8">
+                  <Printer className="w-3 h-3" />
+                  طباعة
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1 text-xs h-8">
+                  <Download className="w-3 h-3" />
+                  PDF
+                </Button>
+              </div>
             </div>
           </div>
 

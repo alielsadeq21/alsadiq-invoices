@@ -198,16 +198,16 @@ export default function BranchesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">إدارة الفروع</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold">إدارة الفروع</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
             إجمالي الفروع: {branches.length} | نشطة: {branches.filter((b) => b.is_active).length}
           </p>
         </div>
-        <Button onClick={openAddDialog} className="gap-2 shadow-md">
+        <Button onClick={openAddDialog} className="gap-2 shadow-md w-full sm:w-auto">
           <Plus className="w-4 h-4" />
           إضافة فرع
         </Button>
@@ -215,7 +215,7 @@ export default function BranchesPage() {
 
       {/* Search */}
       <Card className="border-0 shadow-md">
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -228,14 +228,18 @@ export default function BranchesPage() {
         </CardContent>
       </Card>
 
-      {/* Branches Table */}
-      <Card className="border-0 shadow-md">
-        <CardContent className="p-0">
-          {loading ? (
+      {/* Branches List */}
+      {loading ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div className="flex items-center justify-center py-12">
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
-          ) : filteredBranches.length === 0 ? (
+          </CardContent>
+        </Card>
+      ) : filteredBranches.length === 0 ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center py-20 px-4">
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
                 <Building2 className="w-12 h-12 text-primary/60" />
@@ -249,103 +253,179 @@ export default function BranchesPage() {
                 إضافة فرع جديد
               </Button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">الفرع</TableHead>
-                    <TableHead className="text-right hidden md:table-cell">العنوان</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">الهاتف</TableHead>
-                    <TableHead className="text-center">الحالة</TableHead>
-                    <TableHead className="text-center">تفعيل</TableHead>
-                    <TableHead className="text-center">الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBranches.map((branch) => (
-                    <TableRow key={branch.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Building2 className="w-4 h-4 text-primary" />
-                          </div>
-                          <span className="font-medium">{branch.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex items-center gap-1 text-muted-foreground text-sm">
-                          {branch.address ? (
-                            <>
-                              <MapPin className="w-3 h-3" />
-                              {branch.address}
-                            </>
-                          ) : (
-                            '—'
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <div className="flex items-center gap-1 text-muted-foreground text-sm">
-                          {branch.phone ? (
-                            <>
-                              <Phone className="w-3 h-3" />
-                              {branch.phone}
-                            </>
-                          ) : (
-                            '—'
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile Card Layout */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {filteredBranches.map((branch) => (
+              <Card key={branch.id} className="border-0 shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm">{branch.name}</h3>
                         <Badge
                           variant="secondary"
                           className={
                             branch.is_active
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-[10px]'
                           }
                         >
                           {branch.is_active ? 'نشط' : 'معطل'}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={branch.is_active}
-                          onCheckedChange={() => toggleBranchStatus(branch)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(branch)}
-                            className="h-8 w-8"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setDeletingBranch(branch);
-                              setDeleteDialogOpen(true);
-                            }}
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={branch.is_active}
+                      onCheckedChange={() => toggleBranchStatus(branch)}
+                    />
+                  </div>
+                  {branch.address && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5">
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{branch.address}</span>
+                    </div>
+                  )}
+                  {branch.phone && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-3">
+                      <Phone className="w-3 h-3 flex-shrink-0" />
+                      <span>{branch.phone}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 border-t pt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(branch)}
+                      className="flex-1 gap-1.5 h-8 text-xs"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      تعديل
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDeletingBranch(branch);
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="flex-1 gap-1.5 h-8 text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      حذف
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop Table Layout */}
+          <Card className="border-0 shadow-md hidden sm:block">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">الفرع</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">العنوان</TableHead>
+                      <TableHead className="text-right hidden sm:table-cell">الهاتف</TableHead>
+                      <TableHead className="text-center">الحالة</TableHead>
+                      <TableHead className="text-center">تفعيل</TableHead>
+                      <TableHead className="text-center">الإجراءات</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBranches.map((branch) => (
+                      <TableRow key={branch.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Building2 className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="font-medium">{branch.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                            {branch.address ? (
+                              <>
+                                <MapPin className="w-3 h-3" />
+                                {branch.address}
+                              </>
+                            ) : (
+                              '—'
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                            {branch.phone ? (
+                              <>
+                                <Phone className="w-3 h-3" />
+                                {branch.phone}
+                              </>
+                            ) : (
+                              '—'
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge
+                            variant="secondary"
+                            className={
+                              branch.is_active
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            }
+                          >
+                            {branch.is_active ? 'نشط' : 'معطل'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch
+                            checked={branch.is_active}
+                            onCheckedChange={() => toggleBranchStatus(branch)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(branch)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setDeletingBranch(branch);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

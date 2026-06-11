@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,21 @@ export default function AppSidebar() {
   // Filter nav items based on permissions
   const navItems = allNavItems.filter(item => canAccessPage(item.id));
 
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen && window.innerWidth < 1024) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [sidebarOpen]);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -104,12 +120,13 @@ export default function AppSidebar() {
           position: 'fixed',
           right: 0,
           top: 0,
-          height: '100vh',
+          height: '100dvh',
           width: '18rem',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           zIndex: 50,
+          overscrollBehavior: 'contain',
         }}
         className={cn(
           'bg-sidebar text-sidebar-foreground shadow-2xl transition-transform duration-300',
@@ -153,7 +170,10 @@ export default function AppSidebar() {
             flex: '1 1 0%',
             minHeight: 0,
             overflowY: 'auto',
+            overflowX: 'hidden',
             WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y',
           }}
           className="px-3 py-4"
         >

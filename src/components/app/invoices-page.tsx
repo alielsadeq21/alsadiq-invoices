@@ -291,17 +291,17 @@ export default function InvoicesPage() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">الفواتير</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold">الفواتير</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
             إجمالي: {totalCount} فاتورة
           </p>
         </div>
         {hasPermission('invoices', 'create') && (
-          <Button onClick={() => navigateTo('invoice-form')} className="gap-2 shadow-md">
+          <Button onClick={() => navigateTo('invoice-form')} className="gap-2 shadow-md w-full sm:w-auto">
             <Plus className="w-4 h-4" />
             فاتورة جديدة
           </Button>
@@ -310,40 +310,40 @@ export default function InvoicesPage() {
 
       {/* Filters */}
       <Card className="border-0 shadow-md">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <div className="relative sm:col-span-2 lg:col-span-1">
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+            <div className="relative col-span-2 lg:col-span-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="بحث برقم الفاتورة أو الفرع..."
+                placeholder="بحث برقم الفاتورة..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="pr-10"
+                className="pr-10 h-9"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
               <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                className="h-9"
+                className="h-9 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                className="h-9"
+                className="h-9 text-xs sm:text-sm"
               />
             </div>
             {isAdmin && (
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">الفرع</Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">الفرع</Label>
                 <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-9 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -356,9 +356,9 @@ export default function InvoicesPage() {
               </div>
             )}
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">الحالة</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">الحالة</Label>
               <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -374,14 +374,18 @@ export default function InvoicesPage() {
         </CardContent>
       </Card>
 
-      {/* Invoices Table */}
-      <Card className="border-0 shadow-md">
-        <CardContent className="p-0">
-          {loading ? (
+      {/* Invoices List */}
+      {loading ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div className="flex items-center justify-center py-12">
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
-          ) : invoices.length === 0 ? (
+          </CardContent>
+        </Card>
+      ) : invoices.length === 0 ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center py-20 px-4">
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
                 <FileText className="w-12 h-12 text-primary/60" />
@@ -395,8 +399,84 @@ export default function InvoicesPage() {
                 إنشاء فاتورة جديدة
               </Button>
             </div>
-          ) : (
-            <>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile Card Layout */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {invoices.map((invoice) => (
+              <Card
+                key={invoice.id}
+                className="border-0 shadow-md cursor-pointer active:scale-[0.98] transition-transform"
+                onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-bold text-sm">{invoice.invoice_number}</h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {(invoice as { branches?: { name: string } }).branches?.name || ''}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className={`text-[10px] ${getStatusColor(invoice.status)}`}
+                    >
+                      {getStatusLabel(invoice.status)}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-2 border-t">
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(invoice.invoice_date)}
+                    </span>
+                    <span className="font-bold text-sm">{formatCurrency(invoice.total)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-3 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-7 text-[10px] gap-1"
+                      onClick={(e) => { e.stopPropagation(); navigateTo('invoice-detail', { id: invoice.id }); }}
+                    >
+                      <Eye className="w-3 h-3" />
+                      عرض
+                    </Button>
+                    {hasPermission('invoices', 'print') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-7 text-[10px] gap-1"
+                        onClick={(e) => { e.stopPropagation(); handleQuickPrint(invoice, 'a4'); }}
+                      >
+                        <Printer className="w-3 h-3" />
+                        طباعة
+                      </Button>
+                    )}
+                    {invoice.status === 'active' && hasPermission('invoices', 'delete') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-7 text-[10px] gap-1 text-destructive hover:text-destructive border-destructive/30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCancellingInvoice(invoice);
+                          setCancelDialogOpen(true);
+                        }}
+                      >
+                        <XCircle className="w-3 h-3" />
+                        إلغاء
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop Table Layout */}
+          <Card className="border-0 shadow-md hidden sm:block">
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -512,10 +592,22 @@ export default function InvoicesPage() {
                 onPageChange={setPage}
                 label="فاتورة"
               />
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Mobile Pagination */}
+          <div className="sm:hidden">
+            <DataTablePagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              label="فاتورة"
+            />
+          </div>
+        </>
+      )}
 
       {/* Cancel Dialog */}
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>

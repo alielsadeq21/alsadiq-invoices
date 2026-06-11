@@ -456,12 +456,12 @@ export default function AccountStatementPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">كشف حساب الفرع</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold">كشف حساب الفرع</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
             عرض تفصيلي لكل حركات الفرع من فواتير ومرتجعات ومدفوعات
           </p>
         </div>
@@ -469,12 +469,12 @@ export default function AccountStatementPage() {
 
       {/* Filters */}
       <Card className="border-0 shadow-md">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">الفرع *</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">الفرع *</Label>
               <Select value={selectedBranch} onValueChange={setSelectedBranch} disabled={!isAdmin && !!user?.branch_id}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 text-xs sm:text-sm">
                   <SelectValue placeholder="اختر الفرع" />
                 </SelectTrigger>
                 <SelectContent>
@@ -485,27 +485,27 @@ export default function AccountStatementPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ *</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">من تاريخ *</Label>
               <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="h-9"
+                className="h-9 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ *</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">إلى تاريخ *</Label>
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="h-9"
+                className="h-9 text-xs sm:text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">نوع الحركة</Label>
+              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">نوع الحركة</Label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -516,8 +516,8 @@ export default function AccountStatementPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
-              <Button onClick={generateStatement} disabled={loading} className="w-full gap-2 h-9">
+            <div className="flex items-end col-span-2 lg:col-span-1">
+              <Button onClick={generateStatement} disabled={loading} className="w-full gap-2 h-9 text-xs sm:text-sm">
                 <Search className="w-4 h-4" />
                 {loading ? 'جاري التحليل...' : 'عرض الكشف'}
               </Button>
@@ -531,59 +531,59 @@ export default function AccountStatementPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-4">
-            <Button onClick={handlePrint} variant="outline" className="gap-2">
-              <Printer className="w-4 h-4" />
+            <Button onClick={handlePrint} variant="outline" className="gap-2 text-xs sm:text-sm h-8 sm:h-9">
+              <Printer className="w-3.5 h-3.5" />
               طباعة
             </Button>
-            <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
-              <FileDown className="w-4 h-4" />
+            <Button onClick={handleDownloadPDF} variant="outline" className="gap-2 text-xs sm:text-sm h-8 sm:h-9">
+              <FileDown className="w-3.5 h-3.5" />
               تحميل PDF
             </Button>
-            <Button onClick={handleDownloadExcel} variant="outline" className="gap-2">
-              <FileSpreadsheet className="w-4 h-4" />
+            <Button onClick={handleDownloadExcel} variant="outline" className="gap-2 text-xs sm:text-sm h-8 sm:h-9">
+              <FileSpreadsheet className="w-3.5 h-3.5" />
               تحميل Excel
             </Button>
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mb-4">
             <Card className="border-0 shadow-md bg-gradient-to-bl from-red-50 to-white dark:from-red-900/20 dark:to-card">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                    <ArrowUpFromLine className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                    <ArrowUpFromLine className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">إجمالي المدين (عليه)</p>
-                    <p className="text-xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalDebit)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">إجمالي المدين (عليه)</p>
+                    <p className="text-base sm:text-xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalDebit)}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card className="border-0 shadow-md bg-gradient-to-bl from-emerald-50 to-white dark:from-emerald-900/20 dark:to-card">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                    <ArrowDownToLine className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                    <ArrowDownToLine className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">إجمالي الدائن (له)</p>
-                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalCredit)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">إجمالي الدائن (له)</p>
+                    <p className="text-base sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalCredit)}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card className="border-0 shadow-md bg-gradient-to-bl from-primary/5 to-white dark:from-primary/20 dark:to-card">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Scale className="w-5 h-5 text-primary" />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">الرصيد الصافي</p>
-                    <p className={`text-xl font-bold ${netBalance > 0 ? 'text-red-600 dark:text-red-400' : netBalance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'}`}>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">الرصيد الصافي</p>
+                    <p className={`text-base sm:text-xl font-bold ${netBalance > 0 ? 'text-red-600 dark:text-red-400' : netBalance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'}`}>
                       {formatCurrency(Math.abs(netBalance))}
-                      <span className="text-sm font-normal mr-1">
+                      <span className="text-[10px] sm:text-sm font-normal mr-1">
                         {netBalance > 0 ? '(عليه)' : netBalance < 0 ? '(له)' : ''}
                       </span>
                     </p>
@@ -597,7 +597,7 @@ export default function AccountStatementPage() {
           {netBalance !== 0 && (
             <Card className="border-0 shadow-md mb-4 border-dashed">
               <CardContent className="p-3">
-                <p className="text-sm text-center text-muted-foreground">
+                <p className="text-xs sm:text-sm text-center text-muted-foreground">
                   الرصيد: <span className="font-semibold text-foreground">{numberToArabicWords(Math.abs(netBalance))}</span>
                   <span className="mr-1">{netBalance > 0 ? '(مدين/عليه)' : netBalance < 0 ? '(دائن/له)' : ''}</span>
                 </p>
@@ -605,8 +605,58 @@ export default function AccountStatementPage() {
             </Card>
           )}
 
-          {/* Transactions Table */}
-          <Card className="border-0 shadow-md">
+          {/* Transactions - Mobile Card Layout */}
+          <Card className="border-0 shadow-md sm:hidden">
+            <CardContent className="p-0">
+              {entries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-4">
+                  <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <FileText className="w-10 h-10 text-muted-foreground/50" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">لا توجد حركات</h3>
+                  <p className="text-muted-foreground text-sm text-center">
+                    لا توجد حركات مسجلة لهذا الفرع في الفترة المحددة
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {entries.map((entry, idx) => (
+                    <div key={idx} className="p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-medium ${getTypeBadgeColor(entry.type)}`}>
+                            {getTypeLabel(entry.type)}
+                          </span>
+                          <span className="text-xs font-medium">{entry.reference}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{formatDate(entry.date)}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-2">{entry.description}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex gap-3 text-[11px]">
+                          {entry.debit > 0 && (
+                            <span className="text-red-600 font-semibold">عليه: {formatCurrency(entry.debit)}</span>
+                          )}
+                          {entry.credit > 0 && (
+                            <span className="text-emerald-600 font-semibold">له: {formatCurrency(entry.credit)}</span>
+                          )}
+                        </div>
+                        <span className={`text-xs font-bold ${entry.balance > 0 ? 'text-red-600' : entry.balance < 0 ? 'text-emerald-600' : ''}`}>
+                          {formatCurrency(Math.abs(entry.balance))}
+                          <span className="text-[9px] font-normal mr-0.5">
+                            {entry.balance > 0 ? 'ع' : entry.balance < 0 ? 'ل' : ''}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Transactions - Desktop Table Layout */}
+          <Card className="border-0 shadow-md hidden sm:block">
             <CardContent className="p-0">
               {entries.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 px-4">
