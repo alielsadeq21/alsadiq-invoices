@@ -38,30 +38,61 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const allNavItems = [
-  { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
-  { id: 'branches', label: 'الفروع', icon: Building2 },
-  { id: 'products', label: 'المنتجات', icon: Package },
-  { id: 'customers', label: 'العملاء', icon: Users },
-  { id: 'invoices', label: 'الفواتير', icon: FileText },
-  { id: 'returns', label: 'المرتجعات', icon: RotateCcw },
-  { id: 'payments', label: 'القبض', icon: Banknote },
-  { id: 'inventory', label: 'المخزون', icon: Warehouse },
-  { id: 'inventory-transfers', label: 'التصبين والتحويلات', icon: ArrowRightLeft },
-  { id: 'inventory-counts', label: 'جرد المخزون', icon: ClipboardCheck },
-  { id: 'expenses', label: 'المصروفات', icon: Receipt },
-  { id: 'branch-accounts', label: 'كشف الحسابات', icon: Wallet },
-  { id: 'account-statement', label: 'كشف حساب مفصل', icon: ScrollText },
-  { id: 'accounting', label: 'القيود المحاسبية', icon: BookOpen },
-  { id: 'chart-of-accounts', label: 'شجرة الحسابات', icon: BookOpenCheck },
-  { id: 'accounting-reports', label: 'التقارير المحاسبية', icon: BookOpen },
-  { id: 'reports', label: 'التقارير', icon: BarChart3 },
-  { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList },
-  { id: 'payment-methods', label: 'طرق الدفع', icon: CreditCard },
-  { id: 'expense-categories', label: 'تصنيفات المصروفات', icon: Tags },
-  { id: 'users', label: 'المستخدمين', icon: Users },
-  { id: 'roles', label: 'الأدوار', icon: Shield },
-  { id: 'settings', label: 'الإعدادات', icon: Settings },
+// Navigation groups with colored icons
+const navGroups = [
+  {
+    title: 'الرئيسية',
+    items: [
+      { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, color: 'from-blue-500 to-blue-600' },
+    ],
+  },
+  {
+    title: 'إدارة البيانات',
+    items: [
+      { id: 'branches', label: 'الفروع', icon: Building2, color: 'from-violet-500 to-violet-600' },
+      { id: 'products', label: 'المنتجات', icon: Package, color: 'from-amber-500 to-amber-600' },
+      { id: 'customers', label: 'العملاء', icon: Users, color: 'from-teal-500 to-teal-600' },
+    ],
+  },
+  {
+    title: 'المبيعات والمالية',
+    items: [
+      { id: 'invoices', label: 'الفواتير', icon: FileText, color: 'from-emerald-500 to-emerald-600' },
+      { id: 'returns', label: 'المرتجعات', icon: RotateCcw, color: 'from-rose-500 to-rose-600' },
+      { id: 'payments', label: 'القبض', icon: Banknote, color: 'from-green-500 to-green-600' },
+      { id: 'expenses', label: 'المصروفات', icon: Receipt, color: 'from-orange-500 to-orange-600' },
+    ],
+  },
+  {
+    title: 'المخزون',
+    items: [
+      { id: 'inventory', label: 'المخزون', icon: Warehouse, color: 'from-cyan-500 to-cyan-600' },
+      { id: 'inventory-transfers', label: 'التصبين والتحويلات', icon: ArrowRightLeft, color: 'from-indigo-500 to-indigo-600' },
+      { id: 'inventory-counts', label: 'جرد المخزون', icon: ClipboardCheck, color: 'from-sky-500 to-sky-600' },
+    ],
+  },
+  {
+    title: 'الحسابات',
+    items: [
+      { id: 'branch-accounts', label: 'كشف الحسابات', icon: Wallet, color: 'from-lime-500 to-lime-600' },
+      { id: 'account-statement', label: 'كشف حساب مفصل', icon: ScrollText, color: 'from-fuchsia-500 to-fuchsia-600' },
+      { id: 'accounting', label: 'القيود المحاسبية', icon: BookOpen, color: 'from-purple-500 to-purple-600' },
+      { id: 'chart-of-accounts', label: 'شجرة الحسابات', icon: BookOpenCheck, color: 'from-pink-500 to-pink-600' },
+      { id: 'accounting-reports', label: 'التقارير المحاسبية', icon: BookOpen, color: 'from-red-500 to-red-600' },
+    ],
+  },
+  {
+    title: 'التقارير والإدارة',
+    items: [
+      { id: 'reports', label: 'التقارير', icon: BarChart3, color: 'from-yellow-500 to-yellow-600' },
+      { id: 'activity-log', label: 'سجل النشاط', icon: ClipboardList, color: 'from-gray-500 to-gray-600' },
+      { id: 'payment-methods', label: 'طرق الدفع', icon: CreditCard, color: 'from-emerald-500 to-emerald-600' },
+      { id: 'expense-categories', label: 'تصنيفات المصروفات', icon: Tags, color: 'from-orange-500 to-orange-600' },
+      { id: 'users', label: 'المستخدمين', icon: Users, color: 'from-blue-500 to-blue-600' },
+      { id: 'roles', label: 'الأدوار', icon: Shield, color: 'from-red-500 to-red-600' },
+      { id: 'settings', label: 'الإعدادات', icon: Settings, color: 'from-slate-500 to-slate-600' },
+    ],
+  },
 ];
 
 // Role display names mapping
@@ -77,7 +108,10 @@ export default function AppSidebar() {
   const { theme, setTheme } = useTheme();
 
   // Filter nav items based on permissions
-  const navItems = allNavItems.filter(item => canAccessPage(item.id));
+  const filteredGroups = navGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => canAccessPage(item.id)),
+  })).filter(group => group.items.length > 0);
 
   // Lock body scroll when sidebar is open on mobile
   useEffect(() => {
@@ -96,10 +130,10 @@ export default function AppSidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay with blur */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -108,7 +142,7 @@ export default function AppSidebar() {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-4 right-4 z-50 lg:hidden bg-card shadow-md h-10 w-10"
+        className="fixed top-4 right-4 z-50 lg:hidden bg-card/80 backdrop-blur-md shadow-lg border border-border/50 h-11 w-11 rounded-xl hover:bg-card transition-all"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
         {sidebarOpen ? <ChevronRight className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -121,7 +155,7 @@ export default function AppSidebar() {
           right: 0,
           top: 0,
           height: '100dvh',
-          width: '18rem',
+          width: '17.5rem',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -133,36 +167,39 @@ export default function AppSidebar() {
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        {/* Header - fixed at top */}
-        <div style={{ flexShrink: 0 }} className="p-5 flex items-center gap-3">
-          <div className="w-11 h-11 bg-sidebar-primary rounded-xl flex items-center justify-center shadow-md flex-shrink-0 overflow-hidden">
-            {settings?.logo_url ? (
-              <img
-                src={settings.logo_url}
-                alt="شعار المصنع"
-                className="w-8 h-8 object-contain"
-              />
-            ) : (
-              <span className="text-2xl font-extrabold text-[#D4A843] leading-none select-none">ص</span>
-            )}
+        {/* Header with gradient accent */}
+        <div style={{ flexShrink: 0 }} className="relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-primary via-emerald-400 to-primary" />
+          <div className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-primary to-primary/80">
+              {settings?.logo_url ? (
+                <img
+                  src={settings.logo_url}
+                  alt="شعار المصنع"
+                  className="w-7 h-7 object-contain"
+                />
+              ) : (
+                <span className="text-xl font-extrabold text-primary-foreground leading-none select-none">ص</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-bold text-sm truncate">
+                {settings?.factory_name || 'مصنع الصادق'}
+              </h2>
+              <p className="text-[11px] text-sidebar-foreground/50">نظام فواتير الصرف</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 h-7 w-7"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-sm truncate">
-              {settings?.factory_name || 'مصنع الصادق'}
-            </h2>
-            <p className="text-xs text-sidebar-foreground/60">نظام فواتير الصرف</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
         </div>
 
-        <Separator className="bg-sidebar-border" />
+        <Separator className="bg-sidebar-border/50" />
 
         {/* Navigation - scrollable area */}
         <div
@@ -175,50 +212,80 @@ export default function AppSidebar() {
             overscrollBehavior: 'contain',
             touchAction: 'pan-y',
           }}
-          className="px-3 py-4"
+          className="px-2.5 py-3"
         >
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = currentPage === item.id ||
-                (item.id === 'invoices' && (currentPage === 'invoice-form' || currentPage === 'invoice-detail')) ||
-                (item.id === 'returns' && currentPage === 'return-form');
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.id}
-                  variant="ghost"
-                  onClick={() => {
-                    navigateTo(item.id);
-                    if (window.innerWidth < 1024) setSidebarOpen(false);
-                  }}
-                  className={cn(
-                    'w-full justify-start gap-3 h-11 px-4 rounded-xl transition-all',
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground shadow-md'
-                      : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                  )}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Button>
-              );
-            })}
-          </nav>
+          {filteredGroups.map((group, groupIndex) => (
+            <div key={group.title} className={cn(groupIndex > 0 && 'mt-4')}>
+              {/* Group header */}
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                {group.title}
+              </p>
+              <nav className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = currentPage === item.id ||
+                    (item.id === 'invoices' && (currentPage === 'invoice-form' || currentPage === 'invoice-detail')) ||
+                    (item.id === 'returns' && currentPage === 'return-form');
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        navigateTo(item.id);
+                        if (window.innerWidth < 1024) setSidebarOpen(false);
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 h-9 px-3 rounded-lg transition-all duration-200 text-right',
+                        isActive
+                          ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/20'
+                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
+                      )}
+                    >
+                      {/* Icon with colored circle when inactive, white when active */}
+                      <div className={cn(
+                        'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all',
+                        isActive
+                          ? 'bg-white/20'
+                          : `bg-gradient-to-br ${item.color} shadow-sm`
+                      )}>
+                        <Icon className={cn(
+                          'w-3.5 h-3.5',
+                          isActive ? 'text-sidebar-primary-foreground' : 'text-white'
+                        )} />
+                      </div>
+                      <span className={cn(
+                        'text-[13px] truncate',
+                        isActive ? 'font-semibold' : 'font-medium'
+                      )}>
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          ))}
         </div>
 
-        <Separator className="bg-sidebar-border" />
+        <Separator className="bg-sidebar-border/50" />
 
         {/* Footer - fixed at bottom */}
-        <div style={{ flexShrink: 0 }} className="p-4 space-y-3">
+        <div style={{ flexShrink: 0 }} className="p-3 space-y-2.5">
           {/* Theme toggle */}
-          <div className="flex items-center justify-between px-2">
+          <div className="flex items-center justify-between px-2 py-1">
             <div className="flex items-center gap-2">
-              {theme === 'dark' ? (
-                <Moon className="w-4 h-4 text-sidebar-foreground/60" />
-              ) : (
-                <Sun className="w-4 h-4 text-sidebar-foreground/60" />
-              )}
-              <Label className="text-xs text-sidebar-foreground/60 cursor-pointer">
+              <div className={cn(
+                'w-6 h-6 rounded-md flex items-center justify-center',
+                theme === 'dark'
+                  ? 'bg-indigo-500/20'
+                  : 'bg-amber-500/20'
+              )}>
+                {theme === 'dark' ? (
+                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                ) : (
+                  <Sun className="w-3.5 h-3.5 text-amber-500" />
+                )}
+              </div>
+              <Label className="text-[11px] text-sidebar-foreground/50 cursor-pointer">
                 الوضع الليلي
               </Label>
             </div>
@@ -229,18 +296,18 @@ export default function AppSidebar() {
             />
           </div>
 
-          <Separator className="bg-sidebar-border" />
+          <Separator className="bg-sidebar-border/30" />
 
           {/* User info */}
-          <div className="flex items-center gap-3 px-2">
-            <Avatar className="w-9 h-9 border-2 border-sidebar-primary">
-              <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
+          <div className="flex items-center gap-2.5 px-2 py-1">
+            <Avatar className="w-8 h-8 border-2 border-sidebar-primary/50">
+              <AvatarFallback className="bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 text-sidebar-primary-foreground text-[11px] font-bold">
                 {user?.full_name?.charAt(0) || 'ع'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.full_name || 'علي محمد الصادق'}</p>
-              <p className="text-xs text-sidebar-foreground/50">
+              <p className="text-[12px] font-medium truncate">{user?.full_name || 'علي محمد الصادق'}</p>
+              <p className="text-[10px] text-sidebar-foreground/40">
                 {user?.role_name ? (roleDisplayNames[user.role_name] || user.role_name) : 'مدير النظام'}
               </p>
             </div>
@@ -249,10 +316,10 @@ export default function AppSidebar() {
           <Button
             variant="ghost"
             onClick={logout}
-            className="w-full justify-start gap-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 h-10"
+            className="w-full justify-start gap-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 text-[12px] rounded-lg"
           >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">تسجيل الخروج</span>
+            <LogOut className="w-3.5 h-3.5" />
+            <span>تسجيل الخروج</span>
           </Button>
         </div>
       </aside>

@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Building2, Plus, Search, Edit, Trash2, Phone, MapPin } from 'lucide-react';
+import { Building2, Plus, Search, Edit, Trash2, Phone, MapPin, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function BranchesPage() {
@@ -183,11 +183,14 @@ export default function BranchesPage() {
       (b.phone && b.phone.includes(search))
   );
 
+  const activeCount = branches.filter((b) => b.is_active).length;
+  const inactiveCount = branches.length - activeCount;
+
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
-          <Building2 className="w-12 h-12 text-destructive/60" />
+        <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))' }}>
+          <Building2 className="w-12 h-12 text-red-500/70" />
         </div>
         <h2 className="text-xl font-bold">غير مسموح</h2>
         <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -200,21 +203,44 @@ export default function BranchesPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">إدارة الفروع</h1>
-          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
-            إجمالي الفروع: {branches.length} | نشطة: {branches.filter((b) => b.is_active).length}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+            <Building2 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">إدارة الفروع</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-1 text-xs">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-muted-foreground">نشطة: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{activeCount}</span></span>
+              </div>
+              <div className="w-px h-3 bg-border" />
+              <div className="flex items-center gap-1 text-xs">
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-muted-foreground">معطلة: <span className="font-semibold text-red-600 dark:text-red-400">{inactiveCount}</span></span>
+              </div>
+              <div className="w-px h-3 bg-border" />
+              <div className="flex items-center gap-1 text-xs">
+                <Building2 className="w-3 h-3 text-muted-foreground" />
+                <span className="text-muted-foreground">الإجمالي: <span className="font-semibold">{branches.length}</span></span>
+              </div>
+            </div>
+          </div>
         </div>
-        <Button onClick={openAddDialog} className="gap-2 shadow-md w-full sm:w-auto">
+        <Button
+          onClick={openAddDialog}
+          className="gap-2 shadow-lg w-full sm:w-auto text-white font-medium"
+          style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+        >
           <Plus className="w-4 h-4" />
           إضافة فرع
         </Button>
       </div>
 
       {/* Search */}
-      <Card className="border-0 shadow-md">
+      <Card className="border-0 shadow-md overflow-hidden">
+        <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #10b981)' }} />
         <CardContent className="p-3 sm:p-4">
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -241,14 +267,19 @@ export default function BranchesPage() {
         <Card className="border-0 shadow-md">
           <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                <Building2 className="w-12 h-12 text-primary/60" />
+              <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))' }}>
+                <Building2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h3 className="text-xl font-bold mb-2">لا توجد فروع</h3>
-              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+              <h3 className="text-xl font-bold mb-2 tracking-tight">لا توجد فروع</h3>
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
                 لم يتم إضافة أي فروع بعد. أضف فرعاً لبدء إدارة الفواتير وتتبع الصرف لكل فرع.
               </p>
-              <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
+              <Button
+                onClick={openAddDialog}
+                className="gap-2 shadow-lg text-white font-medium"
+                size="lg"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              >
                 <Plus className="w-5 h-5" />
                 إضافة فرع جديد
               </Button>
@@ -260,132 +291,168 @@ export default function BranchesPage() {
           {/* Mobile Card Layout */}
           <div className="flex flex-col gap-3 sm:hidden">
             {filteredBranches.map((branch) => (
-              <Card key={branch.id} className="border-0 shadow-md">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Building2 className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm">{branch.name}</h3>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            branch.is_active
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-[10px]'
-                          }
+              <Card
+                key={branch.id}
+                className="border-0 shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden"
+              >
+                <div className="flex" style={{ display: 'flex' }}>
+                  {/* Right accent border */}
+                  <div
+                    className="w-1 flex-shrink-0"
+                    style={{ background: branch.is_active ? 'linear-gradient(180deg, #10b981, #059669)' : 'linear-gradient(180deg, #ef4444, #dc2626)' }}
+                  />
+                  <CardContent className="p-4 flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+                          style={{ background: branch.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}
                         >
-                          {branch.is_active ? 'نشط' : 'معطل'}
-                        </Badge>
+                          <Building2 className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-sm leading-tight">{branch.name}</h3>
+                          <div className="mt-1">
+                            <Badge
+                              variant="secondary"
+                              className={
+                                branch.is_active
+                                  ? 'text-[10px] px-2 py-0 border-0 font-medium'
+                                  : 'text-[10px] px-2 py-0 border-0 font-medium'
+                              }
+                              style={
+                                branch.is_active
+                                  ? { background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1))', color: '#059669' }
+                                  : { background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.1))', color: '#dc2626' }
+                              }
+                            >
+                              {branch.is_active ? (
+                                <span className="flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5" /> نشط</span>
+                              ) : (
+                                <span className="flex items-center gap-1"><XCircle className="w-2.5 h-2.5" /> معطل</span>
+                              )}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
+                      <Switch
+                        checked={branch.is_active}
+                        onCheckedChange={() => toggleBranchStatus(branch)}
+                      />
                     </div>
-                    <Switch
-                      checked={branch.is_active}
-                      onCheckedChange={() => toggleBranchStatus(branch)}
-                    />
-                  </div>
-                  {branch.address && (
-                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5">
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{branch.address}</span>
+                    {branch.address && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5 mr-1">
+                        <MapPin className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+                        <span className="truncate">{branch.address}</span>
+                      </div>
+                    )}
+                    {branch.phone && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-3 mr-1">
+                        <Phone className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+                        <span dir="ltr">{branch.phone}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 border-t pt-3 mt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(branch)}
+                        className="flex-1 gap-1.5 h-9 text-xs font-medium border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 hover:border-emerald-300"
+                        style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.06), rgba(5,150,105,0.03))' }}
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        تعديل
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDeletingBranch(branch);
+                          setDeleteDialogOpen(true);
+                        }}
+                        className="flex-1 gap-1.5 h-9 text-xs font-medium border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 hover:text-red-700 hover:border-red-300"
+                        style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(220,38,38,0.03))' }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        حذف
+                      </Button>
                     </div>
-                  )}
-                  {branch.phone && (
-                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-3">
-                      <Phone className="w-3 h-3 flex-shrink-0" />
-                      <span>{branch.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 border-t pt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(branch)}
-                      className="flex-1 gap-1.5 h-8 text-xs"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                      تعديل
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setDeletingBranch(branch);
-                        setDeleteDialogOpen(true);
-                      }}
-                      className="flex-1 gap-1.5 h-8 text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      حذف
-                    </Button>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                </div>
               </Card>
             ))}
           </div>
 
           {/* Desktop Table Layout */}
-          <Card className="border-0 shadow-md hidden sm:block">
+          <Card className="border-0 shadow-md overflow-hidden hidden sm:block">
+            {/* Gradient accent bar */}
+            <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #10b981)' }} />
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">الفرع</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">العنوان</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">الهاتف</TableHead>
-                      <TableHead className="text-center">الحالة</TableHead>
-                      <TableHead className="text-center">تفعيل</TableHead>
-                      <TableHead className="text-center">الإجراءات</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3">الفرع</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden md:table-cell">العنوان</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden sm:table-cell">الهاتف</TableHead>
+                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الحالة</TableHead>
+                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">تفعيل</TableHead>
+                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredBranches.map((branch) => (
-                      <TableRow key={branch.id}>
+                      <TableRow key={branch.id} className="transition-colors hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10">
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <Building2 className="w-4 h-4 text-primary" />
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+                              style={{ background: branch.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+                            >
+                              <Building2 className="w-4 h-4 text-white" />
                             </div>
-                            <span className="font-medium">{branch.name}</span>
+                            <span className="font-semibold text-sm">{branch.name}</span>
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                             {branch.address ? (
                               <>
-                                <MapPin className="w-3 h-3" />
+                                <MapPin className="w-3.5 h-3.5 text-emerald-500" />
                                 {branch.address}
                               </>
                             ) : (
-                              '—'
+                              <span className="text-muted-foreground/50">—</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                             {branch.phone ? (
                               <>
-                                <Phone className="w-3 h-3" />
-                                {branch.phone}
+                                <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                                <span dir="ltr">{branch.phone}</span>
                               </>
                             ) : (
-                              '—'
+                              <span className="text-muted-foreground/50">—</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
                             variant="secondary"
-                            className={
+                            className="border-0 font-medium px-3"
+                            style={
                               branch.is_active
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                ? { background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1))', color: '#059669' }
+                                : { background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.1))', color: '#dc2626' }
                             }
                           >
-                            {branch.is_active ? 'نشط' : 'معطل'}
+                            {branch.is_active ? (
+                              <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> نشط</span>
+                            ) : (
+                              <span className="flex items-center gap-1"><XCircle className="w-3 h-3" /> معطل</span>
+                            )}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -400,7 +467,7 @@ export default function BranchesPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => openEditDialog(branch)}
-                              className="h-8 w-8"
+                              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -411,7 +478,7 @@ export default function BranchesPage() {
                                 setDeletingBranch(branch);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -429,9 +496,15 @@ export default function BranchesPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              >
+                {editingBranch ? <Edit className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+              </div>
               {editingBranch ? 'تعديل الفرع' : 'إضافة فرع جديد'}
             </DialogTitle>
           </DialogHeader>
@@ -472,11 +545,15 @@ export default function BranchesPage() {
               <Label htmlFor="branch-active">فرع نشط</Label>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave}>
+            <Button
+              onClick={handleSave}
+              className="text-white font-medium"
+              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+            >
               {editingBranch ? 'تحديث' : 'إضافة'}
             </Button>
           </DialogFooter>
@@ -485,16 +562,28 @@ export default function BranchesPage() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[95vw] sm:w-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف الفرع</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+              >
+                <Trash2 className="w-4 h-4 text-white" />
+              </div>
+              حذف الفرع
+            </AlertDialogTitle>
             <AlertDialogDescription>
               هل أنت متأكد من حذف فرع &quot;{deletingBranch?.name}&quot;؟ لا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="text-white font-medium"
+              style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+            >
               حذف
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -57,6 +57,8 @@ import {
   UserX,
   Filter,
   Loader2,
+  Mail,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -386,8 +388,8 @@ export default function UsersPage() {
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
-        <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-5">
-          <Shield className="w-12 h-12 text-red-500" />
+        <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+          <Shield className="w-10 h-10 text-white" />
         </div>
         <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
         <p className="text-muted-foreground text-sm text-center">
@@ -402,16 +404,18 @@ export default function UsersPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Users className="w-6 h-6 text-primary" />
-              إدارة المستخدمين
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              إجمالي المستخدمين: {users.length} | نشط: {users.filter(u => u.is_active).length}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">إدارة المستخدمين</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                إجمالي المستخدمين: <span className="font-semibold text-foreground">{users.length}</span> | نشط: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{users.filter(u => u.is_active).length}</span>
+              </p>
+            </div>
           </div>
-          <Button onClick={openAddDialog} className="gap-2 shadow-md">
+          <Button onClick={openAddDialog} className="gap-2 shadow-lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
             <Plus className="w-4 h-4" />
             إضافة مستخدم
           </Button>
@@ -420,7 +424,8 @@ export default function UsersPage() {
 
       {/* Search & Filters */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb, #1d4ed8)' }} />
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -465,133 +470,238 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+                </div>
+                <p className="text-muted-foreground text-sm">جاري تحميل المستخدمين...</p>
               </div>
             ) : filteredUsers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <Users className="w-12 h-12 text-primary/60" />
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #93c5fd, #3b82f6)' }}>
+                  <Users className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا يوجد مستخدمون</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم إضافة أي مستخدمين بعد. أضف مستخدماً لبدء إدارة الصلاحيات.
                 </p>
-                <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
+                <Button onClick={openAddDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
                   <Plus className="w-5 h-5" />
                   إضافة مستخدم جديد
                 </Button>
               </div>
             ) : (
-              <ScrollArea className="max-h-[calc(100vh-320px)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">الاسم الكامل</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">اسم المستخدم</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">الدور</TableHead>
-                      <TableHead className="text-right hidden lg:table-cell">الفرع</TableHead>
-                      <TableHead className="text-center">الحالة</TableHead>
-                      <TableHead className="text-center hidden lg:table-cell">آخر دخول</TableHead>
-                      <TableHead className="text-center">الإجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((u) => {
-                      const isCurrentUser = u.id === currentUser?.id;
-                      const isAdminUser = u.roles?.name === 'admin';
-                      return (
-                        <TableRow key={u.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${u.is_active ? 'bg-primary/10' : 'bg-muted'}`}>
-                                <span className={`text-sm font-bold ${u.is_active ? 'text-primary' : 'text-muted-foreground'}`}>
-                                  {u.full_name.charAt(0)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="font-medium text-sm">{u.full_name}</span>
-                                {isCurrentUser && (
-                                  <span className="text-[10px] text-primary mr-1">(أنت)</span>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-                            {u.username}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            {u.roles?.display_name ? (
-                              <Badge variant="secondary" className="text-[11px] bg-primary/10 text-primary">
-                                {u.roles.display_name}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
-                            {isAdminUser ? 'الكل' : (u.branches?.name || '—')}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge
-                              variant="secondary"
-                              className={
-                                u.is_active
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                              }
-                            >
-                              {u.is_active ? 'نشط' : 'معطل'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center hidden lg:table-cell text-muted-foreground text-xs whitespace-nowrap">
-                            {u.last_login ? formatDateTime(u.last_login) : '—'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditDialog(u)}
-                                title="تعديل"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openResetPasswordDialog(u)}
-                                title="إعادة تعيين كلمة المرور"
-                              >
-                                <KeyRound className="w-4 h-4" />
-                              </Button>
-                              {!(isCurrentUser && u.is_active) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={`h-8 w-8 ${u.is_active ? 'text-destructive hover:text-destructive' : 'text-emerald-600 hover:text-emerald-600'}`}
-                                  onClick={() => {
-                                    setTogglingUser(u);
-                                    setToggleDialogOpen(true);
-                                  }}
-                                  title={u.is_active ? 'تعطيل' : 'تفعيل'}
-                                >
-                                  {u.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+              <>
+                {/* Desktop Table */}
+                <div className="hidden sm:block">
+                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb, #1d4ed8)' }} />
+                  <ScrollArea className="max-h-[calc(100vh-320px)]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right">الاسم الكامل</TableHead>
+                          <TableHead className="text-right">اسم المستخدم</TableHead>
+                          <TableHead className="text-right hidden md:table-cell">الدور</TableHead>
+                          <TableHead className="text-right hidden lg:table-cell">الفرع</TableHead>
+                          <TableHead className="text-center">الحالة</TableHead>
+                          <TableHead className="text-center hidden lg:table-cell">آخر دخول</TableHead>
+                          <TableHead className="text-center">الإجراءات</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUsers.map((u) => {
+                          const isCurrentUser = u.id === currentUser?.id;
+                          const isAdminUser = u.roles?.name === 'admin';
+                          return (
+                            <TableRow key={u.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${u.is_active ? '' : 'bg-muted'}`} style={u.is_active ? { background: 'linear-gradient(135deg, #93c5fd, #3b82f6)' } : {}}>
+                                    <span className={`text-sm font-bold ${u.is_active ? 'text-white' : 'text-muted-foreground'}`}>
+                                      {u.full_name.charAt(0)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-sm">{u.full_name}</span>
+                                    {isCurrentUser && (
+                                      <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>(أنت)</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {u.username}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {u.roles?.display_name ? (
+                                  <Badge variant="secondary" className="text-[11px] text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                                    {u.roles.display_name}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                                <div className="flex items-center gap-1">
+                                  <Building2 className="w-3.5 h-3.5" />
+                                  {isAdminUser ? 'الكل' : (u.branches?.name || '—')}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge
+                                  variant="secondary"
+                                  className={
+                                    u.is_active
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                  }
+                                >
+                                  {u.is_active ? 'نشط' : 'معطل'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center hidden lg:table-cell text-muted-foreground text-xs whitespace-nowrap">
+                                {u.last_login ? formatDateTime(u.last_login) : '—'}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                    onClick={() => openEditDialog(u)}
+                                    title="تعديل"
+                                  >
+                                    <Edit className="w-4 h-4 text-blue-600" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                    onClick={() => openResetPasswordDialog(u)}
+                                    title="إعادة تعيين كلمة المرور"
+                                  >
+                                    <KeyRound className="w-4 h-4 text-amber-600" />
+                                  </Button>
+                                  {!(isCurrentUser && u.is_active) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={`h-8 w-8 ${u.is_active ? 'text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-emerald-600 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                                      onClick={() => {
+                                        setTogglingUser(u);
+                                        setToggleDialogOpen(true);
+                                      }}
+                                      title={u.is_active ? 'تعطيل' : 'تفعيل'}
+                                    >
+                                      {u.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </div>
+
+                {/* Mobile Card Layout */}
+                <div className="sm:hidden divide-y">
+                  {filteredUsers.map((u) => {
+                    const isCurrentUser = u.id === currentUser?.id;
+                    const isAdminUser = u.roles?.name === 'admin';
+                    return (
+                      <motion.div
+                        key={u.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="p-3 border-r-4 hover:bg-muted/30 transition-all"
+                        style={{ borderRightColor: u.is_active ? '#3b82f6' : '#94a3b8' }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${u.is_active ? '' : 'bg-muted'}`} style={u.is_active ? { background: 'linear-gradient(135deg, #93c5fd, #3b82f6)' } : {}}>
+                              <span className={`text-sm font-bold ${u.is_active ? 'text-white' : 'text-muted-foreground'}`}>
+                                {u.full_name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">
+                                {u.full_name}
+                                {isCurrentUser && (
+                                  <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>(أنت)</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{u.username}</p>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              u.is_active
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-[10px]'
+                            }
+                          >
+                            {u.is_active ? 'نشط' : 'معطل'}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          {u.roles?.display_name && (
+                            <Badge variant="secondary" className="text-[10px] text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                              {u.roles.display_name}
+                            </Badge>
+                          )}
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {isAdminUser ? 'الكل' : (u.branches?.name || '—')}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground">
+                            آخر دخول: {u.last_login ? formatDateTime(u.last_login) : '—'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              onClick={() => openEditDialog(u)}
+                            >
+                              <Edit className="w-3.5 h-3.5 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                              onClick={() => openResetPasswordDialog(u)}
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                            </Button>
+                            {!(isCurrentUser && u.is_active) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-7 w-7 ${u.is_active ? 'text-destructive hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                                onClick={() => {
+                                  setTogglingUser(u);
+                                  setToggleDialogOpen(true);
+                                }}
+                              >
+                                {u.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -599,9 +709,12 @@ export default function UsersPage() {
 
       {/* Add/Edit User Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                <Users className="w-4 h-4 text-white" />
+              </div>
               {editingUser ? 'تعديل المستخدم' : 'إضافة مستخدم جديد'}
             </DialogTitle>
           </DialogHeader>
@@ -716,7 +829,7 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
               {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
               {editingUser ? 'تحديث' : 'إضافة'}
             </Button>
@@ -728,7 +841,10 @@ export default function UsersPage() {
       <AlertDialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${togglingUser?.is_active ? '' : ''}`} style={{ background: togglingUser?.is_active ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)' }}>
+                {togglingUser?.is_active ? <UserX className="w-4 h-4 text-white" /> : <UserCheck className="w-4 h-4 text-white" />}
+              </div>
               {togglingUser?.is_active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -751,9 +867,12 @@ export default function UsersPage() {
 
       {/* Reset Password Dialog */}
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                <KeyRound className="w-4 h-4 text-white" />
+              </div>
               إعادة تعيين كلمة المرور - {resettingUser?.full_name}
             </DialogTitle>
           </DialogHeader>
@@ -783,7 +902,7 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleResetPassword} disabled={saving}>
+            <Button onClick={handleResetPassword} disabled={saving} style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
               {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
               إعادة تعيين
             </Button>

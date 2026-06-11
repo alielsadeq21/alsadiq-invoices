@@ -33,6 +33,8 @@ import {
   FileText,
   ArrowUpRight,
   ArrowDownRight,
+  Building2,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -629,10 +631,13 @@ export default function ReportsPage() {
 
   // ── Period Selector ───────────────────────────────────────────────────────────
   const PeriodSelector = () => (
-    <Card className="border-0 shadow-md">
+    <Card className="border-0 shadow-md overflow-hidden">
+      <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
       <CardContent className="p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Calendar className="w-5 h-5 text-muted-foreground" />
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+            <Calendar className="w-4 h-4 text-white" />
+          </div>
           <span className="text-sm font-medium text-muted-foreground">فترة التقرير</span>
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-40">
@@ -691,15 +696,15 @@ export default function ReportsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.08 }}
     >
-      <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+      <Card className="border-0 shadow-md hover:shadow-lg transition-shadow overflow-hidden">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{title}</p>
               <p className={`text-xl font-bold mt-1 ${color}`}>{value}</p>
             </div>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgColor}`}>
-              <Icon className={`w-5 h-5 ${color}`} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: bgColor.includes('emerald') ? 'linear-gradient(135deg, #10b981, #059669)' : bgColor.includes('red') ? 'linear-gradient(135deg, #ef4444, #dc2626)' : bgColor.includes('blue') ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : bgColor.includes('amber') ? 'linear-gradient(135deg, #f59e0b, #d97706)' : bgColor.includes('primary') ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+              <Icon className="w-5 h-5 text-white" />
             </div>
           </div>
         </CardContent>
@@ -721,15 +726,17 @@ export default function ReportsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BarChart3 className="w-7 h-7 text-primary" />
-            التقارير المتقدمة
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            تقارير شاملة عن المبيعات والمخزون والمالية
-            {!isAdmin && user?.branch_name && ` - فرع ${user.branch_name}`}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+            <BarChart3 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">التقارير المتقدمة</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              تقارير شاملة عن المبيعات والمخزون والمالية
+              {!isAdmin && user?.branch_name && ` - فرع ${user.branch_name}`}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -797,9 +804,15 @@ export default function ReportsPage() {
           {/* Sales by Branch Chart */}
           {salesData.byBranch.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">المبيعات حسب الفرع</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <BarChart3 className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    المبيعات حسب الفرع
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-72">
@@ -821,9 +834,15 @@ export default function ReportsPage() {
           {/* Sales by Product Table */}
           {salesData.byProduct.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-base">المبيعات حسب المنتج</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <Package className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    المبيعات حسب المنتج
+                  </CardTitle>
                   {canExport && (
                     <Button variant="outline" size="sm" onClick={handleExportSales} className="gap-1.5">
                       <Download className="w-4 h-4" />
@@ -832,28 +851,53 @@ export default function ReportsPage() {
                   )}
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="max-h-96">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">#</TableHead>
-                          <TableHead className="text-right">المنتج</TableHead>
-                          <TableHead className="text-center">الكمية المباعة</TableHead>
-                          <TableHead className="text-right">الإجمالي</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {salesData.byProduct.map((p, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                            <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
-                            <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
+                    <ScrollArea className="max-h-96">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="text-right">#</TableHead>
+                            <TableHead className="text-right">المنتج</TableHead>
+                            <TableHead className="text-center">الكمية المباعة</TableHead>
+                            <TableHead className="text-right">الإجمالي</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                        </TableHeader>
+                        <TableBody>
+                          {salesData.byProduct.map((p, i) => (
+                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                              <TableCell className="text-muted-foreground">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
+                                  {i + 1}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">{p.name}</TableCell>
+                              <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+                              <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden p-3 space-y-2 max-h-96 overflow-y-auto">
+                    {salesData.byProduct.map((p, i) => (
+                      <div key={i} className="rounded-xl border-r-4 border-amber-500 bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
+                              {i + 1}
+                            </div>
+                            <span className="font-medium text-sm">{p.name}</span>
+                          </div>
+                          <span className="font-semibold text-sm text-emerald-600">{formatCurrency(p.total)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">الكمية: {p.qty.toLocaleString('ar-EG')}</p>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -861,8 +905,11 @@ export default function ReportsPage() {
 
           {salesData.byBranch.length === 0 && salesData.byProduct.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <BarChart3 className="w-14 h-14 mb-4 opacity-40" />
-              <p className="text-lg">لا توجد بيانات مبيعات للفترة المحددة</p>
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                <BarChart3 className="w-10 h-10 text-white" />
+              </div>
+              <p className="text-lg font-semibold">لا توجد بيانات مبيعات</p>
+              <p className="text-sm text-muted-foreground mt-1">للفترة المحددة</p>
             </div>
           )}
         </TabsContent>
@@ -871,10 +918,13 @@ export default function ReportsPage() {
         <TabsContent value="inventory" className="space-y-4 mt-4">
           {/* Inventory Movement */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <ArrowUpDown className="w-5 h-5 text-blue-600" />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                    <ArrowUpDown className="w-3.5 h-3.5 text-white" />
+                  </div>
                   حركة المخزون
                 </CardTitle>
               </CardHeader>
@@ -932,10 +982,13 @@ export default function ReportsPage() {
 
           {/* Current Balances */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="w-5 h-5 text-emerald-600" />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                    <Package className="w-3.5 h-3.5 text-white" />
+                  </div>
                   أرصدة المخزون
                 </CardTitle>
               </CardHeader>
@@ -975,36 +1028,64 @@ export default function ReportsPage() {
           {/* Branch Debts */}
           {branchDebts.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Wallet className="w-5 h-5 text-red-600" />
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      <Wallet className="w-3.5 h-3.5 text-white" />
+                    </div>
                     مديونيات الفروع
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">الفرع</TableHead>
-                        <TableHead className="text-right">إجمالي التحويلات</TableHead>
-                        <TableHead className="text-right">إجمالي المدفوعات</TableHead>
-                        <TableHead className="text-right">المبلغ المتبقي</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {branchDebts.map((d, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="font-medium">{d.branch_name}</TableCell>
-                          <TableCell>{formatCurrency(d.total_transferred)}</TableCell>
-                          <TableCell className="text-emerald-600">{formatCurrency(d.total_paid)}</TableCell>
-                          <TableCell className={`font-semibold ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                            {formatCurrency(d.remaining)}
-                          </TableCell>
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableHead className="text-right">الفرع</TableHead>
+                          <TableHead className="text-right">إجمالي التحويلات</TableHead>
+                          <TableHead className="text-right">إجمالي المدفوعات</TableHead>
+                          <TableHead className="text-right">المبلغ المتبقي</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {branchDebts.map((d, i) => (
+                          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="font-medium">{d.branch_name}</TableCell>
+                            <TableCell>{formatCurrency(d.total_transferred)}</TableCell>
+                            <TableCell className="text-emerald-600">{formatCurrency(d.total_paid)}</TableCell>
+                            <TableCell className={`font-semibold ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                              {formatCurrency(d.remaining)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden p-3 space-y-2">
+                    {branchDebts.map((d, i) => (
+                      <div key={i} className="rounded-xl border-r-4 border-red-500 bg-card p-3 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                              <Wallet className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <span className="font-medium text-sm">{d.branch_name}</span>
+                          </div>
+                          <span className={`font-semibold text-sm ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                            {formatCurrency(d.remaining)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>تحويلات: {formatCurrency(d.total_transferred)}</span>
+                          <span className="text-emerald-600">مدفوع: {formatCurrency(d.total_paid)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -1013,10 +1094,13 @@ export default function ReportsPage() {
           {/* Low Stock */}
           {invBalances.lowStock.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2 flex-row items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2 text-amber-600">
-                    <TrendingDown className="w-5 h-5" />
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <TrendingDown className="w-3.5 h-3.5 text-white" />
+                    </div>
                     مخزون منخفض
                   </CardTitle>
                   {canExport && (
@@ -1027,41 +1111,69 @@ export default function ReportsPage() {
                   )}
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="max-h-96">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">المنتج</TableHead>
-                          <TableHead className="text-right">الفرع</TableHead>
-                          <TableHead className="text-center">الكمية الحالية</TableHead>
-                          <TableHead className="text-center">الحد الأدنى</TableHead>
-                          <TableHead className="text-center">الحالة</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {invBalances.lowStock.map((item, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="font-medium">{item.product_name}</TableCell>
-                            <TableCell>{item.branch_name}</TableCell>
-                            <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
-                            <TableCell className="text-center">{item.min_quantity}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant="secondary"
-                                className={
-                                  item.quantity <= 0
-                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-                                }
-                              >
-                                {item.quantity <= 0 ? 'نفد' : 'منخفض'}
-                              </Badge>
-                            </TableCell>
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <ScrollArea className="max-h-96">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="text-right">المنتج</TableHead>
+                            <TableHead className="text-right">الفرع</TableHead>
+                            <TableHead className="text-center">الكمية الحالية</TableHead>
+                            <TableHead className="text-center">الحد الأدنى</TableHead>
+                            <TableHead className="text-center">الحالة</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                        </TableHeader>
+                        <TableBody>
+                          {invBalances.lowStock.map((item, i) => (
+                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                              <TableCell className="font-medium">{item.product_name}</TableCell>
+                              <TableCell>{item.branch_name}</TableCell>
+                              <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
+                              <TableCell className="text-center">{item.min_quantity}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge
+                                  variant="secondary"
+                                  className={
+                                    item.quantity <= 0
+                                      ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                      : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                                  }
+                                >
+                                  {item.quantity <= 0 ? 'نفد' : 'منخفض'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden p-3 space-y-2 max-h-96 overflow-y-auto">
+                    {invBalances.lowStock.map((item, i) => (
+                      <div key={i} className="rounded-xl border-r-4 border-amber-500 bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">{item.product_name}</span>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              item.quantity <= 0
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-[10px]'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]'
+                            }
+                          >
+                            {item.quantity <= 0 ? 'نفد' : 'منخفض'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">الفرع: {item.branch_name}</p>
+                        <div className="flex justify-between text-xs mt-1">
+                          <span>الكمية: <strong>{item.quantity}</strong></span>
+                          <span>الحد الأدنى: {item.min_quantity}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -1069,8 +1181,10 @@ export default function ReportsPage() {
 
           {invBalances.totalItems === 0 && !loading && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Package className="w-14 h-14 mb-4 opacity-40" />
-              <p className="text-lg">لا توجد بيانات مخزون</p>
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                <Package className="w-10 h-10 text-white" />
+              </div>
+              <p className="text-lg font-semibold">لا توجد بيانات مخزون</p>
             </div>
           )}
         </TabsContent>
@@ -1117,9 +1231,14 @@ export default function ReportsPage() {
 
           {/* Revenue vs Expenses Bar Chart */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">الإيرادات مقابل المصروفات</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                    <TrendingUp className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  الإيرادات مقابل المصروفات</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
@@ -1150,9 +1269,14 @@ export default function ReportsPage() {
           {/* Monthly Trend Line Chart */}
           {finData.monthlyTrend.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">اتجاه الإيرادات والمصروفات الشهرية</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <TrendingUp className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    اتجاه الإيرادات والمصروفات الشهرية</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-72">
@@ -1177,9 +1301,14 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Cash Flow */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <Card className="border-0 shadow-md h-full">
+              <Card className="border-0 shadow-md h-full overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">التدفقات النقدية</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                      <Wallet className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    التدفقات النقدية</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
@@ -1211,9 +1340,14 @@ export default function ReportsPage() {
 
             {/* Branch Debts */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-              <Card className="border-0 shadow-md h-full">
+              <Card className="border-0 shadow-md h-full overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">مديونيات الفروع للمصنع</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      <Wallet className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    مديونيات الفروع للمصنع</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {finData.finBranchDebts.length === 0 ? (
@@ -1240,9 +1374,15 @@ export default function ReportsPage() {
           {/* Customer Debts */}
           {finData.customerDebts.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-base">مديونيات العملاء</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      <Wallet className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    مديونيات العملاء
+                  </CardTitle>
                   {canExport && (
                     <Button variant="outline" size="sm" onClick={handleExportFinancial} className="gap-1.5">
                       <Download className="w-4 h-4" />
@@ -1251,26 +1391,46 @@ export default function ReportsPage() {
                   )}
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="max-h-96">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">العميل</TableHead>
-                          <TableHead className="text-center">عدد الفواتير</TableHead>
-                          <TableHead className="text-right">المبلغ المستحق</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {finData.customerDebts.map((c, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="font-medium">{c.customer_name}</TableCell>
-                            <TableCell className="text-center">{c.invoice_count}</TableCell>
-                            <TableCell className="font-semibold text-red-600">{formatCurrency(c.total_unpaid)}</TableCell>
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <ScrollArea className="max-h-96">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="text-right">العميل</TableHead>
+                            <TableHead className="text-center">عدد الفواتير</TableHead>
+                            <TableHead className="text-right">المبلغ المستحق</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                        </TableHeader>
+                        <TableBody>
+                          {finData.customerDebts.map((c, i) => (
+                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                              <TableCell className="font-medium">{c.customer_name}</TableCell>
+                              <TableCell className="text-center">{c.invoice_count}</TableCell>
+                              <TableCell className="font-semibold text-red-600">{formatCurrency(c.total_unpaid)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden p-3 space-y-2 max-h-96 overflow-y-auto">
+                    {finData.customerDebts.map((c, i) => (
+                      <div key={i} className="rounded-xl border-r-4 border-red-500 bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                              <Wallet className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <span className="font-medium text-sm">{c.customer_name}</span>
+                          </div>
+                          <span className="font-semibold text-sm text-red-600">{formatCurrency(c.total_unpaid)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">عدد الفواتير: {c.invoice_count}</p>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -1278,8 +1438,11 @@ export default function ReportsPage() {
 
           {finData.totalRevenue === 0 && finData.totalExpenses === 0 && !loading && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Wallet className="w-14 h-14 mb-4 opacity-40" />
-              <p className="text-lg">لا توجد بيانات مالية للفترة المحددة</p>
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                <Wallet className="w-10 h-10 text-white" />
+              </div>
+              <p className="text-lg font-semibold">لا توجد بيانات مالية</p>
+              <p className="text-sm text-muted-foreground mt-1">للفترة المحددة</p>
             </div>
           )}
         </TabsContent>
@@ -1288,7 +1451,8 @@ export default function ReportsPage() {
         <TabsContent value="general" className="space-y-4 mt-4">
           {/* Summary Dashboard */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-0 shadow-md bg-gradient-to-l from-primary to-emerald-700 text-primary-foreground">
+            <Card className="border-0 shadow-md bg-gradient-to-l from-primary to-emerald-700 text-primary-foreground overflow-hidden">
+              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #fbbf24, #ffffff, #fbbf24)' }} />
               <CardContent className="p-6">
                 <h2 className="text-lg font-bold mb-4">ملخص عام</h2>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1313,9 +1477,14 @@ export default function ReportsPage() {
 
           {/* Activity Summary */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">ملخص النشاط</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                    <BarChart3 className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  ملخص النشاط</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -1352,42 +1521,77 @@ export default function ReportsPage() {
           {/* Branch Performance Table */}
           {generalData.branchPerformance.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">أداء الفروع</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <Building2 className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    أداء الفروع
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="max-h-96">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">الفرع</TableHead>
-                          <TableHead className="text-center">الفواتير</TableHead>
-                          <TableHead className="text-right">الإيرادات</TableHead>
-                          <TableHead className="text-right">المرتجعات</TableHead>
-                          <TableHead className="text-right">المصروفات</TableHead>
-                          <TableHead className="text-right">صافي</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {generalData.branchPerformance.map((b, i) => {
-                          const net = b.revenue - b.returns - b.expenses;
-                          return (
-                            <TableRow key={i}>
-                              <TableCell className="font-medium">{b.name}</TableCell>
-                              <TableCell className="text-center">{b.invoices}</TableCell>
-                              <TableCell className="text-emerald-600">{formatCurrency(b.revenue)}</TableCell>
-                              <TableCell className="text-red-600">{formatCurrency(b.returns)}</TableCell>
-                              <TableCell className="text-amber-600">{formatCurrency(b.expenses)}</TableCell>
-                              <TableCell className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                {formatCurrency(net)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <ScrollArea className="max-h-96">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="text-right">الفرع</TableHead>
+                            <TableHead className="text-center">الفواتير</TableHead>
+                            <TableHead className="text-right">الإيرادات</TableHead>
+                            <TableHead className="text-right">المرتجعات</TableHead>
+                            <TableHead className="text-right">المصروفات</TableHead>
+                            <TableHead className="text-right">صافي</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {generalData.branchPerformance.map((b, i) => {
+                            const net = b.revenue - b.returns - b.expenses;
+                            return (
+                              <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                                <TableCell className="font-medium">{b.name}</TableCell>
+                                <TableCell className="text-center">{b.invoices}</TableCell>
+                                <TableCell className="text-emerald-600">{formatCurrency(b.revenue)}</TableCell>
+                                <TableCell className="text-red-600">{formatCurrency(b.returns)}</TableCell>
+                                <TableCell className="text-amber-600">{formatCurrency(b.expenses)}</TableCell>
+                                <TableCell className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {formatCurrency(net)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden p-3 space-y-2 max-h-96 overflow-y-auto">
+                    {generalData.branchPerformance.map((b, i) => {
+                      const net = b.revenue - b.returns - b.expenses;
+                      return (
+                        <div key={i} className="rounded-xl border-r-4 border-amber-500 bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                                <Building2 className="w-3.5 h-3.5 text-white" />
+                              </div>
+                              <span className="font-medium text-sm">{b.name}</span>
+                            </div>
+                            <span className={`font-semibold text-sm ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {formatCurrency(net)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div><span className="text-muted-foreground">إيرادات:</span> <span className="text-emerald-600 font-medium">{formatCurrency(b.revenue)}</span></div>
+                            <div><span className="text-muted-foreground">مرتجعات:</span> <span className="text-red-600 font-medium">{formatCurrency(b.returns)}</span></div>
+                            <div><span className="text-muted-foreground">مصروفات:</span> <span className="text-amber-600 font-medium">{formatCurrency(b.expenses)}</span></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -1396,9 +1600,15 @@ export default function ReportsPage() {
           {/* Top Products */}
           {generalData.topProducts.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-base">أكثر المنتجات مبيعاً</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <TrendingUp className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    أكثر المنتجات مبيعاً
+                  </CardTitle>
                   {canExport && (
                     <Button variant="outline" size="sm" onClick={handleExportGeneral} className="gap-1.5">
                       <Download className="w-4 h-4" />
@@ -1407,30 +1617,50 @@ export default function ReportsPage() {
                   )}
                 </CardHeader>
                 <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">#</TableHead>
-                        <TableHead className="text-right">المنتج</TableHead>
-                        <TableHead className="text-center">الكمية</TableHead>
-                        <TableHead className="text-right">الإجمالي</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {generalData.topProducts.map((p, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="text-muted-foreground">
-                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableHead className="text-right">#</TableHead>
+                          <TableHead className="text-right">المنتج</TableHead>
+                          <TableHead className="text-center">الكمية</TableHead>
+                          <TableHead className="text-right">الإجمالي</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {generalData.topProducts.map((p, i) => (
+                          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="text-muted-foreground">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
+                                {i + 1}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+                            <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden p-3 space-y-2">
+                    {generalData.topProducts.map((p, i) => (
+                      <div key={i} className="rounded-xl border-r-4 border-amber-500 bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
                               {i + 1}
                             </div>
-                          </TableCell>
-                          <TableCell className="font-medium">{p.name}</TableCell>
-                          <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
-                          <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                            <span className="font-medium text-sm">{p.name}</span>
+                          </div>
+                          <span className="font-semibold text-sm text-emerald-600">{formatCurrency(p.total)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">الكمية: {p.qty.toLocaleString('ar-EG')}</p>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -1438,8 +1668,10 @@ export default function ReportsPage() {
 
           {generalData.totalInvoices === 0 && !loading && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <FileText className="w-14 h-14 mb-4 opacity-40" />
-              <p className="text-lg">لا توجد بيانات</p>
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                <FileText className="w-10 h-10 text-white" />
+              </div>
+              <p className="text-lg font-semibold">لا توجد بيانات</p>
             </div>
           )}
         </TabsContent>

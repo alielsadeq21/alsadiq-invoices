@@ -68,6 +68,14 @@ const ACCOUNT_TYPE_ICONS: Record<string, React.ReactNode> = {
   expense: <TrendingDown className="w-4 h-4" />,
 };
 
+const ACCOUNT_TYPE_GRADIENTS: Record<string, string> = {
+  asset: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+  liability: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+  equity: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+  revenue: 'linear-gradient(135deg, #10b981, #059669)',
+  expense: 'linear-gradient(135deg, #f59e0b, #d97706)',
+};
+
 interface AccountFormData {
   code: string;
   name: string;
@@ -375,7 +383,6 @@ export default function ChartOfAccountsPage() {
         <div
           className={cn(
             'flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group',
-            depth > 0 && 'mr-6'
           )}
           style={{ marginRight: depth > 0 ? `${depth * 1.5}rem` : undefined }}
         >
@@ -400,22 +407,32 @@ export default function ChartOfAccountsPage() {
             )}
           </button>
 
-          {/* Folder icon */}
-          {hasChildren ? (
-            isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
+          {/* Folder icon with colored type indicator */}
+          <div className="relative shrink-0">
+            {hasChildren ? (
+              isExpanded ? (
+                <FolderOpen className="w-4 h-4 text-amber-500" />
+              ) : (
+                <FolderTree className="w-4 h-4 text-amber-500" />
+              )
             ) : (
-              <FolderTree className="w-4 h-4 text-amber-500 shrink-0" />
-            )
-          ) : (
-            <span className="w-4 h-4 shrink-0 flex items-center justify-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
-            </span>
-          )}
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+              </div>
+            )}
+          </div>
 
           {/* Account code */}
-          <span className="font-mono text-sm font-semibold text-primary min-w-[60px]">
-            {account.code}
+          <span
+            className="font-mono text-sm font-bold min-w-[60px] px-1.5 py-0.5 rounded"
+            style={{ color: ACCOUNT_TYPE_GRADIENTS[account.account_type] ? 'inherit' : undefined }}
+          >
+            <span style={{ color: 'transparent', background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', backgroundClip: 'text', WebkitBackgroundClip: 'text' }}>
+              {account.code}
+            </span>
           </span>
 
           {/* Account name */}
@@ -430,10 +447,11 @@ export default function ChartOfAccountsPage() {
             </span>
           )}
 
-          {/* Account type badge */}
+          {/* Account type badge with gradient */}
           <Badge
             variant="secondary"
-            className={cn('text-[10px] hidden sm:inline-flex', getAccountTypeColor(account.account_type))}
+            className={cn('text-[10px] hidden sm:inline-flex text-white border-0')}
+            style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
           >
             {getAccountTypeLabel(account.account_type)}
           </Badge>
@@ -511,8 +529,8 @@ export default function ChartOfAccountsPage() {
     return (
       <div className="space-y-6">
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-          <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Network className="w-12 h-12 text-destructive/60" />
+          <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+            <Network className="w-12 h-12 text-white" />
           </div>
           <h2 className="text-xl font-bold">غير مسموح</h2>
           <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -532,14 +550,16 @@ export default function ChartOfAccountsPage() {
         transition={{ duration: 0.3 }}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Network className="w-6 h-6 text-primary" />
-              شجرة الحسابات
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              إجمالي الحسابات: {accounts.length}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+              <Network className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">شجرة الحسابات</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                إجمالي الحسابات: {accounts.length}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={expandAll} className="gap-1.5">
@@ -551,7 +571,7 @@ export default function ChartOfAccountsPage() {
               طي الكل
             </Button>
             {canCreate && (
-              <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+              <Button onClick={openCreateDialog} className="gap-2 shadow-md" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
                 <Plus className="w-4 h-4" />
                 إضافة حساب
               </Button>
@@ -568,18 +588,12 @@ export default function ChartOfAccountsPage() {
       >
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {ACCOUNT_TYPES.map((type) => (
-            <Card key={type} className="border-0 shadow-md">
+            <Card key={type} className="border-0 shadow-md hover:shadow-lg transition-shadow cursor-default group">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div
-                    className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center',
-                      type === 'asset' && 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-                      type === 'liability' && 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-                      type === 'equity' && 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-                      type === 'revenue' && 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-                      type === 'expense' && 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-                    )}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white transition-transform group-hover:scale-110"
+                    style={{ background: ACCOUNT_TYPE_GRADIENTS[type] }}
                   >
                     {ACCOUNT_TYPE_ICONS[type]}
                   </div>
@@ -603,7 +617,8 @@ export default function ChartOfAccountsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #0ea5e9, #0284c7, #0369a1)' }} />
           <CardContent className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="relative">
@@ -654,10 +669,11 @@ export default function ChartOfAccountsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.15 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #0ea5e9, #0284c7, #0369a1)' }} />
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <FolderTree className="w-5 h-5 text-primary" />
+              <FolderTree className="w-5 h-5" style={{ color: '#0ea5e9' }} />
               الحسابات
             </CardTitle>
           </CardHeader>
@@ -668,15 +684,15 @@ export default function ChartOfAccountsPage() {
               </div>
             ) : filteredAccounts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <Network className="w-12 h-12 text-primary/60" />
+                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+                  <Network className="w-12 h-12 text-white/80" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا توجد حسابات</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم إنشاء أي حسابات بعد. ابدأ بإنشاء أول حساب.
                 </p>
                 {canCreate && (
-                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
                     <Plus className="w-5 h-5" />
                     إنشاء حساب جديد
                   </Button>
@@ -695,10 +711,12 @@ export default function ChartOfAccountsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Network className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+                <Network className="w-4 h-4 text-white" />
+              </div>
               {editingAccount ? 'تعديل حساب' : 'إضافة حساب جديد'}
             </DialogTitle>
           </DialogHeader>
@@ -779,7 +797,12 @@ export default function ChartOfAccountsPage() {
                   {ACCOUNT_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
                       <div className="flex items-center gap-2">
-                        {ACCOUNT_TYPE_ICONS[type]}
+                        <div
+                          className="w-4 h-4 rounded flex items-center justify-center text-white"
+                          style={{ background: ACCOUNT_TYPE_GRADIENTS[type] }}
+                        >
+                          <span className="text-[8px]">{getAccountTypeLabel(type).charAt(0)}</span>
+                        </div>
                         {getAccountTypeLabel(type)}
                       </div>
                     </SelectItem>
@@ -803,7 +826,7 @@ export default function ChartOfAccountsPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
               {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
               {editingAccount ? 'تحديث الحساب' : 'إضافة الحساب'}
             </Button>

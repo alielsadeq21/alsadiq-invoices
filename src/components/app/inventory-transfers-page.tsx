@@ -218,7 +218,6 @@ export default function InventoryTransfersPage() {
         .select('*, from_branch:branches!inventory_transfers_from_branch_id_fkey(name), to_branch:branches!inventory_transfers_to_branch_id_fkey(name), items:inventory_transfer_items(*, products(name, unit_price, unit_count))', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      // Filters
       if (search) {
         query = query.or(`transfer_number.ilike.%${search}%`);
       }
@@ -253,7 +252,6 @@ export default function InventoryTransfersPage() {
   const loadBranchDebts = async () => {
     setLoading(true);
     try {
-      // Get all confirmed transfers grouped by destination branch
       const { data: transfersData, error: tError } = await supabase
         .from('inventory_transfers')
         .select('to_branch_id, total_amount')
@@ -261,14 +259,12 @@ export default function InventoryTransfersPage() {
 
       if (tError) throw tError;
 
-      // Get all payments from branches
       const { data: paymentsData, error: pError } = await supabase
         .from('payments')
         .select('branch_id, amount');
 
       if (pError) throw pError;
 
-      // Get branch names
       const { data: branchesData } = await supabase
         .from('branches')
         .select('id, name')
@@ -276,7 +272,6 @@ export default function InventoryTransfersPage() {
 
       const branchMap = new Map((branchesData || []).map((b: { id: string; name: string }) => [b.id, b.name]));
 
-      // Calculate debts
       const debtMap = new Map<string, { transferred: number; paid: number }>();
 
       (transfersData || []).forEach((t: { to_branch_id: string; total_amount: number }) => {
@@ -303,7 +298,6 @@ export default function InventoryTransfersPage() {
         });
       });
 
-      // Sort by remaining debt descending
       debts.sort((a, b) => b.remaining_debt - a.remaining_debt);
       setBranchDebts(debts);
     } catch (err) {
@@ -313,7 +307,6 @@ export default function InventoryTransfersPage() {
     }
   };
 
-  // ─── Filtered transfers (client-side supplement) ──────────────────────────
   const hasActiveFilters = search || statusFilter !== 'all' || branchFilter !== 'all' || dateFrom || dateTo;
 
   const clearFilters = () => {
@@ -325,7 +318,6 @@ export default function InventoryTransfersPage() {
     setPage(1);
   };
 
-  // ─── Summary stats ────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const pending = transfers.filter((t) => t.status === 'pending').length;
     const confirmed = transfers.filter((t) => t.status === 'confirmed').length;
@@ -337,12 +329,10 @@ export default function InventoryTransfersPage() {
     return branchDebts.reduce((sum, d) => sum + d.remaining_debt, 0);
   }, [branchDebts]);
 
-  // ─── Create transfer ──────────────────────────────────────────────────────
   const openCreateDialog = async () => {
     const year = getCurrentYear();
     setCreating(false);
 
-    // Pre-select first factory branch if available
     const defaultFactory = factoryBranches.length > 0 ? factoryBranches[0].id : '';
 
     setCreateForm({
@@ -369,7 +359,6 @@ export default function InventoryTransfersPage() {
 
     if (field === 'product_id') {
       item.product_id = value as string;
-      // Auto-fill unit price from product
       const product = products.find((p) => p.id === value);
       if (product) {
         item.unit_price = product.unit_price;
@@ -392,7 +381,6 @@ export default function InventoryTransfersPage() {
   }, [formItems]);
 
   const handleCreateTransfer = async () => {
-    // Validation
     if (!createForm.from_branch_id) {
       toast.error('يرجى اختيار الفرع المصدر (المصنع)');
       return;
@@ -426,7 +414,6 @@ export default function InventoryTransfersPage() {
 
     setCreating(true);
     try {
-      // Generate transfer number
       const year = getCurrentYear();
       const { data: lastTransfer } = await supabase
         .from('inventory_transfers')
@@ -443,7 +430,6 @@ export default function InventoryTransfersPage() {
 
       const transferNumber = generateTransferNumber(lastNum, year);
 
-      // Create transfer header
       const { data: newTransfer, error: transferError } = await supabase
         .from('inventory_transfers')
         .insert({
@@ -462,7 +448,6 @@ export default function InventoryTransfersPage() {
       if (transferError) throw transferError;
       if (!newTransfer) throw new Error('Failed to create transfer');
 
-      // Create transfer items
       const itemsPayload = formItems.map((item) => ({
         transfer_id: newTransfer.id,
         product_id: item.product_id,
@@ -477,7 +462,6 @@ export default function InventoryTransfersPage() {
 
       if (itemsError) throw itemsError;
 
-      // Audit log
       await supabase.from('audit_log').insert({
         action: 'create_inventory_transfer',
         details: {
@@ -500,7 +484,6 @@ export default function InventoryTransfersPage() {
     }
   };
 
-  // ─── View transfer details ────────────────────────────────────────────────
   const openDetailDialog = async (transfer: TransferRow) => {
     setDetailTransfer(transfer);
     setDetailDialogOpen(true);
@@ -527,7 +510,6 @@ export default function InventoryTransfersPage() {
     }
   };
 
-  // ─── Confirm transfer ─────────────────────────────────────────────────────
   const openConfirmDialog = (transfer: TransferRow) => {
     setConfirmingTransfer(transfer);
     setConfirmDialogOpen(true);
@@ -540,7 +522,6 @@ export default function InventoryTransfersPage() {
     try {
       const transfer = confirmingTransfer;
 
-      // Load items if not loaded
       let items = transfer.items;
       if (!items || items.length === 0) {
         const { data, error } = await supabase
@@ -558,7 +539,6 @@ export default function InventoryTransfersPage() {
         return;
       }
 
-      // ─── Step 1: Verify source inventory for each item ───────────────────
       for (const item of items) {
         const { data: sourceInv } = await supabase
           .from('inventory')
@@ -575,9 +555,7 @@ export default function InventoryTransfersPage() {
         }
       }
 
-      // ─── Step 2: Update inventory for each item ──────────────────────────
       for (const item of items) {
-        // Decrease from source (factory)
         const { data: sourceInv } = await supabase
           .from('inventory')
           .select('id, quantity')
@@ -597,7 +575,6 @@ export default function InventoryTransfersPage() {
           if (srcErr) throw srcErr;
         }
 
-        // Increase at destination (branch)
         const { data: destInv } = await supabase
           .from('inventory')
           .select('id, quantity')
@@ -630,9 +607,7 @@ export default function InventoryTransfersPage() {
         }
       }
 
-      // ─── Step 3: Create inventory_transactions for each item ──────────────
       for (const item of items) {
-        // Out transaction from factory
         const { error: outTxErr } = await supabase
           .from('inventory_transactions')
           .insert({
@@ -649,7 +624,6 @@ export default function InventoryTransfersPage() {
 
         if (outTxErr) throw outTxErr;
 
-        // In transaction at branch
         const { error: inTxErr } = await supabase
           .from('inventory_transactions')
           .insert({
@@ -667,7 +641,6 @@ export default function InventoryTransfersPage() {
         if (inTxErr) throw inTxErr;
       }
 
-      // ─── Step 4: Create journal entry ────────────────────────────────────
       const year = getCurrentYear();
       const { data: lastEntry } = await supabase
         .from('journal_entries')
@@ -685,7 +658,6 @@ export default function InventoryTransfersPage() {
       const entryNumber = generateJournalEntryNumber(lastNum, year);
       const totalAmount = Number(transfer.total_amount);
 
-      // Get account IDs
       const { data: branchAccount } = await supabase
         .from('chart_of_accounts')
         .select('id')
@@ -716,7 +688,6 @@ export default function InventoryTransfersPage() {
         .single();
 
       if (!jeError && newEntry) {
-        // Create journal entry lines: debit branch accounts, credit factory inventory
         await supabase.from('journal_entry_lines').insert([
           {
             journal_entry_id: newEntry.id,
@@ -736,14 +707,12 @@ export default function InventoryTransfersPage() {
           },
         ]);
 
-        // Link journal entry to transfer
         await supabase
           .from('inventory_transfers')
           .update({ journal_entry_id: newEntry.id })
           .eq('id', transfer.id);
       }
 
-      // ─── Step 5: Update transfer status to confirmed ─────────────────────
       const { error: statusError } = await supabase
         .from('inventory_transfers')
         .update({
@@ -754,7 +723,6 @@ export default function InventoryTransfersPage() {
 
       if (statusError) throw statusError;
 
-      // Audit log
       await supabase.from('audit_log').insert({
         action: 'confirm_inventory_transfer',
         details: {
@@ -776,7 +744,6 @@ export default function InventoryTransfersPage() {
     }
   };
 
-  // ─── Cancel transfer ──────────────────────────────────────────────────────
   const openCancelDialog = (transfer: TransferRow) => {
     setCancellingTransfer(transfer);
     setCancelDialogOpen(true);
@@ -816,10 +783,8 @@ export default function InventoryTransfersPage() {
     }
   };
 
-  // ─── Pagination ───────────────────────────────────────────────────────────
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // ─── Product lookup ───────────────────────────────────────────────────────
   const getProductName = useCallback((productId: string) => {
     return products.find((p) => p.id === productId)?.name || 'غير معروف';
   }, [products]);
@@ -829,14 +794,15 @@ export default function InventoryTransfersPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+            <Loader2 className="w-6 h-6 animate-spin text-white" />
+          </div>
           <p className="text-muted-foreground text-sm">جاري تحميل التحويلات...</p>
         </div>
       </div>
     );
   }
 
-  // ─── Stat cards data ──────────────────────────────────────────────────────
   const listStatCards = [
     {
       title: 'في الانتظار',
@@ -856,8 +822,8 @@ export default function InventoryTransfersPage() {
       title: 'إجمالي المبلغ',
       value: formatCurrency(stats.totalAmount),
       icon: TrendingUp,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
+      color: 'text-indigo-600 dark:text-indigo-400',
+      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
     },
   ];
 
@@ -880,8 +846,8 @@ export default function InventoryTransfersPage() {
       title: 'إجمالي التصبينات',
       value: formatCurrency(branchDebts.reduce((s, d) => s + d.total_transferred, 0)),
       icon: ArrowRightLeft,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
+      color: 'text-indigo-600 dark:text-indigo-400',
+      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
     },
   ];
 
@@ -897,11 +863,16 @@ export default function InventoryTransfersPage() {
         transition={{ duration: 0.3 }}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-bold">التصبين والتحويلات</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            تحويل المخزون من المصنع إلى الفروع وإدارة مديونيات الفروع
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+            <ArrowRightLeft className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">التصبين والتحويلات</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              تحويل المخزون من المصنع إلى الفروع وإدارة مديونيات الفروع
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {hasPermission('inventory_transfers', 'view') && (
@@ -917,7 +888,8 @@ export default function InventoryTransfersPage() {
           {hasPermission('inventory_transfers', 'create') && (
             <Button
               onClick={openCreateDialog}
-              className="gap-2 shadow-md"
+              className="gap-2 shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}
             >
               <Plus className="w-4 h-4" />
               تصبين جديد
@@ -964,7 +936,8 @@ export default function InventoryTransfersPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
           >
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                   <div className="relative">
@@ -1028,24 +1001,26 @@ export default function InventoryTransfersPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.4 }}
           >
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
               <CardContent className="p-0">
                 {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                    <span className="mr-2 text-muted-foreground">جاري التحميل...</span>
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                      <Loader2 className="w-6 h-6 animate-spin text-white" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">جاري التحميل...</p>
                   </div>
                 ) : transfers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                      <ArrowRightLeft className="w-12 h-12 text-primary/60" />
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+                      <ArrowRightLeft className="w-10 h-10 text-white" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">لا توجد تحويلات</h3>
                     <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                       لم يتم إنشاء أي تصبين بعد. ابدأ بتحويل المخزون من المصنع إلى الفروع.
                     </p>
                     {hasPermission('inventory_transfers', 'create') && (
-                      <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                      <Button onClick={openCreateDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
                         <Plus className="w-5 h-5" />
                         تصبين جديد
                       </Button>
@@ -1053,90 +1028,150 @@ export default function InventoryTransfersPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-right">رقم التحويل</TableHead>
-                            <TableHead className="text-right hidden md:table-cell">المصنع (المصدر)</TableHead>
-                            <TableHead className="text-right hidden md:table-cell">الفرع (الوجهة)</TableHead>
-                            <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
-                            <TableHead className="text-right">المبلغ الإجمالي</TableHead>
-                            <TableHead className="text-center">الحالة</TableHead>
-                            <TableHead className="text-center">الإجراءات</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {transfers.map((transfer) => {
-                            const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
-                            return (
-                              <TableRow key={transfer.id}>
-                                <TableCell className="font-medium">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10">
-                                      <FileText className="w-4 h-4 text-primary" />
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block">
+                      <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-right">رقم التحويل</TableHead>
+                              <TableHead className="text-right hidden md:table-cell">المصنع (المصدر)</TableHead>
+                              <TableHead className="text-right hidden md:table-cell">الفرع (الوجهة)</TableHead>
+                              <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
+                              <TableHead className="text-right">المبلغ الإجمالي</TableHead>
+                              <TableHead className="text-center">الحالة</TableHead>
+                              <TableHead className="text-center">الإجراءات</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {transfers.map((transfer) => {
+                              const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
+                              return (
+                                <TableRow key={transfer.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors">
+                                  <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+                                        <FileText className="w-4 h-4 text-white" />
+                                      </div>
+                                      {transfer.transfer_number}
                                     </div>
-                                    {transfer.transfer_number}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell text-muted-foreground">
-                                  {transfer.from_branch?.name || '—'}
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell text-muted-foreground">
-                                  {transfer.to_branch?.name || '—'}
-                                </TableCell>
-                                <TableCell className="hidden sm:table-cell text-muted-foreground">
-                                  {formatDate(transfer.transfer_date)}
-                                </TableCell>
-                                <TableCell className="font-semibold text-primary">
-                                  {formatCurrency(transfer.total_amount)}
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Badge variant="secondary" className={`gap-1 ${statusColor[transfer.status]}`}>
-                                    <StatusIcon className="w-3 h-3" />
-                                    {statusLabel[transfer.status]}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => openDetailDialog(transfer)}
-                                      title="عرض التفاصيل"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                    {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
-                                          onClick={() => openConfirmDialog(transfer)}
-                                          title="تأكيد التصبين"
-                                        >
-                                          <CheckCircle2 className="w-4 h-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-red-600 hover:text-red-700"
-                                          onClick={() => openCancelDialog(transfer)}
-                                          title="إلغاء"
-                                        >
-                                          <XCircle className="w-4 h-4" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                                    {transfer.from_branch?.name || '—'}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                                    {transfer.to_branch?.name || '—'}
+                                  </TableCell>
+                                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+                                    {formatDate(transfer.transfer_date)}
+                                  </TableCell>
+                                  <TableCell className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                    {formatCurrency(transfer.total_amount)}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant="secondary" className={`gap-1 ${statusColor[transfer.status]}`}>
+                                      <StatusIcon className="w-3 h-3" />
+                                      {statusLabel[transfer.status]}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                                        onClick={() => openDetailDialog(transfer)}
+                                        title="عرض التفاصيل"
+                                      >
+                                        <Eye className="w-4 h-4 text-indigo-600" />
+                                      </Button>
+                                      {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+                                        <>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                            onClick={() => openConfirmDialog(transfer)}
+                                            title="تأكيد التصبين"
+                                          >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            onClick={() => openCancelDialog(transfer)}
+                                            title="إلغاء"
+                                          >
+                                            <XCircle className="w-4 h-4" />
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+
+                    {/* Mobile Card Layout */}
+                    <div className="sm:hidden divide-y">
+                      {transfers.map((transfer) => {
+                        const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
+                        const borderColor = transfer.status === 'pending' ? '#f59e0b' : transfer.status === 'confirmed' ? '#10b981' : '#ef4444';
+                        return (
+                          <motion.div
+                            key={transfer.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="p-3 border-r-4 hover:bg-muted/30 transition-all"
+                            style={{ borderRightColor: borderColor }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+                                  <ArrowRightLeft className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{transfer.transfer_number}</p>
+                                  <p className="text-xs text-muted-foreground">{formatDate(transfer.transfer_date)}</p>
+                                </div>
+                              </div>
+                              <Badge variant="secondary" className={`gap-1 text-[10px] ${statusColor[transfer.status]}`}>
+                                <StatusIcon className="w-3 h-3" />
+                                {statusLabel[transfer.status]}
+                              </Badge>
+                            </div>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" />{transfer.from_branch?.name || '—'} ← {transfer.to_branch?.name || '—'}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(transfer.total_amount)}</span>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-indigo-50 dark:hover:bg-indigo-900/20" onClick={() => openDetailDialog(transfer)}>
+                                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                                  </Button>
+                                  {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+                                    <>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => openConfirmDialog(transfer)}>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => openCancelDialog(transfer)}>
+                                        <XCircle className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
                     {totalPages > 1 && (
@@ -1181,23 +1216,28 @@ export default function InventoryTransfersPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.3 }}
         >
-          <Card className="border-0 shadow-md">
+          <Card className="border-0 shadow-md overflow-hidden">
+            <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <HandCoins className="w-5 h-5 text-red-500" />
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                  <HandCoins className="w-3.5 h-3.5 text-white" />
+                </div>
                 مديونيات الفروع - ديون على الفروع للمصنع
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  <span className="mr-2 text-muted-foreground">جاري التحميل...</span>
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">جاري التحميل...</p>
                 </div>
               ) : branchDebts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 px-4">
-                  <div className="w-24 h-24 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-5">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #6ee7b7, #10b981)' }}>
+                    <CheckCircle2 className="w-10 h-10 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-2">لا توجد مديونيات</h3>
                   <p className="text-muted-foreground text-sm text-center">
@@ -1208,7 +1248,7 @@ export default function InventoryTransfersPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="bg-muted/30">
                         <TableHead className="text-right">الفرع</TableHead>
                         <TableHead className="text-right">إجمالي التصبينات</TableHead>
                         <TableHead className="text-right">إجمالي المدفوعات</TableHead>
@@ -1217,11 +1257,11 @@ export default function InventoryTransfersPage() {
                     </TableHeader>
                     <TableBody>
                       {branchDebts.map((debt) => (
-                        <TableRow key={debt.branch_id} className={debt.remaining_debt > 0 ? 'bg-red-50/50 dark:bg-red-900/5' : ''}>
+                        <TableRow key={debt.branch_id} className={`hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors ${debt.remaining_debt > 0 ? 'bg-red-50/50 dark:bg-red-900/5' : ''}`}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10">
-                                <Building2 className="w-4 h-4 text-primary" />
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+                                <Building2 className="w-4 h-4 text-white" />
                               </div>
                               <span className="font-medium">{debt.branch_name}</span>
                             </div>
@@ -1250,17 +1290,18 @@ export default function InventoryTransfersPage() {
 
       {/* ─── CREATE TRANSFER DIALOG ─────────────────────────────────────────── */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ArrowRightLeft className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                <ArrowRightLeft className="w-4 h-4 text-white" />
+              </div>
               تصبين جديد - تحويل مخزون
             </DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="space-y-4 py-4">
-              {/* Header fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>الفرع المصدر (المصنع) *</Label>
@@ -1315,7 +1356,6 @@ export default function InventoryTransfersPage() {
                 </div>
               </div>
 
-              {/* Items section */}
               <Separator />
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">المنتجات</Label>
@@ -1415,7 +1455,6 @@ export default function InventoryTransfersPage() {
                 </div>
               )}
 
-              {/* Notes */}
               <div className="space-y-2">
                 <Label>ملاحظات</Label>
                 <Textarea
@@ -1432,7 +1471,7 @@ export default function InventoryTransfersPage() {
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleCreateTransfer} disabled={creating}>
+            <Button onClick={handleCreateTransfer} disabled={creating} style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
               {creating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin ml-2" />
@@ -1448,10 +1487,12 @@ export default function InventoryTransfersPage() {
 
       {/* ─── DETAIL DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                <Eye className="w-4 h-4 text-white" />
+              </div>
               تفاصيل التحويل
             </DialogTitle>
           </DialogHeader>
@@ -1459,7 +1500,6 @@ export default function InventoryTransfersPage() {
           {detailTransfer ? (
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="space-y-4 py-4">
-                {/* Transfer info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">رقم التحويل</Label>
@@ -1487,11 +1527,10 @@ export default function InventoryTransfersPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">المبلغ الإجمالي</Label>
-                    <p className="font-bold text-primary text-lg">{formatCurrency(detailTransfer.total_amount)}</p>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400 text-lg">{formatCurrency(detailTransfer.total_amount)}</p>
                   </div>
                 </div>
 
-                {/* Notes */}
                 {detailTransfer.notes && (
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">ملاحظات</Label>
@@ -1501,7 +1540,6 @@ export default function InventoryTransfersPage() {
 
                 <Separator />
 
-                {/* Items table */}
                 <div className="space-y-2">
                   <Label className="text-base font-semibold">عناصر التحويل</Label>
                   {loadingDetail ? (
@@ -1543,7 +1581,6 @@ export default function InventoryTransfersPage() {
                   )}
                 </div>
 
-                {/* Journal entry info */}
                 {detailTransfer.journal_entry_id && (
                   <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg flex items-center gap-2">
                     <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -1553,7 +1590,6 @@ export default function InventoryTransfersPage() {
                   </div>
                 )}
 
-                {/* Date info */}
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>تاريخ الإنشاء: {formatDateTime(detailTransfer.created_at)}</span>
                   <span>آخر تحديث: {formatDateTime(detailTransfer.updated_at)}</span>
@@ -1602,7 +1638,9 @@ export default function InventoryTransfersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              </div>
               تأكيد التصبين
             </AlertDialogTitle>
             <AlertDialogDescription className="text-right">
@@ -1623,7 +1661,7 @@ export default function InventoryTransfersPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">المبلغ:</span>
-                <span className="font-bold text-primary">{formatCurrency(confirmingTransfer.total_amount)}</span>
+                <span className="font-bold text-indigo-600">{formatCurrency(confirmingTransfer.total_amount)}</span>
               </div>
             </div>
           )}
@@ -1652,7 +1690,9 @@ export default function InventoryTransfersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-red-600" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                <XCircle className="w-4 h-4 text-white" />
+              </div>
               إلغاء التصبين
             </AlertDialogTitle>
             <AlertDialogDescription className="text-right">

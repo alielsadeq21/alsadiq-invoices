@@ -45,6 +45,8 @@ import {
   Download,
   Receipt,
   Eye,
+  Building2,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -417,15 +419,28 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">إيصالات القبض</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            تسجيل دفعات الفروع ({totalCount} إيصال)
-          </p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+            <Banknote className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">إيصالات القبض</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              تسجيل دفعات الفروع
+              <span className="inline-flex items-center gap-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <Banknote className="w-3 h-3" />
+                {totalCount} إيصال
+              </span>
+            </p>
+          </div>
         </div>
         {hasPermission('payments', 'create') && (
-          <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+          <Button
+            onClick={openCreateDialog}
+            className="gap-2 shadow-lg text-white transition-all duration-200 hover:shadow-xl hover:scale-[1.02]"
+            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+          >
             <Plus className="w-4 h-4" />
             إيصال قبض جديد
           </Button>
@@ -433,7 +448,8 @@ export default function PaymentsPage() {
       </div>
 
       {/* Filters */}
-      <Card className="border-0 shadow-md">
+      <Card className="border-0 shadow-md overflow-hidden">
+        <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #047857)' }} />
         <CardContent className="p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="relative">
@@ -464,24 +480,32 @@ export default function PaymentsPage() {
         </CardContent>
       </Card>
 
-      {/* Payments Table */}
-      <Card className="border-0 shadow-md">
+      {/* Payments Content */}
+      <Card className="border-0 shadow-md overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
+                <span className="text-muted-foreground text-sm">جاري التحميل...</span>
+              </div>
             </div>
           ) : payments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                <Banknote className="w-12 h-12 text-primary/60" />
+              <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)' }}>
+                <Banknote className="w-12 h-12 text-emerald-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">لا توجد إيصالات</h3>
-              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+              <h3 className="text-xl font-bold mb-2 text-foreground">لا توجد إيصالات</h3>
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
                 لم يتم تسجيل أي إيصالات قبض بعد. ابدأ بتسجيل أول دفعة من فرع.
               </p>
               {hasPermission('payments', 'create') && (
-                <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                <Button
+                  onClick={openCreateDialog}
+                  className="gap-2 shadow-lg text-white transition-all duration-200 hover:shadow-xl hover:scale-[1.02]"
+                  size="lg"
+                  style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                >
                   <Plus className="w-5 h-5" />
                   تسجيل إيصال قبض
                 </Button>
@@ -489,27 +513,50 @@ export default function PaymentsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Gradient accent bar at top */}
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #047857)' }} />
+
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">رقم الإيصال</TableHead>
-                      <TableHead className="text-right">الفرع</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
-                      <TableHead className="text-right">المبلغ</TableHead>
-                      <TableHead className="text-center hidden md:table-cell">طريقة الدفع</TableHead>
-                      <TableHead className="text-center">طباعة</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="text-right font-semibold">رقم الإيصال</TableHead>
+                      <TableHead className="text-right font-semibold">الفرع</TableHead>
+                      <TableHead className="text-right font-semibold">التاريخ</TableHead>
+                      <TableHead className="text-right font-semibold">المبلغ</TableHead>
+                      <TableHead className="text-center font-semibold">طريقة الدفع</TableHead>
+                      <TableHead className="text-center font-semibold">طباعة</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-medium">{payment.payment_number}</TableCell>
-                        <TableCell>{(payment as any).branches?.name || '—'}</TableCell>
-                        <TableCell className="hidden sm:table-cell">{formatDate(payment.payment_date)}</TableCell>
-                        <TableCell className="font-semibold text-primary">{formatCurrency(payment.amount)}</TableCell>
-                        <TableCell className="text-center hidden md:table-cell">
-                          <Badge variant="secondary" className={`text-[10px] ${getMethodColor(payment.payment_method)}`}>
+                      <TableRow key={payment.id} className="transition-colors duration-150 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-bold" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                              <Banknote className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="font-medium">{payment.payment_number}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span>{(payment as any).branches?.name || '—'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span>{formatDate(payment.payment_date)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(payment.amount)}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className={`text-[10px] px-2.5 py-0.5 ${getMethodColor(payment.payment_method)}`}>
                             {getMethodLabel(payment.payment_method)}
                           </Badge>
                         </TableCell>
@@ -519,29 +566,29 @@ export default function PaymentsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-colors"
                                 onClick={() => handlePrintReceipt(payment)}
                                 title="طباعة A4"
                               >
-                                <Printer className="w-3.5 h-3.5" />
+                                <Printer className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-8 w-8 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400 transition-colors"
                                 onClick={() => handlePrintThermal(payment)}
                                 title="طباعة حرارية"
                               >
-                                <Receipt className="w-3.5 h-3.5" />
+                                <Receipt className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-8 w-8 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 transition-colors"
                                 onClick={() => handleExportPDF(payment)}
                                 title="تحميل PDF"
                               >
-                                <Download className="w-3.5 h-3.5" />
+                                <Download className="w-4 h-4" />
                               </Button>
                             </div>
                           ) : (
@@ -554,28 +601,109 @@ export default function PaymentsPage() {
                 </Table>
               </div>
 
+              {/* Mobile Card Layout */}
+              <div className="sm:hidden p-3 space-y-3">
+                {payments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="relative rounded-xl bg-card border border-border shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                    style={{ borderRightWidth: '4px', borderRightColor: '#10b981' }}
+                  >
+                    <div className="p-3 sm:p-4">
+                      {/* Top: Payment number + Amount */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                            <Banknote className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm leading-tight">{payment.payment_number}</p>
+                            <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 mt-1 ${getMethodColor(payment.payment_method)}`}>
+                              {getMethodLabel(payment.payment_method)}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold text-emerald-600 dark:text-emerald-400 text-lg leading-tight">{formatCurrency(payment.amount)}</p>
+                          <p className="text-[10px] text-muted-foreground">ج.م</p>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div className="mt-3 space-y-1.5">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <Building2 className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm text-muted-foreground">{(payment as any).branches?.name || '—'}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm text-muted-foreground">{formatDate(payment.payment_date)}</span>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      {hasPermission('payments', 'print') && (
+                        <div className="mt-3 pt-3 border-t border-border/50" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1.5 flex-1 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-colors"
+                            onClick={() => handlePrintReceipt(payment)}
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            A4
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1.5 flex-1 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 dark:hover:bg-orange-900/20 dark:hover:text-orange-400 dark:hover:border-orange-800 transition-colors"
+                            onClick={() => handlePrintThermal(payment)}
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            حراري
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1.5 flex-1 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 dark:hover:border-emerald-800 transition-colors"
+                            onClick={() => handleExportPDF(payment)}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            PDF
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    صفحة {page} من {totalPages}
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
+                  <p className="text-sm text-muted-foreground font-medium">
+                    صفحة <span className="text-foreground font-bold">{page}</span> من <span className="text-foreground font-bold">{totalPages}</span>
+                    <span className="hidden sm:inline mr-2 text-muted-foreground">({totalCount} إيصال)</span>
                   </p>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
+                      size="sm"
+                      className="h-8 gap-1 text-xs font-medium hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 dark:hover:border-emerald-800 transition-colors"
                       onClick={() => setPage(Math.max(1, page - 1))}
                       disabled={page <= 1}
                     >
                       <ChevronRight className="w-4 h-4" />
+                      السابق
                     </Button>
                     <Button
                       variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
+                      size="sm"
+                      className="h-8 gap-1 text-xs font-medium hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 dark:hover:border-emerald-800 transition-colors"
                       onClick={() => setPage(Math.min(totalPages, page + 1))}
                       disabled={page >= totalPages}
                     >
+                      التالي
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
                   </div>
@@ -588,10 +716,12 @@ export default function PaymentsPage() {
 
       {/* Create Payment Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Banknote className="w-5 h-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <Banknote className="w-4 h-4" />
+              </div>
               تسجيل إيصال قبض
             </DialogTitle>
           </DialogHeader>
@@ -663,7 +793,12 @@ export default function PaymentsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-white shadow-md transition-all duration-200 hover:shadow-lg hover:scale-[1.02]"
+              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+            >
               {saving ? 'جاري الحفظ...' : 'حفظ الإيصال'}
             </Button>
           </DialogFooter>

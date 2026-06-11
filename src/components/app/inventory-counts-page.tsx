@@ -49,6 +49,7 @@ import {
   Loader2,
   Package,
   History,
+  Building2,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -188,7 +189,6 @@ export default function InventoryCountsPage() {
         .select('*, branches(name), items:inventory_count_items(*, products(name, unit_price, unit_count))', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      // Filters
       if (search) {
         query = query.or(`count_number.ilike.%${search}%`);
       }
@@ -220,7 +220,6 @@ export default function InventoryCountsPage() {
     }
   };
 
-  // ─── Filtered counts helpers ────────────────────────────────────────────────
   const hasActiveFilters = search || statusFilter !== 'all' || branchFilter !== 'all' || dateFrom || dateTo;
 
   const clearFilters = () => {
@@ -232,7 +231,6 @@ export default function InventoryCountsPage() {
     setPage(1);
   };
 
-  // ─── Summary stats ─────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const total = totalCount;
     const draft = counts.filter((c) => c.status === 'draft').length;
@@ -243,7 +241,6 @@ export default function InventoryCountsPage() {
     return { total, draft, confirmed, itemsWithDiff };
   }, [counts, totalCount]);
 
-  // ─── Create count ──────────────────────────────────────────────────────────
   const openCreateDialog = () => {
     setCreateForm({
       branch_id: '',
@@ -265,7 +262,6 @@ export default function InventoryCountsPage() {
 
     setLoadingInventory(true);
     try {
-      // Load inventory for the selected branch
       const { data: inventoryData, error } = await supabase
         .from('inventory')
         .select('*, products(name, unit_price, unit_count)')
@@ -312,7 +308,6 @@ export default function InventoryCountsPage() {
   };
 
   const handleCreateCount = async () => {
-    // Validation
     if (!createForm.branch_id) {
       toast.error('يرجى اختيار الفرع');
       return;
@@ -324,7 +319,6 @@ export default function InventoryCountsPage() {
 
     setCreating(true);
     try {
-      // Generate count number
       const year = getCurrentYear();
       const { data: lastCount } = await supabase
         .from('inventory_counts')
@@ -341,7 +335,6 @@ export default function InventoryCountsPage() {
 
       const countNumber = generateCountNumber(lastNum, year);
 
-      // Create count header
       const { data: newCount, error: countError } = await supabase
         .from('inventory_counts')
         .insert({
@@ -358,7 +351,6 @@ export default function InventoryCountsPage() {
       if (countError) throw countError;
       if (!newCount) throw new Error('Failed to create count');
 
-      // Create count items
       const itemsPayload = formItems.map((item) => ({
         count_id: newCount.id,
         product_id: item.product_id,
@@ -374,7 +366,6 @@ export default function InventoryCountsPage() {
 
       if (itemsError) throw itemsError;
 
-      // Audit log
       await supabase.from('audit_log').insert({
         action: 'create_inventory_count',
         details: {
@@ -395,7 +386,6 @@ export default function InventoryCountsPage() {
     }
   };
 
-  // ─── View count details ────────────────────────────────────────────────────
   const openDetailDialog = async (count: CountRow) => {
     setDetailCount(count);
     setDetailDialogOpen(true);
@@ -422,7 +412,6 @@ export default function InventoryCountsPage() {
     }
   };
 
-  // ─── Confirm count ─────────────────────────────────────────────────────────
   const openConfirmDialog = (count: CountRow) => {
     setConfirmingCount(count);
     setConfirmDialogOpen(true);
@@ -435,7 +424,6 @@ export default function InventoryCountsPage() {
     try {
       const count = confirmingCount;
 
-      // Load items if not loaded
       let items = count.items;
       if (!items || items.length === 0) {
         const { data, error } = await supabase
@@ -453,11 +441,9 @@ export default function InventoryCountsPage() {
         return;
       }
 
-      // ─── Step 1: Update inventory and create transactions for each item with difference ──
       for (const item of items) {
         if (item.difference === 0) continue;
 
-        // Update inventory quantity to match actual_quantity
         const { data: invData } = await supabase
           .from('inventory')
           .select('id, quantity')
@@ -476,7 +462,6 @@ export default function InventoryCountsPage() {
 
           if (updateErr) throw updateErr;
         } else {
-          // Create inventory record if not found
           const { error: insertErr } = await supabase
             .from('inventory')
             .insert({
@@ -490,7 +475,6 @@ export default function InventoryCountsPage() {
           if (insertErr) throw insertErr;
         }
 
-        // Create inventory transaction with type 'count'
         const { error: txErr } = await supabase
           .from('inventory_transactions')
           .insert({
@@ -507,7 +491,6 @@ export default function InventoryCountsPage() {
         if (txErr) throw txErr;
       }
 
-      // ─── Step 2: Update count status to confirmed ──────────────────────
       const { error: statusError } = await supabase
         .from('inventory_counts')
         .update({
@@ -518,7 +501,6 @@ export default function InventoryCountsPage() {
 
       if (statusError) throw statusError;
 
-      // Audit log
       await supabase.from('audit_log').insert({
         action: 'confirm_inventory_count',
         details: {
@@ -540,7 +522,6 @@ export default function InventoryCountsPage() {
     }
   };
 
-  // ─── Cancel count ──────────────────────────────────────────────────────────
   const openCancelDialog = (count: CountRow) => {
     setCancellingCount(count);
     setCancelDialogOpen(true);
@@ -580,10 +561,8 @@ export default function InventoryCountsPage() {
     }
   };
 
-  // ─── Pagination ────────────────────────────────────────────────────────────
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // ─── Difference display helper ─────────────────────────────────────────────
   const getDifferenceColor = (diff: number) => {
     if (diff > 0) return 'text-emerald-600 dark:text-emerald-400';
     if (diff < 0) return 'text-red-600 dark:text-red-400';
@@ -602,7 +581,6 @@ export default function InventoryCountsPage() {
     return 'متطابق';
   };
 
-  // ─── Product lookup ────────────────────────────────────────────────────────
   const getProductName = useCallback((productId: string) => {
     return products.find((p) => p.id === productId)?.name || 'غير معروف';
   }, [products]);
@@ -616,7 +594,9 @@ export default function InventoryCountsPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+            <Loader2 className="w-6 h-6 animate-spin text-white" />
+          </div>
           <p className="text-muted-foreground text-sm">جاري تحميل الجرد...</p>
         </div>
       </div>
@@ -629,8 +609,8 @@ export default function InventoryCountsPage() {
       title: 'إجمالي الجرد',
       value: stats.total,
       icon: ClipboardCheck,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
+      color: 'text-sky-600 dark:text-sky-400',
+      bg: 'bg-sky-50 dark:bg-sky-900/20',
     },
     {
       title: 'جرد معلق',
@@ -665,14 +645,19 @@ export default function InventoryCountsPage() {
         transition={{ duration: 0.3 }}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-bold">جرد المخزون</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            جرد المخزون الفعلي ومقارنته بالكميات بالنظام وتسوية الفروقات
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+            <ClipboardCheck className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">جرد المخزون</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              جرد المخزون الفعلي ومقارنته بالكميات بالنظام وتسوية الفروقات
+            </p>
+          </div>
         </div>
         {hasPermission('inventory_counts', 'create') && (
-          <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+          <Button onClick={openCreateDialog} className="gap-2 shadow-lg" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
             <Plus className="w-4 h-4" />
             جرد جديد
           </Button>
@@ -714,7 +699,8 @@ export default function InventoryCountsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.3 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #38bdf8, #0284c7, #0369a1)' }} />
           <CardContent className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="relative">
@@ -778,24 +764,26 @@ export default function InventoryCountsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.4 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                <span className="mr-2 text-muted-foreground">جاري التحميل...</span>
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+                </div>
+                <p className="text-muted-foreground text-sm">جاري التحميل...</p>
               </div>
             ) : counts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <ClipboardCheck className="w-12 h-12 text-primary/60" />
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #7dd3fc, #0284c7)' }}>
+                  <ClipboardCheck className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا توجد عمليات جرد</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم إنشاء أي جرد بعد. ابدأ بجرد المخزون ومقارنته بالنظام.
                 </p>
                 {hasPermission('inventory_counts', 'create') && (
-                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                  <Button onClick={openCreateDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
                     <Plus className="w-5 h-5" />
                     جرد جديد
                   </Button>
@@ -803,100 +791,169 @@ export default function InventoryCountsPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">رقم الجرد</TableHead>
-                        <TableHead className="text-right hidden md:table-cell">الفرع</TableHead>
-                        <TableHead className="text-right hidden sm:table-cell">تاريخ الجرد</TableHead>
-                        <TableHead className="text-center">إجمالي الأصناف</TableHead>
-                        <TableHead className="text-center">أصناف بفروقات</TableHead>
-                        <TableHead className="text-center">الحالة</TableHead>
-                        <TableHead className="text-center">الإجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {counts.map((count) => {
-                        const StatusIcon = statusIcon[count.status] || History;
-                        const totalItems = count.items?.length || 0;
-                        const diffItems = count.items?.filter((i) => i.difference !== 0).length || 0;
+                {/* Desktop Table */}
+                <div className="hidden sm:block">
+                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #38bdf8, #0284c7, #0369a1)' }} />
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right">رقم الجرد</TableHead>
+                          <TableHead className="text-right hidden md:table-cell">الفرع</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">تاريخ الجرد</TableHead>
+                          <TableHead className="text-center">إجمالي الأصناف</TableHead>
+                          <TableHead className="text-center">أصناف بفروقات</TableHead>
+                          <TableHead className="text-center">الحالة</TableHead>
+                          <TableHead className="text-center">الإجراءات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {counts.map((count) => {
+                          const StatusIcon = statusIcon[count.status] || History;
+                          const totalItems = count.items?.length || 0;
+                          const diffItems = count.items?.filter((i) => i.difference !== 0).length || 0;
 
-                        return (
-                          <TableRow key={count.id} className="hover:bg-muted/50 transition-colors">
-                            <TableCell className="font-medium font-mono">
-                              {count.count_number}
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              {count.branches?.name || getBranchName(count.branch_id)}
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              {formatDate(count.count_date)}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant="outline" className="font-mono">
-                                {totalItems}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  'font-mono',
-                                  diffItems > 0
-                                    ? 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-400'
-                                    : 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400'
-                                )}
-                              >
-                                {diffItems}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge className={cn('gap-1', statusColor[count.status])}>
-                                <StatusIcon className="w-3 h-3" />
-                                {statusLabel[count.status]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => openDetailDialog(count)}
-                                  title="عرض التفاصيل"
+                          return (
+                            <TableRow key={count.id} className="hover:bg-sky-50/50 dark:hover:bg-sky-900/10 transition-colors">
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #7dd3fc, #0284c7)' }}>
+                                    <ClipboardCheck className="w-4 h-4 text-white" />
+                                  </div>
+                                  <span className="font-mono">{count.count_number}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <div className="flex items-center gap-1">
+                                  <Building2 className="w-3.5 h-3.5 text-sky-500" />
+                                  {count.branches?.name || getBranchName(count.branch_id)}
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-muted-foreground">
+                                {formatDate(count.count_date)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="outline" className="font-mono">
+                                  {totalItems}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'font-mono',
+                                    diffItems > 0
+                                      ? 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-400'
+                                      : 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400'
+                                  )}
                                 >
-                                  <Eye className="w-4 h-4" />
+                                  {diffItems}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={cn('gap-1', statusColor[count.status])}>
+                                  <StatusIcon className="w-3 h-3" />
+                                  {statusLabel[count.status]}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-sky-50 dark:hover:bg-sky-900/20"
+                                    onClick={() => openDetailDialog(count)}
+                                    title="عرض التفاصيل"
+                                  >
+                                    <Eye className="w-4 h-4 text-sky-600" />
+                                  </Button>
+                                  {count.status === 'draft' && hasPermission('inventory_counts', 'edit') && (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                        onClick={() => openConfirmDialog(count)}
+                                        title="تأكيد الجرد"
+                                      >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                        onClick={() => openCancelDialog(count)}
+                                        title="إلغاء الجرد"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Mobile Card Layout */}
+                <div className="sm:hidden divide-y">
+                  {counts.map((count) => {
+                    const StatusIcon = statusIcon[count.status] || History;
+                    const totalItems = count.items?.length || 0;
+                    const diffItems = count.items?.filter((i) => i.difference !== 0).length || 0;
+                    const borderColor = count.status === 'draft' ? '#f59e0b' : count.status === 'confirmed' ? '#10b981' : '#ef4444';
+                    return (
+                      <motion.div
+                        key={count.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="p-3 border-r-4 hover:bg-muted/30 transition-all"
+                        style={{ borderRightColor: borderColor }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #7dd3fc, #0284c7)' }}>
+                              <ClipboardCheck className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm font-mono">{count.count_number}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(count.count_date)}</p>
+                            </div>
+                          </div>
+                          <Badge className={cn('gap-1 text-[10px]', statusColor[count.status])}>
+                            <StatusIcon className="w-3 h-3" />
+                            {statusLabel[count.status]}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{count.branches?.name || getBranchName(count.branch_id)}</span>
+                            <span>{totalItems} صنف</span>
+                            {diffItems > 0 && <span className="text-red-600 dark:text-red-400 font-medium">{diffItems} فرق</span>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-sky-50 dark:hover:bg-sky-900/20" onClick={() => openDetailDialog(count)}>
+                              <Eye className="w-3.5 h-3.5 text-sky-600" />
+                            </Button>
+                            {count.status === 'draft' && hasPermission('inventory_counts', 'edit') && (
+                              <>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => openConfirmDialog(count)}>
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
                                 </Button>
-                                {count.status === 'draft' && hasPermission('inventory_counts', 'edit') && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                                      onClick={() => openConfirmDialog(count)}
-                                      title="تأكيد الجرد"
-                                    >
-                                      <CheckCircle2 className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                                      onClick={() => openCancelDialog(count)}
-                                      title="إلغاء الجرد"
-                                    >
-                                      <XCircle className="w-4 h-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => openCancelDialog(count)}>
+                                  <XCircle className="w-3.5 h-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
 
                 {/* Pagination */}
@@ -936,16 +993,17 @@ export default function InventoryCountsPage() {
 
       {/* ─── CREATE DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <ClipboardCheck className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+                <ClipboardCheck className="w-4 h-4 text-white" />
+              </div>
               جرد جديد
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Form fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="branch">الفرع</Label>
@@ -987,11 +1045,12 @@ export default function InventoryCountsPage() {
 
             <Separator />
 
-            {/* Items */}
             {loadingInventory ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                <span className="mr-2 text-muted-foreground">جاري تحميل المخزون...</span>
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+                  <Loader2 className="w-5 h-5 animate-spin text-white" />
+                </div>
+                <p className="text-muted-foreground text-sm">جاري تحميل المخزون...</p>
               </div>
             ) : formItems.length > 0 ? (
               <div className="space-y-3">
@@ -1054,7 +1113,6 @@ export default function InventoryCountsPage() {
                   </Table>
                 </ScrollArea>
 
-                {/* Summary */}
                 <div className="flex flex-wrap gap-4 p-3 rounded-lg bg-muted/50">
                   <div className="text-sm">
                     <span className="text-muted-foreground">إجمالي الأصناف: </span>
@@ -1105,6 +1163,7 @@ export default function InventoryCountsPage() {
               onClick={handleCreateCount}
               disabled={creating || formItems.length === 0}
               className="gap-2"
+              style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}
             >
               {creating ? (
                 <>
@@ -1124,17 +1183,18 @@ export default function InventoryCountsPage() {
 
       {/* ─── DETAIL DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <Eye className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+                <Eye className="w-4 h-4 text-white" />
+              </div>
               تفاصيل الجرد
             </DialogTitle>
           </DialogHeader>
 
           {detailCount && (
             <div className="space-y-4 py-2">
-              {/* Count header info */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">رقم الجرد</p>
@@ -1169,7 +1229,6 @@ export default function InventoryCountsPage() {
 
               <Separator />
 
-              {/* Items table */}
               {loadingDetail ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -1235,7 +1294,6 @@ export default function InventoryCountsPage() {
                     </Table>
                   </ScrollArea>
 
-                  {/* Summary */}
                   <div className="flex flex-wrap gap-4 p-3 rounded-lg bg-muted/50">
                     <div className="text-sm">
                       <span className="text-muted-foreground">إجمالي الأصناف: </span>
@@ -1263,7 +1321,6 @@ export default function InventoryCountsPage() {
                 </>
               )}
 
-              {/* Created at info */}
               <div className="text-xs text-muted-foreground">
                 <span>تاريخ الإنشاء: {formatDateTime(detailCount.created_at)}</span>
                 {detailCount.updated_at !== detailCount.created_at && (
@@ -1286,7 +1343,9 @@ export default function InventoryCountsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              </div>
               تأكيد الجرد
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
@@ -1342,7 +1401,9 @@ export default function InventoryCountsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-red-600" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                <XCircle className="w-4 h-4 text-white" />
+              </div>
               إلغاء الجرد
             </AlertDialogTitle>
             <AlertDialogDescription>

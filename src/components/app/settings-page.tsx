@@ -189,17 +189,27 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">الإعدادات</h1>
-        <p className="text-muted-foreground text-sm mt-1">إعدادات المصنع والنظام</p>
-      </div>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #64748b, #475569)' }}>
+            <SettingsIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">الإعدادات</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">إعدادات المصنع والنظام</p>
+          </div>
+        </div>
+      </motion.div>
 
       {isAdmin && (<>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #64748b, #475569, #334155)' }} />
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Factory className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #64748b, #475569)' }}>
+                <Factory className="w-4 h-4 text-white" />
+              </div>
               بيانات المصنع
             </CardTitle>
           </CardHeader>
@@ -212,6 +222,7 @@ export default function SettingsPage() {
                   value={form.factory_name}
                   onChange={(e) => setForm({ ...form, factory_name: e.target.value })}
                   placeholder="مصنع الصادق"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2">
@@ -221,6 +232,7 @@ export default function SettingsPage() {
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="01XXXXXXXXX"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
@@ -230,11 +242,12 @@ export default function SettingsPage() {
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   placeholder="العنوان الكامل للمصنع"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tax-number" className="flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5" />
+                  <FileText className="w-3.5 h-3.5 text-slate-500" />
                   الرقم الضريبي
                 </Label>
                 <Input
@@ -242,11 +255,12 @@ export default function SettingsPage() {
                   value={form.tax_number}
                   onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
                   placeholder="الرقم الضريبي"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="commercial-register" className="flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5" />
+                  <FileText className="w-3.5 h-3.5 text-slate-500" />
                   السجل التجاري
                 </Label>
                 <Input
@@ -254,11 +268,12 @@ export default function SettingsPage() {
                   value={form.commercial_register}
                   onChange={(e) => setForm({ ...form, commercial_register: e.target.value })}
                   placeholder="رقم السجل التجاري"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="factory-email" className="flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5" />
+                  <Mail className="w-3.5 h-3.5 text-slate-500" />
                   البريد الإلكتروني
                 </Label>
                 <Input
@@ -268,7 +283,7 @@ export default function SettingsPage() {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="info@factory.com"
                   dir="ltr"
-                  className="text-left"
+                  className="text-left border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2">
@@ -282,6 +297,7 @@ export default function SettingsPage() {
                   min="0"
                   max="100"
                   step="0.01"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
             </div>
@@ -289,7 +305,7 @@ export default function SettingsPage() {
             <Separator />
 
             {/* B&W Print Toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
               <div>
                 <Label>طباعة أبيض وأسود</Label>
                 <p className="text-xs text-muted-foreground">تفعيل الطباعة بالأبيض والأسود فقط</p>
@@ -313,6 +329,7 @@ export default function SettingsPage() {
                   placeholder="0 = معطل"
                   min="0"
                   max="120"
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
                 <p className="text-xs text-muted-foreground">0 يعني عدم تسجيل الخروج تلقائياً</p>
               </div>
@@ -323,7 +340,7 @@ export default function SettingsPage() {
             {/* Invoice Footer */}
             <div className="space-y-2">
               <Label htmlFor="invoice-footer" className="flex items-center gap-1">
-                <MessageSquare className="w-3.5 h-3.5" />
+                <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
                 نص تذييل الفاتورة
               </Label>
               <Textarea
@@ -332,11 +349,12 @@ export default function SettingsPage() {
                 onChange={(e) => setForm({ ...form, invoice_footer: e.target.value })}
                 placeholder="مثال: شكراً لتعاملكم معنا - البضاعة المباعة لا ترد ولا تستبدل"
                 rows={2}
+                className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
               />
               <p className="text-xs text-muted-foreground">هذا النص سيظهر أسفل كل فاتورة مطبوعة</p>
             </div>
 
-            <Button onClick={handleSaveSettings} disabled={saving} className="gap-2">
+            <Button onClick={handleSaveSettings} disabled={saving} className="gap-2 shadow-lg" style={{ background: 'linear-gradient(135deg, #64748b, #475569)' }}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               حفظ الإعدادات
             </Button>
@@ -346,26 +364,29 @@ export default function SettingsPage() {
 
       {/* Logo Upload */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #64748b, #475569, #334155)' }} />
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Upload className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #64748b, #475569)' }}>
+                <Upload className="w-4 h-4 text-white" />
+              </div>
               شعار المصنع
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-6">
-              <div className="w-24 h-24 border-2 border-dashed border-muted rounded-xl flex items-center justify-center overflow-hidden bg-muted/50">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800/50">
                 {logoPreview ? (
                   <img src={logoPreview} alt="الشعار" className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-4xl font-extrabold text-[#D4A843]">ص</span>
                 )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 text-center sm:text-right">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="logo-upload" className="cursor-pointer">
-                    <Button variant="outline" className="gap-2" asChild>
+                    <Button variant="outline" className="gap-2 border-slate-300 dark:border-slate-600" asChild>
                       <span>
                         <Upload className="w-4 h-4" />
                         رفع شعار جديد
@@ -400,10 +421,13 @@ export default function SettingsPage() {
 
       {/* Change Password */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #64748b, #475569, #334155)' }} />
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Lock className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #64748b, #475569)' }}>
+                <Lock className="w-4 h-4 text-white" />
+              </div>
               تغيير كلمة المرور
             </CardTitle>
           </CardHeader>
@@ -415,6 +439,7 @@ export default function SettingsPage() {
                 type="password"
                 value={passwordForm.current_password}
                 onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -425,6 +450,7 @@ export default function SettingsPage() {
                   type="password"
                   value={passwordForm.new_password}
                   onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
               <div className="space-y-2">
@@ -434,10 +460,11 @@ export default function SettingsPage() {
                   type="password"
                   value={passwordForm.confirm_password}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                  className="border-slate-200 dark:border-slate-700 focus:border-slate-400"
                 />
               </div>
             </div>
-            <Button onClick={handleChangePassword} variant="outline" className="gap-2">
+            <Button onClick={handleChangePassword} variant="outline" className="gap-2 border-slate-300 dark:border-slate-600">
               <Lock className="w-4 h-4" />
               تغيير كلمة المرور
             </Button>

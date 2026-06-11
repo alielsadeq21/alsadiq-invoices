@@ -35,6 +35,10 @@ import {
   FileText,
   Printer,
   Receipt,
+  Calendar,
+  Building2,
+  DollarSign,
+  Hash,
 } from 'lucide-react';
 import DataTablePagination from '@/components/ui/data-table-pagination';
 import { toast } from 'sonner';
@@ -51,6 +55,39 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 const PAGE_SIZE = 10;
+
+/** Map invoice status to a right-border accent color for mobile cards */
+function getStatusAccent(status: string) {
+  const map: Record<string, string> = {
+    active: 'border-r-emerald-500',
+    cancelled: 'border-r-red-500',
+    partially_returned: 'border-r-amber-500',
+    fully_returned: 'border-r-gray-400',
+  };
+  return map[status] || 'border-r-gray-300';
+}
+
+/** Map invoice status to gradient background for status badges */
+function getStatusGradient(status: string) {
+  const map: Record<string, string> = {
+    active: 'bg-gradient-to-l from-emerald-500 to-emerald-600 text-white shadow-emerald-200 dark:shadow-emerald-900/30',
+    cancelled: 'bg-gradient-to-l from-red-500 to-red-600 text-white shadow-red-200 dark:shadow-red-900/30',
+    partially_returned: 'bg-gradient-to-l from-amber-500 to-amber-600 text-white shadow-amber-200 dark:shadow-amber-900/30',
+    fully_returned: 'bg-gradient-to-l from-gray-400 to-gray-500 text-white shadow-gray-200 dark:shadow-gray-900/30',
+  };
+  return map[status] || 'bg-gray-100 text-gray-800';
+}
+
+/** Map invoice status to gradient for icon circle */
+function getStatusIconGradient(status: string) {
+  const map: Record<string, string> = {
+    active: 'from-emerald-400 to-emerald-600',
+    cancelled: 'from-red-400 to-red-600',
+    partially_returned: 'from-amber-400 to-amber-600',
+    fully_returned: 'from-gray-300 to-gray-500',
+  };
+  return map[status] || 'from-gray-300 to-gray-400';
+}
 
 export default function InvoicesPage() {
   const { navigateTo, user, isAdmin, hasPermission } = useAppStore();
@@ -69,14 +106,6 @@ export default function InvoicesPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancellingInvoice, setCancellingInvoice] = useState<Invoice | null>(null);
   const [cancelReason, setCancelReason] = useState('');
-
-  useEffect(() => {
-    loadBranches();
-  }, []);
-
-  useEffect(() => {
-    loadInvoices();
-  }, [page, search, dateFrom, dateTo, branchFilter, statusFilter]);
 
   const loadBranches = async () => {
     let query = supabase.from('branches').select('*').order('name');
@@ -129,6 +158,14 @@ export default function InvoicesPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadBranches();
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [page, search, dateFrom, dateTo, branchFilter, statusFilter]);
 
   const handleCancel = async () => {
     if (!cancellingInvoice) return;
@@ -292,26 +329,40 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">الفواتير</h1>
-          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
-            إجمالي: {totalCount} فاتورة
-          </p>
+      {/* ─── Header ─── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:flex-row sm:items-center sm:justify-between">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Icon in gradient circle */}
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 shrink-0">
+            <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">الفواتير</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="mt-0.5">
+              <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+              <p className="text-muted-foreground text-xs sm:text-sm">
+                إجمالي <span className="font-bold text-foreground">{totalCount}</span> فاتورة
+              </p>
+            </div>
+          </div>
         </div>
         {hasPermission('invoices', 'create') && (
-          <Button onClick={() => navigateTo('invoice-form')} className="gap-2 shadow-md w-full sm:w-auto">
+          <Button
+            onClick={() => navigateTo('invoice-form')}
+            className="gap-2 w-full sm:w-auto bg-gradient-to-l from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 border-0 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+          >
             <Plus className="w-4 h-4" />
             فاتورة جديدة
           </Button>
         )}
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-md">
-        <CardContent className="p-3 sm:p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+      {/* ─── Filters ─── */}
+      <Card className="border-0 shadow-md overflow-hidden relative">
+        {/* Gradient top border accent */}
+        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
+        <CardContent className="p-3 sm:p-4 pt-4 sm:pt-5">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }} className="sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
             <div className="relative col-span-2 lg:col-span-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -374,7 +425,7 @@ export default function InvoicesPage() {
         </CardContent>
       </Card>
 
-      {/* Invoices List */}
+      {/* ─── Invoices List ─── */}
       {loading ? (
         <Card className="border-0 shadow-md">
           <CardContent className="p-0">
@@ -384,17 +435,22 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
       ) : invoices.length === 0 ? (
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                <FileText className="w-12 h-12 text-primary/60" />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} className="py-20 px-4">
+              {/* Gradient icon circle */}
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-5 shadow-xl shadow-emerald-200 dark:shadow-emerald-900/30">
+                <FileText className="w-12 h-12 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">لا توجد فواتير</h3>
-              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+              <h3 className="text-xl font-bold mb-2 tracking-tight">لا توجد فواتير</h3>
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
                 لم يتم إنشاء أي فواتير بعد. ابدأ بإنشاء أول فاتورة صرف لتتبع عمليات البيع والتسليم.
               </p>
-              <Button onClick={() => navigateTo('invoice-form')} className="gap-2 shadow-md" size="lg">
+              <Button
+                onClick={() => navigateTo('invoice-form')}
+                className="gap-2 shadow-lg bg-gradient-to-l from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white border-0 shadow-emerald-200 dark:shadow-emerald-900/30 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                size="lg"
+              >
                 <Plus className="w-5 h-5" />
                 إنشاء فاتورة جديدة
               </Button>
@@ -403,53 +459,73 @@ export default function InvoicesPage() {
         </Card>
       ) : (
         <>
-          {/* Mobile Card Layout */}
-          <div className="flex flex-col gap-3 sm:hidden">
+          {/* ─── Mobile Card Layout ─── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden">
             {invoices.map((invoice) => (
               <Card
                 key={invoice.id}
-                className="border-0 shadow-md cursor-pointer active:scale-[0.98] transition-transform"
+                className={`border-0 shadow-md cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden border-r-4 ${getStatusAccent(invoice.status)}`}
                 onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h3 className="font-bold text-sm">{invoice.invoice_number}</h3>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {(invoice as { branches?: { name: string } }).branches?.name || ''}
-                      </p>
+                  {/* Top row: Invoice number + status */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                      {/* Invoice number icon in gradient circle */}
+                      <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${getStatusIconGradient(invoice.status)} flex items-center justify-center shadow-sm shrink-0`}>
+                        <FileText className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm tracking-tight">{invoice.invoice_number}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="mt-0.5">
+                          <Building2 className="w-3 h-3 text-muted-foreground" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {(invoice as { branches?: { name: string } }).branches?.name || ''}
+                          </p>
+                        </div>
+                      </div>
                     </div>
+                    {/* Gradient status badge */}
                     <Badge
-                      variant="secondary"
-                      className={`text-[10px] ${getStatusColor(invoice.status)}`}
+                      className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${getStatusGradient(invoice.status)}`}
                     >
                       {getStatusLabel(invoice.status)}
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t">
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(invoice.invoice_date)}
-                    </span>
-                    <span className="font-bold text-sm">{formatCurrency(invoice.total)}</span>
+
+                  {/* Info row: Date + Total */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-2 pt-2.5 border-t border-dashed">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(invoice.invoice_date)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="font-bold text-sm">{formatCurrency(invoice.total)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-3 pt-2 border-t">
+
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="mt-3 pt-2.5 border-t">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 h-7 text-[10px] gap-1"
+                      className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 transition-colors"
                       onClick={(e) => { e.stopPropagation(); navigateTo('invoice-detail', { id: invoice.id }); }}
                     >
-                      <Eye className="w-3 h-3" />
+                      <Eye className="w-3.5 h-3.5" />
                       عرض
                     </Button>
                     {hasPermission('invoices', 'print') && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-7 text-[10px] gap-1"
+                        className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:hover:bg-blue-950 dark:hover:text-blue-400 transition-colors"
                         onClick={(e) => { e.stopPropagation(); handleQuickPrint(invoice, 'a4'); }}
                       >
-                        <Printer className="w-3 h-3" />
+                        <Printer className="w-3.5 h-3.5" />
                         طباعة
                       </Button>
                     )}
@@ -457,14 +533,14 @@ export default function InvoicesPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-7 text-[10px] gap-1 text-destructive hover:text-destructive border-destructive/30"
+                        className="flex-1 h-8 text-[11px] gap-1.5 text-destructive hover:bg-red-50 hover:text-red-700 hover:border-red-200 dark:hover:bg-red-950 dark:hover:text-red-400 border-destructive/30 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCancellingInvoice(invoice);
                           setCancelDialogOpen(true);
                         }}
                       >
-                        <XCircle className="w-3 h-3" />
+                        <XCircle className="w-3.5 h-3.5" />
                         إلغاء
                       </Button>
                     )}
@@ -474,52 +550,77 @@ export default function InvoicesPage() {
             ))}
           </div>
 
-          {/* Desktop Table Layout */}
-          <Card className="border-0 shadow-md hidden sm:block">
+          {/* ─── Desktop Table Layout ─── */}
+          <Card className="border-0 shadow-md overflow-hidden hidden sm:block">
+            {/* Gradient accent bar at top */}
+            <div className="h-1 bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">رقم الفاتورة</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">الفرع</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">العميل</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">التاريخ</TableHead>
-                      <TableHead className="text-right">الإجمالي</TableHead>
-                      <TableHead className="text-center">الحالة</TableHead>
-                      <TableHead className="text-center hidden lg:table-cell">الأصناف</TableHead>
-                      <TableHead className="text-center">الإجراءات</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">رقم الفاتورة</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">الفرع</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">العميل</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">التاريخ</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الإجمالي</TableHead>
+                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">الأصناف</TableHead>
+                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.map((invoice) => (
-                      <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigateTo('invoice-detail', { id: invoice.id })}>
-                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {(invoice as { branches?: { name: string } }).branches?.name || '—'}
+                      <TableRow
+                        key={invoice.id}
+                        className="cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors"
+                        onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
+                      >
+                        <TableCell>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getStatusIconGradient(invoice.status)} flex items-center justify-center shadow-sm shrink-0`}>
+                              <FileText className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <span className="font-semibold text-sm">{invoice.invoice_number}</span>
+                          </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
+                        <TableCell className="hidden sm:table-cell">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-sm">{(invoice as { branches?: { name: string } }).branches?.name || '—'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">
                           {(invoice as any).customers?.name || '—'}
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">{formatDate(invoice.invoice_date)}</TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(invoice.total)}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-sm">{formatDate(invoice.invoice_date)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="font-bold text-sm">{formatCurrency(invoice.total)}</span>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                           <Badge
-                            variant="secondary"
-                            className={`text-[10px] ${getStatusColor(invoice.status)}`}
+                            className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${getStatusGradient(invoice.status)}`}
                           >
                             {getStatusLabel(invoice.status)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-center hidden lg:table-cell">
+                        <TableCell className="text-center hidden lg:table-cell text-sm">
                           {invoice.items?.length || '—'}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center gap-0.5">
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.125rem' }}>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-8 w-8 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 transition-colors"
                               onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
                               title="عرض"
                             >
@@ -530,7 +631,7 @@ export default function InvoicesPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-400 transition-colors"
                                   onClick={() => handleQuickPrint(invoice, 'a4')}
                                   title="طباعة A4"
                                 >
@@ -539,7 +640,7 @@ export default function InvoicesPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 hover:bg-purple-50 hover:text-purple-700 dark:hover:bg-purple-950 dark:hover:text-purple-400 transition-colors"
                                   onClick={() => handleQuickPrint(invoice, 'thermal')}
                                   title="طباعة حرارية"
                                 >
@@ -553,7 +654,7 @@ export default function InvoicesPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8"
+                                    className="h-8 w-8 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950 dark:hover:text-amber-400 transition-colors"
                                     onClick={() => handleDuplicate(invoice)}
                                     title="تكرار"
                                   >
@@ -564,7 +665,7 @@ export default function InvoicesPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-destructive"
+                                    className="h-8 w-8 text-destructive hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-400 transition-colors"
                                     onClick={() => {
                                       setCancellingInvoice(invoice);
                                       setCancelDialogOpen(true);
@@ -595,16 +696,19 @@ export default function InvoicesPage() {
             </CardContent>
           </Card>
 
-          {/* Mobile Pagination */}
+          {/* ─── Mobile Pagination ─── */}
           <div className="sm:hidden">
-            <DataTablePagination
-              page={page}
-              totalPages={totalPages}
-              totalCount={totalCount}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-              label="فاتورة"
-            />
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-0.5 bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
+              <DataTablePagination
+                page={page}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                label="فاتورة"
+              />
+            </Card>
           </div>
         </>
       )}

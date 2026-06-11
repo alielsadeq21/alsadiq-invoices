@@ -66,6 +66,8 @@ import {
   X,
   CircleDot,
   FileText,
+  Calendar,
+  Hash,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -538,8 +540,8 @@ export default function AccountingPage() {
   if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
-        <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-5">
-          <BookOpen className="w-12 h-12 text-red-500" />
+        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+          <BookOpen className="w-12 h-12 text-white" />
         </div>
         <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
         <p className="text-muted-foreground text-sm text-center">
@@ -554,14 +556,16 @@ export default function AccountingPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-primary" />
-              القيود المحاسبية
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              إجمالي القيود: {totalCount}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+              <BookOpen className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">القيود المحاسبية</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                إجمالي القيود: {totalCount}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {canExport && (
@@ -571,7 +575,7 @@ export default function AccountingPage() {
               </Button>
             )}
             {canCreate && (
-              <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+              <Button onClick={openCreateDialog} className="gap-2 shadow-md" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
                 <Plus className="w-4 h-4" />
                 قيد جديد
               </Button>
@@ -582,7 +586,8 @@ export default function AccountingPage() {
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9, #4c1d95)' }} />
           <CardContent className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="relative">
@@ -637,7 +642,7 @@ export default function AccountingPage() {
 
       {/* Entries Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -645,15 +650,15 @@ export default function AccountingPage() {
               </div>
             ) : entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <BookOpen className="w-12 h-12 text-primary/60" />
+                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                  <BookOpen className="w-12 h-12 text-white/80" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا توجد قيود</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم إنشاء أي قيود محاسبية بعد. ابدأ بإنشاء أول قيد.
                 </p>
                 {canCreate && (
-                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
                     <Plus className="w-5 h-5" />
                     إنشاء قيد جديد
                   </Button>
@@ -661,106 +666,188 @@ export default function AccountingPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">رقم القيد</TableHead>
-                        <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
-                        <TableHead className="text-right hidden md:table-cell">الوصف</TableHead>
-                        <TableHead className="text-right">إجمالي المدين</TableHead>
-                        <TableHead className="text-right hidden sm:table-cell">إجمالي الدائن</TableHead>
-                        <TableHead className="text-center">الحالة</TableHead>
-                        <TableHead className="text-center">الإجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {entries.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell className="font-medium">{entry.entry_number}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{formatDate(entry.entry_date)}</TableCell>
-                          <TableCell className="hidden md:table-cell max-w-[200px] truncate">
-                            {entry.description}
-                          </TableCell>
-                          <TableCell className="font-semibold text-primary">
-                            {formatCurrency(entry.total_debit)}
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell font-semibold">
-                            {formatCurrency(entry.total_credit)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {entry.is_posted ? (
-                              <Badge
-                                variant="secondary"
-                                className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                              >
-                                <CheckCircle2 className="w-3 h-3 ml-1" />
-                                مرحل
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="secondary"
-                                className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                              >
-                                <CircleDot className="w-3 h-3 ml-1" />
-                                مسودة
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openViewDialog(entry)}
-                                title="عرض التفاصيل"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              {canEdit && !entry.is_posted && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => openEditDialog(entry)}
-                                    title="تعديل"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
-                                    onClick={() => {
-                                      setPostingEntry(entry);
-                                      setPostDialogOpen(true);
-                                    }}
-                                    title="ترحيل"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      setDeletingEntry(entry);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                    title="حذف"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
+                {/* Mobile Card Layout */}
+                <div className="sm:hidden divide-y">
+                  {entries.map((entry) => (
+                    <div key={entry.id} className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                            <Hash className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="font-semibold text-sm">{entry.entry_number}</span>
+                        </div>
+                        {entry.is_posted ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          >
+                            <CheckCircle2 className="w-3 h-3 ml-1" />
+                            مرحل
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                          >
+                            <CircleDot className="w-3 h-3 ml-1" />
+                            مسودة
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {formatDate(entry.entry_date)}
+                      </div>
+                      {entry.description && (
+                        <p className="text-sm text-muted-foreground truncate">{entry.description}</p>
+                      )}
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                          <p className="text-sm font-bold text-primary">{formatCurrency(entry.total_debit)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                          <p className="text-sm font-bold">{formatCurrency(entry.total_credit)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 pt-1">
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openViewDialog(entry)}>
+                          <Eye className="w-3.5 h-3.5" />
+                          عرض
+                        </Button>
+                        {canEdit && !entry.is_posted && (
+                          <>
+                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openEditDialog(entry)}>
+                              <Edit className="w-3.5 h-3.5" />
+                              تعديل
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-emerald-600" onClick={() => { setPostingEntry(entry); setPostDialogOpen(true); }}>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              ترحيل
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-destructive" onClick={() => { setDeletingEntry(entry); setDeleteDialogOpen(true); }}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table */}
+                <div className="hidden sm:block">
+                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9, #4c1d95)' }} />
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right font-bold">رقم القيد</TableHead>
+                          <TableHead className="text-right font-bold">التاريخ</TableHead>
+                          <TableHead className="text-right font-bold hidden md:table-cell">الوصف</TableHead>
+                          <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+                          <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+                          <TableHead className="text-center font-bold">الحالة</TableHead>
+                          <TableHead className="text-center font-bold">الإجراءات</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {entries.map((entry) => (
+                          <TableRow key={entry.id} className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                                  <FileText className="w-3 h-3 text-white" />
+                                </div>
+                                {entry.entry_number}
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDate(entry.entry_date)}</TableCell>
+                            <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+                              {entry.description}
+                            </TableCell>
+                            <TableCell className="font-semibold text-primary">
+                              {formatCurrency(entry.total_debit)}
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {formatCurrency(entry.total_credit)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {entry.is_posted ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 ml-1" />
+                                  مرحل
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                                >
+                                  <CircleDot className="w-3 h-3 ml-1" />
+                                  مسودة
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openViewDialog(entry)}
+                                  title="عرض التفاصيل"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                {canEdit && !entry.is_posted && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => openEditDialog(entry)}
+                                      title="تعديل"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
+                                      onClick={() => {
+                                        setPostingEntry(entry);
+                                        setPostDialogOpen(true);
+                                      }}
+                                      title="ترحيل"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        setDeletingEntry(entry);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      title="حذف"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
 
                 {totalPages > 1 && (
@@ -798,10 +885,12 @@ export default function AccountingPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                <BookOpen className="w-4 h-4 text-white" />
+              </div>
               {editingEntry ? 'تعديل القيد' : 'إنشاء قيد جديد'}
             </DialogTitle>
           </DialogHeader>
@@ -969,7 +1058,7 @@ export default function AccountingPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
               {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
               {editingEntry ? 'تحديث القيد' : 'حفظ القيد'}
             </Button>
@@ -979,10 +1068,12 @@ export default function AccountingPage() {
 
       {/* View Detail Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                <FileText className="w-4 h-4 text-white" />
+              </div>
               تفاصيل القيد {viewEntry?.entry_number}
             </DialogTitle>
           </DialogHeader>
@@ -991,15 +1082,15 @@ export default function AccountingPage() {
               <div className="space-y-5 py-4">
                 {/* Entry Info */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div>
+                  <div className="p-3 rounded-lg bg-muted/30">
                     <p className="text-xs text-muted-foreground mb-1">رقم القيد</p>
                     <p className="font-semibold text-sm">{viewEntry.entry_number}</p>
                   </div>
-                  <div>
+                  <div className="p-3 rounded-lg bg-muted/30">
                     <p className="text-xs text-muted-foreground mb-1">التاريخ</p>
                     <p className="font-semibold text-sm">{formatDate(viewEntry.entry_date)}</p>
                   </div>
-                  <div>
+                  <div className="p-3 rounded-lg bg-muted/30">
                     <p className="text-xs text-muted-foreground mb-1">الحالة</p>
                     {viewEntry.is_posted ? (
                       <Badge
@@ -1019,7 +1110,7 @@ export default function AccountingPage() {
                       </Badge>
                     )}
                   </div>
-                  <div>
+                  <div className="p-3 rounded-lg bg-muted/30">
                     <p className="text-xs text-muted-foreground mb-1">تاريخ الإنشاء</p>
                     <p className="font-semibold text-sm">{formatDateTime(viewEntry.created_at)}</p>
                   </div>
@@ -1052,11 +1143,11 @@ export default function AccountingPage() {
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-right text-xs">اسم الحساب</TableHead>
-                            <TableHead className="text-right text-xs">مدين</TableHead>
-                            <TableHead className="text-right text-xs">دائن</TableHead>
-                            <TableHead className="text-right text-xs hidden sm:table-cell">البيان</TableHead>
+                          <TableRow className="bg-muted/30">
+                            <TableHead className="text-right text-xs font-bold">اسم الحساب</TableHead>
+                            <TableHead className="text-right text-xs font-bold">مدين</TableHead>
+                            <TableHead className="text-right text-xs font-bold">دائن</TableHead>
+                            <TableHead className="text-right text-xs font-bold hidden sm:table-cell">البيان</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

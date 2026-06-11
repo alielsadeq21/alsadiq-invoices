@@ -53,6 +53,10 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Building2,
+  Tags,
+  Calendar,
+  Banknote,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -566,14 +570,19 @@ export default function ExpensesPage() {
         transition={{ duration: 0.3 }}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-bold">المصروفات</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            إجمالي المصروفات ({totalCount} مصروف)
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+            <Receipt className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">المصروفات</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              إجمالي المصروفات ({totalCount} مصروف)
+            </p>
+          </div>
         </div>
         {hasPermission('expenses', 'create') && (
-          <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+          <Button onClick={openCreateDialog} className="gap-2 shadow-lg text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
             <Plus className="w-4 h-4" />
             مصروف جديد
           </Button>
@@ -586,10 +595,11 @@ export default function ExpensesPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c, #f97316)' }} />
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="relative">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="relative col-span-2 sm:col-span-1">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="بحث برقم المصروف أو الوصف..."
@@ -643,7 +653,7 @@ export default function ExpensesPage() {
                 />
               </div>
               {hasActiveFilters && (
-                <div className="flex items-end">
+                <div className="flex items-end col-span-2 sm:col-span-1">
                   <Button variant="outline" onClick={clearFilters} className="gap-2 w-full">
                     مسح الفلاتر
                   </Button>
@@ -654,13 +664,13 @@ export default function ExpensesPage() {
         </Card>
       </motion.div>
 
-      {/* Expenses Table */}
+      {/* Expenses Table / Cards */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.2 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -668,16 +678,17 @@ export default function ExpensesPage() {
                 <span className="mr-2 text-muted-foreground">جاري التحميل...</span>
               </div>
             ) : expenses.length === 0 ? (
+              /* Empty State */
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <Receipt className="w-12 h-12 text-primary/60" />
+                <div className="w-24 h-24 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                  <Receipt className="w-12 h-12 text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا توجد مصروفات</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم تسجيل أي مصروفات بعد. ابدأ بتسجيل أول مصروف لتتبع نفقات المصنع.
                 </p>
                 {hasPermission('expenses', 'create') && (
-                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                  <Button onClick={openCreateDialog} className="gap-2 shadow-lg text-white" size="lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
                     <Plus className="w-5 h-5" />
                     تسجيل مصروف جديد
                   </Button>
@@ -685,83 +696,186 @@ export default function ExpensesPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">رقم المصروف</TableHead>
-                        <TableHead className="text-right hidden md:table-cell">الفرع</TableHead>
-                        <TableHead className="text-right hidden sm:table-cell">التصنيف</TableHead>
-                        <TableHead className="text-right">الوصف</TableHead>
-                        <TableHead className="text-right">المبلغ</TableHead>
-                        <TableHead className="text-right hidden lg:table-cell">التاريخ</TableHead>
-                        <TableHead className="text-center hidden md:table-cell">طريقة الدفع</TableHead>
-                        <TableHead className="text-center">إجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {expenses.map((expense) => (
-                        <TableRow key={expense.id}>
-                          <TableCell className="font-medium">{expense.expense_number}</TableCell>
-                          <TableCell className="hidden md:table-cell">{(expense as any).branches?.name || '—'}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{(expense as any).expense_categories?.name || '—'}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
-                          <TableCell className="font-semibold text-primary">{formatCurrency(expense.amount)}</TableCell>
-                          <TableCell className="hidden lg:table-cell">{formatDate(expense.expense_date)}</TableCell>
-                          <TableCell className="text-center hidden md:table-cell">
-                            <Badge variant="secondary" className={`text-[10px] ${getMethodColor(expense.payment_method)}`}>
-                              {getMethodLabel(expense.payment_method)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              {hasPermission('expenses', 'print') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => handlePrint(expense)}
-                                  title="طباعة"
-                                >
-                                  <Printer className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                              {hasPermission('expenses', 'edit') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => openEditDialog(expense)}
-                                  title="تعديل"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                              {hasPermission('expenses', 'delete') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                  onClick={() => confirmDelete(expense)}
-                                  title="حذف"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                {/* Desktop Table */}
+                <div className="hidden sm:block">
+                  {/* Gradient accent bar */}
+                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c, #f97316)' }} />
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableHead className="text-right font-semibold">رقم المصروف</TableHead>
+                          <TableHead className="text-right hidden md:table-cell font-semibold">الفرع</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell font-semibold">التصنيف</TableHead>
+                          <TableHead className="text-right font-semibold">الوصف</TableHead>
+                          <TableHead className="text-right font-semibold">المبلغ</TableHead>
+                          <TableHead className="text-right hidden lg:table-cell font-semibold">التاريخ</TableHead>
+                          <TableHead className="text-center hidden md:table-cell font-semibold">طريقة الدفع</TableHead>
+                          <TableHead className="text-center font-semibold">إجراءات</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {expenses.map((expense) => (
+                          <TableRow key={expense.id} className="transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/10">
+                            <TableCell>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                                  <Receipt className="w-3.5 h-3.5 text-white" />
+                                </div>
+                                <span className="font-medium text-sm">{expense.expense_number}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">{(expense as any).branches?.name || '—'}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{(expense as any).expense_categories?.name || '—'}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
+                            <TableCell>
+                              <span className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(expense.amount)}</span>
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">{formatDate(expense.expense_date)}</TableCell>
+                            <TableCell className="text-center hidden md:table-cell">
+                              <Badge variant="secondary" className={`text-[10px] font-medium ${getMethodColor(expense.payment_method)}`}>
+                                {getMethodLabel(expense.payment_method)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                                {hasPermission('expenses', 'print') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600"
+                                    onClick={() => handlePrint(expense)}
+                                    title="طباعة"
+                                  >
+                                    <Printer className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                                {hasPermission('expenses', 'edit') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-600"
+                                    onClick={() => openEditDialog(expense)}
+                                    title="تعديل"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                                {hasPermission('expenses', 'delete') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30"
+                                    onClick={() => confirmDelete(expense)}
+                                    title="حذف"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
 
+                {/* Mobile Card Layout */}
+                <div className="sm:hidden p-3 space-y-3">
+                  {expenses.map((expense) => (
+                    <motion.div
+                      key={expense.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border border-border/50 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5"
+                      style={{ borderRight: '4px solid #f97316' }}
+                    >
+                      <div className="p-3 sm:p-4 space-y-3">
+                        {/* Top row: expense number + amount */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                              <Receipt className="w-4 h-4 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm">{expense.expense_number}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(expense.expense_date)}</p>
+                            </div>
+                          </div>
+                          <div className="text-left">
+                            <p className="font-bold text-lg text-orange-600 dark:text-orange-400">{formatCurrency(expense.amount)}</p>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <p className="text-sm text-foreground/80 line-clamp-2 leading-relaxed">
+                          {expense.description}
+                        </p>
+
+                        {/* Info badges row */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="rounded-md bg-muted/50 px-2 py-1">
+                            <Building2 className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">{(expense as any).branches?.name || '—'}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="rounded-md bg-muted/50 px-2 py-1">
+                            <Tags className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">{(expense as any).expense_categories?.name || '—'}</span>
+                          </div>
+                          <Badge variant="secondary" className={`text-[10px] font-medium h-6 ${getMethodColor(expense.payment_method)}`}>
+                            {getMethodLabel(expense.payment_method)}
+                          </Badge>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', paddingTop: '4px', borderTop: '1px solid', borderTopColor: 'var(--border)' }}>
+                          {hasPermission('expenses', 'print') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200"
+                              onClick={() => handlePrint(expense)}
+                            >
+                              <Printer className="w-3 h-3" />
+                              طباعة
+                            </Button>
+                          )}
+                          {hasPermission('expenses', 'edit') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-600 hover:border-amber-200"
+                              onClick={() => openEditDialog(expense)}
+                            >
+                              <Pencil className="w-3 h-3" />
+                              تعديل
+                            </Button>
+                          )}
+                          {hasPermission('expenses', 'delete') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200"
+                              onClick={() => confirmDelete(expense)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              حذف
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t">
                     <p className="text-sm text-muted-foreground">
                       صفحة {page} من {totalPages}
                     </p>
-                    <div className="flex items-center gap-1">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Button
                         variant="outline"
                         size="icon"
@@ -791,10 +905,12 @@ export default function ExpensesPage() {
 
       {/* Create/Edit Expense Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                <Receipt className="w-4 h-4 text-white" />
+              </div>
               {isEditing ? 'تعديل المصروف' : 'تسجيل مصروف جديد'}
             </DialogTitle>
           </DialogHeader>
@@ -899,7 +1015,7 @@ export default function ExpensesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} className="text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin ml-2" />
@@ -915,9 +1031,14 @@ export default function ExpensesPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>تأكيد حذف المصروف</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل أنت متأكد من حذف المصروف رقم "{expenseToDelete?.expense_number}" بمبلغ {expenseToDelete ? formatCurrency(expenseToDelete.amount) : ''}؟
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-destructive/10">
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </div>
+              تأكيد حذف المصروف
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-right">
+              هل أنت متأكد من حذف المصروف رقم &quot;{expenseToDelete?.expense_number}&quot; بمبلغ {expenseToDelete ? formatCurrency(expenseToDelete.amount) : ''}؟
               لا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>

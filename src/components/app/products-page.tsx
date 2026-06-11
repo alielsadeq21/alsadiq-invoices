@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Package, Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
 import DataTablePagination from '@/components/ui/data-table-pagination';
 import { toast } from 'sonner';
 
@@ -202,18 +202,42 @@ export default function ProductsPage() {
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  const activeCount = useMemo(() => products.filter((p) => p.is_active).length, [products]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">إدارة المنتجات</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            إجمالي المنتجات: {totalCount} | نشطة: {products.filter((p) => p.is_active).length}
-          </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="sm:flex-row sm:items-center sm:justify-between">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))' }}>
+            <Package className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">إدارة المنتجات</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }} className="flex-wrap">
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="text-sm text-muted-foreground">
+                <BarChart3 className="w-3.5 h-3.5" />
+                الإجمالي: {totalCount}
+              </span>
+              <span className="text-border">|</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="text-sm text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                نشطة: {activeCount}
+              </span>
+              <span className="text-border">|</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="text-sm text-red-500 dark:text-red-400">
+                <XCircle className="w-3.5 h-3.5" />
+                معطلة: {totalCount - activeCount}
+              </span>
+            </div>
+          </div>
         </div>
         {hasPermission('products', 'create') && (
-          <Button onClick={openAddDialog} className="gap-2 shadow-md">
+          <Button
+            onClick={openAddDialog}
+            className="gap-2 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] shrink-0"
+            style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
+          >
             <Plus className="w-4 h-4" />
             إضافة منتج
           </Button>
@@ -221,7 +245,8 @@ export default function ProductsPage() {
       </div>
 
       {/* Search */}
-      <Card className="border-0 shadow-md">
+      <Card className="border-0 shadow-md overflow-hidden">
+        <div className="h-1" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.4), hsl(var(--primary)))' }} />
         <CardContent className="p-4">
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -235,24 +260,32 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
 
-      {/* Products Table */}
-      <Card className="border-0 shadow-md">
+      {/* Products Content */}
+      <Card className="border-0 shadow-md overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="py-12">
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
           ) : products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} className="py-20 px-4">
+              <div
+                className="w-24 h-24 rounded-full flex items-center justify-center mb-5"
+                style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}
+              >
                 <Package className="w-12 h-12 text-primary/60" />
               </div>
-              <h3 className="text-xl font-bold mb-2">لا توجد منتجات</h3>
-              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+              <h3 className="text-xl font-bold mb-2 tracking-tight">لا توجد منتجات</h3>
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
                 لم يتم إضافة أي منتجات بعد. أضف منتجات لتسهيل إنشاء الفواتير وتوفير الوقت.
               </p>
               {hasPermission('products', 'create') && (
-                <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
+                <Button
+                  onClick={openAddDialog}
+                  className="gap-2 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] text-primary-foreground"
+                  size="lg"
+                  style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
+                >
                   <Plus className="w-5 h-5" />
                   إضافة منتج جديد
                 </Button>
@@ -260,69 +293,82 @@ export default function ProductsPage() {
             </div>
           ) : (
             <>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">المنتج</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">الفئة</TableHead>
-                    <TableHead className="text-right hidden md:table-cell">عدد/وحدة</TableHead>
-                    <TableHead className="text-right">سعر الوحدة</TableHead>
-                    <TableHead className="text-center">الحالة</TableHead>
-                    <TableHead className="text-center">تفعيل</TableHead>
-                    <TableHead className="text-center">الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Package className="w-4 h-4 text-primary" />
-                          </div>
-                          <span className="font-medium">{product.name}</span>
+              {/* Mobile Card Layout */}
+              <div className="sm:hidden p-3 space-y-3">
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    className="rounded-xl border-r-4 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+                    style={{
+                      borderRightColor: product.is_active ? '#10b981' : '#ef4444',
+                      background: 'hsl(var(--card))',
+                    }}
+                  >
+                    <div className="p-3 sm:p-4 space-y-3">
+                      {/* Product name with icon */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}
+                        >
+                          <Package className="w-5 h-5 text-primary" />
                         </div>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {product.category ? (
-                          <Badge variant="secondary" className="text-xs">
-                            {product.category}
-                          </Badge>
-                        ) : '—'}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {product.unit_count > 1 ? product.unit_count : '—'}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {formatCurrency(product.unit_price)}
-                      </TableCell>
-                      <TableCell className="text-center">
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h3 className="font-semibold text-sm truncate">{product.name}</h3>
+                          {product.category && (
+                            <span className="text-xs text-muted-foreground">{product.category}</span>
+                          )}
+                        </div>
                         <Badge
                           variant="secondary"
                           className={
                             product.is_active
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs shrink-0'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-xs shrink-0'
                           }
                         >
                           {product.is_active ? 'نشط' : 'معطل'}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={product.is_active}
-                          onCheckedChange={() => toggleProductStatus(product)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
+                      </div>
+
+                      {/* Price and unit row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div
+                          className="rounded-lg px-3 py-1.5 text-center"
+                          style={{ background: 'hsl(var(--muted))' }}
+                        >
+                          <span className="text-xs text-muted-foreground block">السعر</span>
+                          <span className="font-bold text-sm">{formatCurrency(product.unit_price)}</span>
+                        </div>
+                        {product.unit_count > 1 && (
+                          <div
+                            className="rounded-lg px-3 py-1.5 text-center"
+                            style={{ background: 'hsl(var(--muted))' }}
+                          >
+                            <span className="text-xs text-muted-foreground block">الوحدة</span>
+                            <span className="font-semibold text-sm">{product.unit_count}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Toggle + Actions */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Switch
+                            checked={product.is_active}
+                            onCheckedChange={() => toggleProductStatus(product)}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {product.is_active ? 'مفعّل' : 'معطّل'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                           {hasPermission('products', 'edit') && (
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => openEditDialog(product)}
-                              className="h-8 w-8"
+                              className="h-9 w-9 hover:bg-primary/10 hover:text-primary transition-colors"
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -335,18 +381,113 @@ export default function ProductsPage() {
                                 setDeletingProduct(product);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {/* Desktop Table */}
+              <div className="hidden sm:block">
+                <div className="h-1" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.3), transparent)' }} />
+                <div style={{ overflowX: 'auto' }}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-right font-semibold">المنتج</TableHead>
+                        <TableHead className="text-right font-semibold hidden sm:table-cell">الفئة</TableHead>
+                        <TableHead className="text-right font-semibold hidden md:table-cell">عدد/وحدة</TableHead>
+                        <TableHead className="text-right font-semibold">سعر الوحدة</TableHead>
+                        <TableHead className="text-center font-semibold">الحالة</TableHead>
+                        <TableHead className="text-center font-semibold">تفعيل</TableHead>
+                        <TableHead className="text-center font-semibold">الإجراءات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {products.map((product) => (
+                        <TableRow key={product.id} className="transition-colors hover:bg-muted/50">
+                          <TableCell>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <div
+                                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                                style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}
+                              >
+                                <Package className="w-4 h-4 text-primary" />
+                              </div>
+                              <span className="font-medium">{product.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {product.category ? (
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {product.category}
+                              </Badge>
+                            ) : '—'}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {product.unit_count > 1 ? product.unit_count : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-bold text-sm">{formatCurrency(product.unit_price)}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant="secondary"
+                              className={
+                                product.is_active
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              }
+                            >
+                              {product.is_active ? 'نشط' : 'معطل'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={product.is_active}
+                              onCheckedChange={() => toggleProductStatus(product)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                              {hasPermission('products', 'edit') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditDialog(product)}
+                                  className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {hasPermission('products', 'delete') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setDeletingProduct(product);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
               <DataTablePagination
                 page={page}
                 totalPages={totalPages}
@@ -363,7 +504,7 @@ export default function ProductsPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}
@@ -418,7 +559,7 @@ export default function ProductsPage() {
                 placeholder="مثال: حلويات شرقية"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Switch
                 id="product-active"
                 checked={form.is_active}
@@ -431,7 +572,11 @@ export default function ProductsPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave}>
+            <Button
+              onClick={handleSave}
+              className="text-primary-foreground"
+              style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
+            >
               {editingProduct ? 'تحديث' : 'إضافة'}
             </Button>
           </DialogFooter>

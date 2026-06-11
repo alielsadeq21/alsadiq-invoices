@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,13 +21,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Wallet,
+  CreditCard,
   Plus,
   Pencil,
   Trash2,
   Star,
   GripVertical,
   Loader2,
+  ShieldAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -234,8 +236,8 @@ export default function PaymentMethodsPage() {
     <div className="space-y-6 max-w-2xl">
       {!isAdmin ? (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-          <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Wallet className="w-12 h-12 text-destructive/60" />
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+            <ShieldAlert className="w-10 h-10 text-white" />
           </div>
           <h2 className="text-xl font-bold">غير مسموح</h2>
           <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -243,19 +245,28 @@ export default function PaymentMethodsPage() {
           </p>
         </div>
       ) : (<>
-      <div>
-        <h1 className="text-2xl font-bold">طرق الدفع</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          إدارة طرق الدفع المتاحة في إيصالات القبض - إضافة أو تعديل أو حذف
-        </p>
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+          <CreditCard className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">طرق الدفع</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            إدارة طرق الدفع المتاحة في إيصالات القبض - إضافة أو تعديل أو حذف
+          </p>
+        </div>
       </div>
 
       {/* Add new */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10b981, #34d399, #10b981)' }} />
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Plus className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <Plus className="w-4 h-4 text-white" />
+              </div>
               إضافة طريقة دفع جديدة
             </CardTitle>
           </CardHeader>
@@ -269,7 +280,7 @@ export default function PaymentMethodsPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
                 />
               </div>
-              <Button onClick={handleAdd} disabled={saving} className="gap-2">
+              <Button onClick={handleAdd} disabled={saving} className="gap-2" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 إضافة
               </Button>
@@ -280,29 +291,121 @@ export default function PaymentMethodsPage() {
 
       {/* List */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10b981, #34d399, #10b981)' }} />
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <CreditCard className="w-4 h-4 text-white" />
+              </div>
               طرق الدفع الحالية
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                  <p className="text-sm text-muted-foreground">جاري التحميل...</p>
+                </div>
               </div>
             ) : methods.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                لا توجد طرق دفع مسجلة
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-md" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                  <CreditCard className="w-8 h-8 text-white" />
+                </div>
+                <p className="text-muted-foreground text-sm">لا توجد طرق دفع مسجلة</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {methods.map((method) => (
-                  <div key={method.id}>
-                    {editId === method.id ? (
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
-                        <div className="flex-1 space-y-2">
+              <>
+                {/* Desktop List */}
+                <div className="hidden sm:block space-y-1">
+                  {methods.map((method) => (
+                    <div key={method.id}>
+                      {editId === method.id ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800">
+                          <div className="flex-1 space-y-2">
+                            <Input
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="اسم طريقة الدفع"
+                              autoFocus
+                            />
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id={`default-${method.id}`}
+                                checked={editIsDefault}
+                                onCheckedChange={(checked) => setEditIsDefault(checked)}
+                              />
+                              <Label htmlFor={`default-${method.id}`} className="text-xs cursor-pointer">
+                                طريقة الدفع الافتراضية
+                              </Label>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button size="sm" onClick={handleEdit} disabled={saving} className="gap-1" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                              حفظ
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                              إلغاء
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors group">
+                          <GripVertical className="w-4 h-4 text-muted-foreground/50" />
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                            <CreditCard className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{method.name}</span>
+                              {method.is_default && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                  <Star className="w-3 h-3" />
+                                  افتراضي
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">ترتيب: {method.sort_order}</span>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                              onClick={() => startEdit(method)}
+                              title="تعديل"
+                            >
+                              <Pencil className="w-4 h-4 text-emerald-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              onClick={() => {
+                                setDeletingMethod(method);
+                                setDeleteDialogOpen(true);
+                              }}
+                              title="حذف"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      <Separator className="mt-1 last:hidden" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="sm:hidden space-y-2">
+                  {methods.map((method) => (
+                    <div key={method.id}>
+                      {editId === method.id ? (
+                        <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 space-y-3">
                           <Input
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
@@ -310,71 +413,73 @@ export default function PaymentMethodsPage() {
                             autoFocus
                           />
                           <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id={`default-${method.id}`}
+                            <Switch
+                              id={`default-m-${method.id}`}
                               checked={editIsDefault}
-                              onChange={(e) => setEditIsDefault(e.target.checked)}
-                              className="rounded"
+                              onCheckedChange={(checked) => setEditIsDefault(checked)}
                             />
-                            <Label htmlFor={`default-${method.id}`} className="text-xs cursor-pointer">
+                            <Label htmlFor={`default-m-${method.id}`} className="text-xs cursor-pointer">
                               طريقة الدفع الافتراضية
                             </Label>
                           </div>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button size="sm" onClick={handleEdit} disabled={saving} className="gap-1">
-                            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                            حفظ
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                            إلغاء
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors group">
-                        <GripVertical className="w-4 h-4 text-muted-foreground/50" />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{method.name}</span>
-                            {method.is_default && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
-                                <Star className="w-3 h-3" />
-                                افتراضي
-                              </span>
-                            )}
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleEdit} disabled={saving} className="flex-1 gap-1" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                              حفظ
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={cancelEdit} className="flex-1">
+                              إلغاء
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => startEdit(method)}
-                            title="تعديل"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => {
-                              setDeletingMethod(method);
-                              setDeleteDialogOpen(true);
-                            }}
-                            title="حذف"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                      ) : (
+                        <div className="rounded-xl border-r-4 border-emerald-500 bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                              <CreditCard className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-sm">{method.name}</span>
+                                {method.is_default && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                    <Star className="w-3 h-3" />
+                                    افتراضي
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">ترتيب: {method.sort_order}</span>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => startEdit(method)}
+                                title="تعديل"
+                              >
+                                <Pencil className="w-4 h-4 text-emerald-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setDeletingMethod(method);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                title="حذف"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    <Separator className="mt-2 last:hidden" />
-                  </div>
-                ))}
-              </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -382,9 +487,14 @@ export default function PaymentMethodsPage() {
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[95vw] sm:w-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف طريقة الدفع</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                <Trash2 className="w-4 h-4 text-white" />
+              </div>
+              حذف طريقة الدفع
+            </AlertDialogTitle>
             <AlertDialogDescription>
               هل أنت متأكد من حذف طريقة الدفع &quot;{deletingMethod?.name}&quot;؟
               {deletingMethod?.is_default && ' سيتم تعيين أول طريقة دفع أخرى كافتراضية.'}

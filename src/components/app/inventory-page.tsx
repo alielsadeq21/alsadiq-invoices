@@ -616,29 +616,33 @@ export default function InventoryPage() {
       title: 'إجمالي الأصناف',
       value: stats.totalProducts,
       icon: Package,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+      gradient: 'from-cyan-500 to-emerald-500',
+      textColor: 'text-cyan-600 dark:text-cyan-400',
+      bgLight: 'bg-cyan-50 dark:bg-cyan-900/20',
     },
     {
       title: 'مخزون منخفض',
       value: stats.lowStockCount,
       icon: AlertTriangle,
-      color: 'text-amber-600 dark:text-amber-400',
-      bg: 'bg-amber-50 dark:bg-amber-900/20',
+      gradient: 'from-amber-400 to-orange-500',
+      textColor: 'text-amber-600 dark:text-amber-400',
+      bgLight: 'bg-amber-50 dark:bg-amber-900/20',
     },
     {
       title: 'نفد المخزون',
       value: stats.outOfStockCount,
       icon: AlertTriangle,
-      color: 'text-red-600 dark:text-red-400',
-      bg: 'bg-red-50 dark:bg-red-900/20',
+      gradient: 'from-red-400 to-rose-500',
+      textColor: 'text-red-600 dark:text-red-400',
+      bgLight: 'bg-red-50 dark:bg-red-900/20',
     },
     {
       title: 'إجمالي القيمة',
       value: formatCurrency(stats.totalValue),
       icon: TrendingUp,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
+      gradient: 'from-emerald-500 to-teal-500',
+      textColor: 'text-emerald-600 dark:text-emerald-400',
+      bgLight: 'bg-emerald-50 dark:bg-emerald-900/20',
     },
   ];
 
@@ -646,8 +650,10 @@ export default function InventoryPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-muted-foreground text-sm">جاري تحميل المخزون...</p>
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-white" />
+          </div>
+          <p className="text-muted-foreground text-sm font-medium">جاري تحميل المخزون...</p>
         </div>
       </div>
     );
@@ -657,21 +663,26 @@ export default function InventoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">إدارة المخزون</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            تتبع وإدارة مخزون المنتجات في الفروع
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+            <Warehouse className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">إدارة المخزون</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              تتبع وإدارة مخزون المنتجات في الفروع
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {hasPermission('inventory', 'adjust') && (
-            <Button onClick={openNewAdjustDialog} variant="outline" className="gap-2 shadow-sm">
+            <Button onClick={openNewAdjustDialog} variant="outline" className="gap-2 shadow-sm border-dashed hover:border-solid transition-all">
               <SlidersHorizontal className="w-4 h-4" />
               تسوية مخزون
             </Button>
           )}
           {hasPermission('inventory', 'transfer') && (
-            <Button onClick={openNewTransferDialog} className="gap-2 shadow-md">
+            <Button onClick={openNewTransferDialog} className="gap-2 shadow-md bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-700 hover:to-emerald-700 text-white border-0">
               <ArrowLeftRight className="w-4 h-4" />
               تحويل مخزون
             </Button>
@@ -680,7 +691,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -690,15 +701,15 @@ export default function InventoryPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+              <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group">
+                <CardContent className="p-4 sm:p-5">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <p className="text-sm text-muted-foreground">{card.title}</p>
-                      <p className="text-2xl font-bold mt-1">{card.value}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{card.title}</p>
+                      <p className="text-xl sm:text-2xl font-bold mt-1">{card.value}</p>
                     </div>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${card.bg}`}>
-                      <Icon className={`w-6 h-6 ${card.color}`} />
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${card.gradient} shadow-lg transition-transform duration-300 group-hover:scale-110`}>
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
@@ -714,7 +725,8 @@ export default function InventoryPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.4 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-cyan-500 via-emerald-500 to-teal-500" />
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -756,139 +768,277 @@ export default function InventoryPage() {
         </Card>
       </motion.div>
 
-      {/* Inventory Table */}
+      {/* Inventory Content */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.5 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
+          {/* Gradient accent bar at top */}
+          <div className="h-1 bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500" />
           <CardContent className="p-0">
             {filteredInventory.length === 0 ? (
+              /* Empty State */
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <Warehouse className="w-12 h-12 text-primary/60" />
+                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center mb-6 shadow-xl shadow-cyan-500/20">
+                  <Warehouse className="w-12 h-12 text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا توجد بيانات مخزون</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم العثور على سجلات مخزون. يمكنك تسوية المخزون أو تحويله بين الفروع.
                 </p>
                 {hasPermission('inventory', 'adjust') && (
-                  <Button onClick={openNewAdjustDialog} className="gap-2 shadow-md" size="lg">
+                  <Button onClick={openNewAdjustDialog} className="gap-2 shadow-md bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-700 hover:to-emerald-700 text-white border-0" size="lg">
                     <SlidersHorizontal className="w-5 h-5" />
                     تسوية مخزون
                   </Button>
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">المنتج</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">الفرع</TableHead>
-                      <TableHead className="text-center">الكمية الحالية</TableHead>
-                      <TableHead className="text-center hidden md:table-cell">الحد الأدنى</TableHead>
-                      <TableHead className="text-center">الحالة</TableHead>
-                      <TableHead className="text-right hidden lg:table-cell">آخر تحديث</TableHead>
-                      <TableHead className="text-center">الإجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInventory.map((item) => {
-                      const status = getStockStatus(item);
-                      return (
-                        <TableRow key={item.id} className={cn(
-                          status === 'out' && 'bg-red-50/50 dark:bg-red-900/5',
-                          status === 'low' && 'bg-amber-50/50 dark:bg-amber-900/5',
-                        )}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className={cn(
-                                "w-8 h-8 rounded-lg flex items-center justify-center",
-                                status === 'normal' && 'bg-emerald-100 dark:bg-emerald-900/30',
-                                status === 'low' && 'bg-amber-100 dark:bg-amber-900/30',
-                                status === 'out' && 'bg-red-100 dark:bg-red-900/30',
-                              )}>
-                                <Package className={cn(
-                                  "w-4 h-4",
-                                  status === 'normal' && 'text-emerald-600 dark:text-emerald-400',
-                                  status === 'low' && 'text-amber-600 dark:text-amber-400',
-                                  status === 'out' && 'text-red-600 dark:text-red-400',
-                                )} />
+              <>
+                {/* Mobile Card Layout */}
+                <div className="sm:hidden p-3 space-y-3">
+                  {filteredInventory.map((item, index) => {
+                    const status = getStockStatus(item);
+                    const borderColor = status === 'normal' ? 'border-r-cyan-500' : status === 'low' ? 'border-r-amber-500' : 'border-r-red-500';
+                    const gradientClass = status === 'normal'
+                      ? 'from-cyan-500 to-emerald-500'
+                      : status === 'low'
+                      ? 'from-amber-400 to-orange-500'
+                      : 'from-red-400 to-rose-500';
+                    const stockPercent = item.min_quantity > 0
+                      ? Math.min(100, Math.round((item.quantity / (item.min_quantity * 2)) * 100))
+                      : item.quantity > 0 ? 100 : 0;
+
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, delay: index * 0.03 }}
+                        className={cn(
+                          "rounded-xl border-r-4 bg-card shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                          borderColor
+                        )}
+                      >
+                        <div className="p-4">
+                          {/* Card Header: Product name + icon + status badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradientClass} flex items-center justify-center shadow-md`}>
+                                <Package className="w-5 h-5 text-white" />
                               </div>
-                              <span className="font-medium">{item.products?.name || 'غير معروف'}</span>
+                              <div>
+                                <p className="font-semibold text-sm leading-tight">{item.products?.name || 'غير معروف'}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{item.branches?.name || 'غير معروف'}</p>
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell">
-                            <span className="text-muted-foreground text-sm">
-                              {item.branches?.name || 'غير معروف'}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className={cn(
-                              "font-bold",
-                              status === 'out' && 'text-red-600 dark:text-red-400',
-                              status === 'low' && 'text-amber-600 dark:text-amber-400',
-                              status === 'normal' && 'text-emerald-600 dark:text-emerald-400',
-                            )}>
-                              {item.quantity}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center hidden md:table-cell">
-                            <span className="text-muted-foreground text-sm">
-                              {item.min_quantity}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
                             {getStatusBadge(status)}
-                          </TableCell>
-                          <TableCell className="text-right hidden lg:table-cell">
-                            <span className="text-muted-foreground text-xs">
-                              {formatDateTime(item.last_updated)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              {hasPermission('inventory', 'adjust') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openAdjustDialog(item)}
-                                  className="h-8 w-8"
-                                  title="تسوية"
-                                >
-                                  <SlidersHorizontal className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {hasPermission('inventory', 'transfer') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openTransferDialog(item)}
-                                  className="h-8 w-8"
-                                  title="تحويل"
-                                >
-                                  <ArrowLeftRight className="w-4 h-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openHistoryDialog(item)}
-                                className="h-8 w-8"
-                                title="السجل"
-                              >
-                                <History className="w-4 h-4" />
-                              </Button>
+                          </div>
+
+                          {/* Quantity Display */}
+                          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">الكمية الحالية</p>
+                              <p className={cn(
+                                "text-3xl font-bold leading-none",
+                                status === 'out' && 'text-red-600 dark:text-red-400',
+                                status === 'low' && 'text-amber-600 dark:text-amber-400',
+                                status === 'normal' && 'text-emerald-600 dark:text-emerald-400',
+                              )}>
+                                {item.quantity}
+                              </p>
                             </div>
-                          </TableCell>
+                            <div className="text-left">
+                              <p className="text-xs text-muted-foreground">الحد الأدنى</p>
+                              <p className="text-sm font-medium text-muted-foreground">{item.min_quantity}</p>
+                            </div>
+                          </div>
+
+                          {/* Stock Level Bar */}
+                          <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-3">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all duration-500",
+                                status === 'normal' && 'bg-gradient-to-l from-cyan-500 to-emerald-500',
+                                status === 'low' && 'bg-gradient-to-l from-amber-400 to-orange-500',
+                                status === 'out' && 'bg-gradient-to-l from-red-400 to-rose-500',
+                              )}
+                              style={{ width: `${stockPercent}%` }}
+                            />
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {hasPermission('inventory', 'adjust') && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openAdjustDialog(item)}
+                                className="gap-1.5 text-xs flex-1 h-9"
+                              >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                                تسوية
+                              </Button>
+                            )}
+                            {hasPermission('inventory', 'transfer') && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openTransferDialog(item)}
+                                className="gap-1.5 text-xs flex-1 h-9"
+                              >
+                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                                تحويل
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openHistoryDialog(item)}
+                              className="gap-1.5 text-xs flex-1 h-9"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                              السجل
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table */}
+                <div className="hidden sm:block">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">المنتج</TableHead>
+                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الفرع</TableHead>
+                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الكمية الحالية</TableHead>
+                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider hidden md:table-cell">الحد الأدنى</TableHead>
+                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">آخر تحديث</TableHead>
+                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredInventory.map((item) => {
+                          const status = getStockStatus(item);
+                          const gradientClass = status === 'normal'
+                            ? 'from-cyan-500 to-emerald-500'
+                            : status === 'low'
+                            ? 'from-amber-400 to-orange-500'
+                            : 'from-red-400 to-rose-500';
+                          const stockPercent = item.min_quantity > 0
+                            ? Math.min(100, Math.round((item.quantity / (item.min_quantity * 2)) * 100))
+                            : item.quantity > 0 ? 100 : 0;
+
+                          return (
+                            <TableRow
+                              key={item.id}
+                              className={cn(
+                                "transition-colors duration-150 group",
+                                status === 'out' && 'bg-red-50/50 dark:bg-red-900/5',
+                                status === 'low' && 'bg-amber-50/50 dark:bg-amber-900/5',
+                                "hover:bg-muted/50",
+                              )}
+                            >
+                              <TableCell>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center shadow-sm`}>
+                                    <Package className="w-4 h-4 text-white" />
+                                  </div>
+                                  <span className="font-medium">{item.products?.name || 'غير معروف'}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-muted-foreground text-sm">
+                                  {item.branches?.name || 'غير معروف'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-center">
+                                  <span className={cn(
+                                    "font-bold text-lg",
+                                    status === 'out' && 'text-red-600 dark:text-red-400',
+                                    status === 'low' && 'text-amber-600 dark:text-amber-400',
+                                    status === 'normal' && 'text-emerald-600 dark:text-emerald-400',
+                                  )}>
+                                    {item.quantity}
+                                  </span>
+                                  {/* Mini stock bar */}
+                                  <div className="h-1 rounded-full bg-muted/50 overflow-hidden mt-1 w-16 mx-auto">
+                                    <div
+                                      className={cn(
+                                        "h-full rounded-full",
+                                        status === 'normal' && 'bg-gradient-to-l from-cyan-500 to-emerald-500',
+                                        status === 'low' && 'bg-gradient-to-l from-amber-400 to-orange-500',
+                                        status === 'out' && 'bg-gradient-to-l from-red-400 to-rose-500',
+                                      )}
+                                      style={{ width: `${stockPercent}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center hidden md:table-cell">
+                                <span className="text-muted-foreground text-sm">
+                                  {item.min_quantity}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {getStatusBadge(status)}
+                              </TableCell>
+                              <TableCell className="text-right hidden lg:table-cell">
+                                <span className="text-muted-foreground text-xs">
+                                  {formatDateTime(item.last_updated)}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                                  {hasPermission('inventory', 'adjust') && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openAdjustDialog(item)}
+                                      className="h-8 w-8 hover:bg-cyan-50 hover:text-cyan-600 dark:hover:bg-cyan-900/20 dark:hover:text-cyan-400"
+                                      title="تسوية"
+                                    >
+                                      <SlidersHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {hasPermission('inventory', 'transfer') && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openTransferDialog(item)}
+                                      className="h-8 w-8 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-900/20 dark:hover:text-purple-400"
+                                      title="تحويل"
+                                    >
+                                      <ArrowLeftRight className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openHistoryDialog(item)}
+                                    className="h-8 w-8 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                                    title="السجل"
+                                  >
+                                    <History className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -946,7 +1096,7 @@ export default function InventoryPage() {
             </div>
             <div className="space-y-2">
               <Label>الكمية *</Label>
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Button
                   type="button"
                   variant="outline"
@@ -1130,9 +1280,9 @@ export default function InventoryPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="w-5 h-5 text-primary" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} className="p-3 bg-muted/50 rounded-lg">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
+                <Package className="w-5 h-5 text-white" />
               </div>
               <div>
                 <p className="font-medium text-sm">{historyItem?.products?.name || 'غير معروف'}</p>
@@ -1181,7 +1331,7 @@ export default function InventoryPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Badge
                             variant="secondary"
                             className={cn("text-[10px] px-1.5 py-0", getTransactionTypeColor(tx.transaction_type))}

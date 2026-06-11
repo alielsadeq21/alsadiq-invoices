@@ -397,8 +397,8 @@ export default function RolesPage() {
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
-        <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-5">
-          <Shield className="w-12 h-12 text-red-500" />
+        <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+          <Shield className="w-10 h-10 text-white" />
         </div>
         <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
         <p className="text-muted-foreground text-sm text-center">
@@ -413,16 +413,18 @@ export default function RolesPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Shield className="w-6 h-6 text-primary" />
-              إدارة الأدوار والصلاحيات
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              إجمالي الأدوار: {roles.length}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">إدارة الأدوار والصلاحيات</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                إجمالي الأدوار: <span className="font-semibold text-foreground">{roles.length}</span>
+              </p>
+            </div>
           </div>
-          <Button onClick={openAddDialog} className="gap-2 shadow-md">
+          <Button onClick={openAddDialog} className="gap-2 shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
             <Plus className="w-4 h-4" />
             إضافة دور
           </Button>
@@ -431,112 +433,194 @@ export default function RolesPage() {
 
       {/* Roles Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+                </div>
+                <p className="text-muted-foreground text-sm">جاري تحميل الأدوار...</p>
               </div>
             ) : roles.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                  <Shield className="w-12 h-12 text-primary/60" />
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+                  <Shield className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">لا توجد أدوار</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
                   لم يتم إضافة أي أدوار بعد. أضف دوراً لبدء إدارة الصلاحيات.
                 </p>
-                <Button onClick={openAddDialog} className="gap-2 shadow-md" size="lg">
+                <Button onClick={openAddDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
                   <Plus className="w-5 h-5" />
                   إضافة دور جديد
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">الدور</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">الوصف</TableHead>
-                      <TableHead className="text-center">النوع</TableHead>
-                      <TableHead className="text-center hidden sm:table-cell">عدد المستخدمين</TableHead>
-                      <TableHead className="text-center hidden sm:table-cell">الصلاحيات المفعلة</TableHead>
-                      <TableHead className="text-center">الإجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {roles.map((role) => {
-                      const isAdminRole = role.name === 'admin';
-                      return (
-                        <TableRow key={role.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isAdminRole ? 'bg-[#D4A843]/10' : 'bg-primary/10'}`}>
-                                <Shield className={`w-4 h-4 ${isAdminRole ? 'text-[#D4A843]' : 'text-primary'}`} />
-                              </div>
-                              <span className="font-medium">{role.display_name}</span>
+              <>
+                {/* Desktop Table */}
+                <div className="hidden sm:block">
+                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #ef4444, #dc2626, #b91c1c)' }} />
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right">الدور</TableHead>
+                          <TableHead className="text-right hidden md:table-cell">الوصف</TableHead>
+                          <TableHead className="text-center">النوع</TableHead>
+                          <TableHead className="text-center">عدد المستخدمين</TableHead>
+                          <TableHead className="text-center">الصلاحيات المفعلة</TableHead>
+                          <TableHead className="text-center">الإجراءات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {roles.map((role) => {
+                          const isAdminRole = role.name === 'admin';
+                          return (
+                            <TableRow key={role.id} className="hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors">
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm`} style={isAdminRole ? { background: 'linear-gradient(135deg, #D4A843, #b8922e)' } : { background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+                                    <Shield className="w-4 h-4 text-white" />
+                                  </div>
+                                  <span className="font-medium">{role.display_name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                                {role.description || '—'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {role.is_system ? (
+                                  <Badge variant="secondary" className="text-[11px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
+                                    <Lock className="w-3 h-3 ml-1" />
+                                    نظام
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-[11px] bg-muted text-muted-foreground">
+                                    مخصص
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                  <span className="text-sm">{role.user_count || 0}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                  <span className="text-sm">{getEnabledCount(role)}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    onClick={() => openEditDialog(role)}
+                                    title="تعديل"
+                                  >
+                                    <Edit className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                  {!role.is_system && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      onClick={() => {
+                                        setDeletingRole(role);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      title="حذف"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Mobile Card Layout */}
+                <div className="sm:hidden divide-y">
+                  {roles.map((role) => {
+                    const isAdminRole = role.name === 'admin';
+                    return (
+                      <motion.div
+                        key={role.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="p-3 border-r-4 hover:bg-muted/30 transition-all"
+                        style={{ borderRightColor: isAdminRole ? '#D4A843' : '#ef4444' }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={isAdminRole ? { background: 'linear-gradient(135deg, #D4A843, #b8922e)' } : { background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+                              <Shield className="w-5 h-5 text-white" />
                             </div>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                            {role.description || '—'}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {role.is_system ? (
-                              <Badge variant="secondary" className="text-[11px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
-                                <Lock className="w-3 h-3 ml-1" />
-                                نظام
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-[11px] bg-muted text-muted-foreground">
-                                مخصص
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center hidden sm:table-cell">
-                            <div className="flex items-center justify-center gap-1">
-                              <Users className="w-3 h-3 text-muted-foreground" />
-                              <span className="text-sm">{role.user_count || 0}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center hidden sm:table-cell">
-                            <div className="flex items-center justify-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                              <span className="text-sm">{getEnabledCount(role)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditDialog(role)}
-                                title="تعديل"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              {!role.is_system && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    setDeletingRole(role);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                  title="حذف"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                            <div>
+                              <p className="font-medium text-sm">{role.display_name}</p>
+                              {role.description && (
+                                <p className="text-xs text-muted-foreground mt-0.5">{role.description}</p>
                               )}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                          </div>
+                          {role.is_system ? (
+                            <Badge variant="secondary" className="text-[10px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
+                              <Lock className="w-3 h-3 ml-0.5" />
+                              نظام
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
+                              مخصص
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            {role.user_count || 0} مستخدم
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            {getEnabledCount(role)} صلاحية
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            onClick={() => openEditDialog(role)}
+                          >
+                            <Edit className="w-3.5 h-3.5 text-red-600" />
+                          </Button>
+                          {!role.is_system && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:bg-red-50 dark:hover:bg-red-900/20"
+                              onClick={() => {
+                                setDeletingRole(role);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -544,9 +628,12 @@ export default function RolesPage() {
 
       {/* Add/Edit Role Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh]">
+        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                <Shield className="w-4 h-4 text-white" />
+              </div>
               {editingRole ? 'تعديل الدور' : 'إضافة دور جديد'}
             </DialogTitle>
           </DialogHeader>
@@ -582,7 +669,9 @@ export default function RolesPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-primary" />
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      <Lock className="w-3.5 h-3.5 text-white" />
+                    </div>
                     مصفوفة الصلاحيات
                   </h3>
                   {editingRole?.name === 'admin' && (
@@ -630,7 +719,7 @@ export default function RolesPage() {
                         const someEnabled = page.actions.some((a) => pagePerms?.[a]);
 
                         return (
-                          <div key={page.key} className="grid grid-cols-[minmax(120px,1fr)_repeat(8,minmax(50px,60px))] gap-0 p-2 items-center hover:bg-muted/20 transition-colors">
+                          <div key={page.key} className="grid grid-cols-[minmax(120px,1fr)_repeat(8,minmax(50px,60px))] gap-0 p-2 items-center hover:bg-red-50/50 dark:hover:bg-red-900/5 transition-colors">
                             <div className="flex items-center gap-2 pr-2">
                               <input
                                 type="checkbox"
@@ -671,7 +760,7 @@ export default function RolesPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
               {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
               {editingRole ? 'تحديث' : 'إضافة'}
             </Button>
@@ -683,7 +772,12 @@ export default function RolesPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف الدور</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                <Trash2 className="w-4 h-4 text-white" />
+              </div>
+              حذف الدور
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {(deletingRole?.user_count || 0) > 0
                 ? `لا يمكن حذف دور "${deletingRole?.display_name}" لأنه مرتبط بـ ${deletingRole?.user_count} مستخدم. قم بتغيير أدوار المستخدمين أولاً.`

@@ -44,6 +44,9 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Hash,
+  Landmark,
+  CircleDollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -796,8 +799,8 @@ export default function AccountingReportsPage() {
   if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
-        <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-5">
-          <BookOpen className="w-12 h-12 text-red-500" />
+        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+          <BookOpen className="w-12 h-12 text-white" />
         </div>
         <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
         <p className="text-muted-foreground text-sm text-center">
@@ -817,14 +820,16 @@ export default function AccountingReportsPage() {
         transition={{ duration: 0.3 }}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-primary" />
-              التقارير المحاسبية
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              دفتر اليومية • دفتر الأستاذ • ميزان المراجعة • قائمة الدخل • الميزانية العمومية
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+              <BookOpen className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">التقارير المحاسبية</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                دفتر اليومية • دفتر الأستاذ • ميزان المراجعة • قائمة الدخل • الميزانية العمومية
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {canExport && (
@@ -895,7 +900,8 @@ export default function AccountingReportsPage() {
           {/* ==================== GENERAL JOURNAL TAB ==================== */}
           <TabsContent value="journal" className="space-y-4 mt-4">
             {/* Filters */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="relative">
@@ -944,40 +950,61 @@ export default function AccountingReportsPage() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">عدد القيود</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{journalEntries.length}</p>
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <Hash className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">عدد القيود</span>
+                  </div>
+                  <p className="text-2xl font-bold">{journalEntries.length}</p>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي المدين</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                      <TrendingUp className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">إجمالي المدين</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-600">
                     {formatCurrency(totalJournalDebit)}
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي الدائن</p>
-                  <p className="text-2xl font-bold text-orange-600 mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                      <TrendingUp className="w-4 h-4 text-white rotate-180" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">إجمالي الدائن</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600">
                     {formatCurrency(totalJournalCredit)}
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-md bg-primary/5">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">الفرق</p>
-                  <p className="text-2xl font-bold text-primary mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <Scale className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">الفرق</span>
+                  </div>
+                  <p className="text-2xl font-bold">
                     {formatCurrency(Math.abs(totalJournalDebit - totalJournalCredit))}
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Journal Entries Table */}
-            <Card className="border-0 shadow-md">
+            {/* Journal Entries */}
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-0">
                 {journalLoading ? (
                   <div className="flex items-center justify-center py-12">
@@ -985,8 +1012,8 @@ export default function AccountingReportsPage() {
                   </div>
                 ) : journalEntries.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                      <BookOpen className="w-12 h-12 text-primary/60" />
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <BookOpen className="w-12 h-12 text-white/80" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">لا توجد قيود مرحلة</h3>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -994,87 +1021,148 @@ export default function AccountingReportsPage() {
                     </p>
                   </div>
                 ) : (
-                  <ScrollArea className="max-h-[600px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right w-10"></TableHead>
-                          <TableHead className="text-right">رقم القيد</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
-                          <TableHead className="text-right">البيان</TableHead>
-                          <TableHead className="text-right">مدين</TableHead>
-                          <TableHead className="text-right">دائن</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {journalEntries.map((entry) => {
-                          const isExpanded = expandedEntries.has(entry.id);
-                          const lines = journalLines[entry.id] || [];
-                          return (
-                            <>
-                              <TableRow
-                                key={entry.id}
-                                className="cursor-pointer hover:bg-muted/50"
-                                onClick={() => toggleEntryExpand(entry.id)}
-                              >
-                                <TableCell>
-                                  {isExpanded ? (
-                                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                  )}
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  {entry.entry_number}
-                                </TableCell>
-                                <TableCell className="hidden sm:table-cell">
-                                  {formatDate(entry.entry_date)}
-                                </TableCell>
-                                <TableCell className="max-w-[200px] truncate">
-                                  {entry.description}
-                                </TableCell>
-                                <TableCell className="font-semibold text-emerald-600">
-                                  {formatCurrency(entry.total_debit)}
-                                </TableCell>
-                                <TableCell className="font-semibold text-orange-600">
-                                  {formatCurrency(entry.total_credit)}
-                                </TableCell>
-                              </TableRow>
-                              {isExpanded &&
-                                lines.map((line) => (
+                  <>
+                    {/* Mobile Card Layout */}
+                    <div className="sm:hidden divide-y">
+                      {journalEntries.map((entry) => {
+                        const isExpanded = expandedEntries.has(entry.id);
+                        const lines = journalLines[entry.id] || [];
+                        return (
+                          <div key={entry.id} className="p-4 space-y-3">
+                            <div
+                              className="flex items-center justify-between cursor-pointer"
+                              onClick={() => toggleEntryExpand(entry.id)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                                  <FileText className="w-3.5 h-3.5 text-white" />
+                                </div>
+                                <span className="font-semibold text-sm">{entry.entry_number}</span>
+                              </div>
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Calendar className="w-3.5 h-3.5" />
+                              {formatDate(entry.entry_date)}
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">{entry.description}</p>
+                            <div className="flex items-center gap-4">
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                                <p className="text-sm font-bold text-emerald-600">{formatCurrency(entry.total_debit)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                                <p className="text-sm font-bold text-orange-600">{formatCurrency(entry.total_credit)}</p>
+                              </div>
+                            </div>
+                            {isExpanded && lines.length > 0 && (
+                              <div className="space-y-2 pt-2 border-t">
+                                {lines.map((line) => (
+                                  <div key={line.id} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg p-2">
+                                    <span className="text-muted-foreground">{line.account_name}</span>
+                                    <div className="flex items-center gap-3">
+                                      {line.debit > 0 && <span className="font-semibold text-emerald-600">{formatCurrency(line.debit)}</span>}
+                                      {line.credit > 0 && <span className="font-semibold text-orange-600">{formatCurrency(line.credit)}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block">
+                      <ScrollArea className="max-h-[600px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-right w-10"></TableHead>
+                              <TableHead className="text-right font-bold">رقم القيد</TableHead>
+                              <TableHead className="text-right font-bold">التاريخ</TableHead>
+                              <TableHead className="text-right font-bold">البيان</TableHead>
+                              <TableHead className="text-right font-bold">مدين</TableHead>
+                              <TableHead className="text-right font-bold">دائن</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {journalEntries.map((entry) => {
+                              const isExpanded = expandedEntries.has(entry.id);
+                              const lines = journalLines[entry.id] || [];
+                              return (
+                                <>
                                   <TableRow
-                                    key={line.id}
-                                    className="bg-muted/30"
+                                    key={entry.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => toggleEntryExpand(entry.id)}
                                   >
-                                    <TableCell></TableCell>
-                                    <TableCell className="text-xs text-muted-foreground">
-                                      └
-                                    </TableCell>
-                                    <TableCell className="hidden sm:table-cell"></TableCell>
-                                    <TableCell className="text-sm pr-6">
-                                      <span className="text-muted-foreground ml-1">
-                                        {line.account_name}
-                                      </span>
-                                      {line.description && (
-                                        <span className="text-xs text-muted-foreground">
-                                          ({line.description})
-                                        </span>
+                                    <TableCell>
+                                      {isExpanded ? (
+                                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-sm">
-                                      {line.debit > 0 ? formatCurrency(line.debit) : ''}
+                                    <TableCell className="font-medium">
+                                      {entry.entry_number}
                                     </TableCell>
-                                    <TableCell className="text-sm">
-                                      {line.credit > 0 ? formatCurrency(line.credit) : ''}
+                                    <TableCell>
+                                      {formatDate(entry.entry_date)}
+                                    </TableCell>
+                                    <TableCell className="max-w-[200px] truncate">
+                                      {entry.description}
+                                    </TableCell>
+                                    <TableCell className="font-semibold text-emerald-600">
+                                      {formatCurrency(entry.total_debit)}
+                                    </TableCell>
+                                    <TableCell className="font-semibold text-orange-600">
+                                      {formatCurrency(entry.total_credit)}
                                     </TableCell>
                                   </TableRow>
-                                ))}
-                            </>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                                  {isExpanded &&
+                                    lines.map((line) => (
+                                      <TableRow
+                                        key={line.id}
+                                        className="bg-muted/30"
+                                      >
+                                        <TableCell></TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                          └
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell className="text-sm pr-6">
+                                          <span className="text-muted-foreground ml-1">
+                                            {line.account_name}
+                                          </span>
+                                          {line.description && (
+                                            <span className="text-xs text-muted-foreground">
+                                              ({line.description})
+                                            </span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                          {line.debit > 0 ? formatCurrency(line.debit) : ''}
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                          {line.credit > 0 ? formatCurrency(line.credit) : ''}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                </>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1083,7 +1171,8 @@ export default function AccountingReportsPage() {
           {/* ==================== GENERAL LEDGER TAB ==================== */}
           <TabsContent value="ledger" className="space-y-4 mt-4">
             {/* Account Selector & Filters */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
@@ -1176,13 +1265,13 @@ export default function AccountingReportsPage() {
                       <p className="font-bold text-lg">{account.name}</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-md">
+                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
                     <CardContent className="p-4 text-center">
                       <p className="text-sm text-muted-foreground">عدد الحركات</p>
-                      <p className="text-2xl font-bold text-primary mt-1">{ledgerLines.length}</p>
+                      <p className="text-2xl font-bold mt-1">{ledgerLines.length}</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-md">
+                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
                     <CardContent className="p-4 text-center">
                       <p className="text-sm text-muted-foreground">إجمالي المدين</p>
                       <p className="text-2xl font-bold text-emerald-600 mt-1">
@@ -1190,7 +1279,7 @@ export default function AccountingReportsPage() {
                       </p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-md">
+                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
                     <CardContent className="p-4 text-center">
                       <p className="text-sm text-muted-foreground">إجمالي الدائن</p>
                       <p className="text-2xl font-bold text-orange-600 mt-1">
@@ -1198,10 +1287,10 @@ export default function AccountingReportsPage() {
                       </p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-md bg-primary/5">
+                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
                     <CardContent className="p-4 text-center">
                       <p className="text-sm text-muted-foreground">الرصيد الحالي</p>
-                      <p className="text-2xl font-bold text-primary mt-1">
+                      <p className="text-2xl font-bold mt-1">
                         {formatCurrency(Math.abs(currentBalance))}
                         {currentBalance < 0 && (
                           <span className="text-xs text-red-500 mr-1">(دائن)</span>
@@ -1214,12 +1303,13 @@ export default function AccountingReportsPage() {
             })()}
 
             {/* Ledger Table */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-0">
                 {!selectedAccountId ? (
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                      <FileText className="w-12 h-12 text-primary/60" />
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <FileText className="w-12 h-12 text-white/80" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">اختر حساباً</h3>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -1232,8 +1322,8 @@ export default function AccountingReportsPage() {
                   </div>
                 ) : ledgerLines.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-5">
-                      <FileText className="w-12 h-12 text-muted-foreground/60" />
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+                      <FileText className="w-12 h-12 text-white/80" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">لا توجد حركات</h3>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -1244,13 +1334,13 @@ export default function AccountingReportsPage() {
                   <ScrollArea className="max-h-[500px]">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">رقم القيد</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
-                          <TableHead className="text-right">البيان</TableHead>
-                          <TableHead className="text-right">مدين</TableHead>
-                          <TableHead className="text-right">دائن</TableHead>
-                          <TableHead className="text-right">الرصيد</TableHead>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right font-bold">رقم القيد</TableHead>
+                          <TableHead className="text-right font-bold">التاريخ</TableHead>
+                          <TableHead className="text-right font-bold">البيان</TableHead>
+                          <TableHead className="text-right font-bold">مدين</TableHead>
+                          <TableHead className="text-right font-bold">دائن</TableHead>
+                          <TableHead className="text-right font-bold">الرصيد</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1259,7 +1349,7 @@ export default function AccountingReportsPage() {
                             <TableCell className="font-medium">
                               {line.entry_number}
                             </TableCell>
-                            <TableCell className="hidden sm:table-cell">
+                            <TableCell>
                               {formatDate(line.entry_date)}
                             </TableCell>
                             <TableCell className="max-w-[200px] truncate">
@@ -1300,7 +1390,7 @@ export default function AccountingReportsPage() {
                               ledgerLines.reduce((s, l) => s + l.credit, 0)
                             )}
                           </TableCell>
-                          <TableCell className="text-primary">
+                          <TableCell>
                             {formatCurrency(
                               Math.abs(
                                 ledgerLines[ledgerLines.length - 1]?.running_balance || 0
@@ -1319,7 +1409,8 @@ export default function AccountingReportsPage() {
           {/* ==================== TRIAL BALANCE TAB ==================== */}
           <TabsContent value="trial" className="space-y-4 mt-4">
             {/* Filters */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
@@ -1358,26 +1449,41 @@ export default function AccountingReportsPage() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">عدد الحسابات</p>
-                  <p className="text-2xl font-bold text-primary mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <Landmark className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">عدد الحسابات</span>
+                  </div>
+                  <p className="text-2xl font-bold">
                     {trialBalanceData.length}
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي المدين</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                      <TrendingUp className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">إجمالي المدين</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-600">
                     {formatCurrency(trialTotalDebit)}
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">إجمالي الدائن</p>
-                  <p className="text-2xl font-bold text-orange-600 mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                      <CircleDollarSign className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">إجمالي الدائن</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600">
                     {formatCurrency(trialTotalCredit)}
                   </p>
                 </CardContent>
@@ -1413,7 +1519,8 @@ export default function AccountingReportsPage() {
             )}
 
             {/* Trial Balance Table */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-0">
                 {trialLoading ? (
                   <div className="flex items-center justify-center py-12">
@@ -1421,8 +1528,8 @@ export default function AccountingReportsPage() {
                   </div>
                 ) : trialBalanceData.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                      <Scale className="w-12 h-12 text-primary/60" />
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <Scale className="w-12 h-12 text-white/80" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -1433,12 +1540,12 @@ export default function AccountingReportsPage() {
                   <ScrollArea className="max-h-[500px]">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">اسم الحساب</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">نوع الحساب</TableHead>
-                          <TableHead className="text-right">إجمالي المدين</TableHead>
-                          <TableHead className="text-right">إجمالي الدائن</TableHead>
-                          <TableHead className="text-right">صافي الرصيد</TableHead>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right font-bold">اسم الحساب</TableHead>
+                          <TableHead className="text-right font-bold hidden sm:table-cell">نوع الحساب</TableHead>
+                          <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+                          <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+                          <TableHead className="text-right font-bold">صافي الرصيد</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1502,7 +1609,7 @@ export default function AccountingReportsPage() {
                           return rows;
                         })()}
                         {/* Grand Total Row */}
-                        <TableRow className="bg-primary/10 font-bold border-t-2 border-primary">
+                        <TableRow className="font-bold border-t-2" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
                           <TableCell colSpan={2} className="text-lg">
                             الإجمالي الكلي
                           </TableCell>
@@ -1535,7 +1642,8 @@ export default function AccountingReportsPage() {
           {/* ==================== INCOME STATEMENT TAB ==================== */}
           <TabsContent value="income" className="space-y-4 mt-4">
             {/* Filters */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
@@ -1574,10 +1682,15 @@ export default function AccountingReportsPage() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">الإيرادات</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                      <TrendingUp className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">الإيرادات</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-600">
                     {formatCurrency(totalRevenue)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1585,10 +1698,15 @@ export default function AccountingReportsPage() {
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-md">
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">المصروفات</p>
-                  <p className="text-2xl font-bold text-red-600 mt-1">
+              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      <TrendingUp className="w-4 h-4 text-white rotate-180" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">المصروفات</span>
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">
                     {formatCurrency(totalExpenses)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1597,16 +1715,21 @@ export default function AccountingReportsPage() {
                 </CardContent>
               </Card>
               <Card
-                className={`border-0 shadow-md ${
+                className={`border-0 shadow-md hover:shadow-lg transition-shadow ${
                   netProfit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
                 }`}
               >
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
-                  </p>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: netProfit >= 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      <Scale className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+                    </span>
+                  </div>
                   <p
-                    className={`text-2xl font-bold mt-1 ${
+                    className={`text-2xl font-bold ${
                       netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
                     }`}
                   >
@@ -1627,7 +1750,8 @@ export default function AccountingReportsPage() {
             </div>
 
             {/* Income Statement Detail */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-0">
                 {incomeLoading ? (
                   <div className="flex items-center justify-center py-12">
@@ -1635,8 +1759,8 @@ export default function AccountingReportsPage() {
                   </div>
                 ) : incomeData.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                      <TrendingUp className="w-12 h-12 text-primary/60" />
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <TrendingUp className="w-12 h-12 text-white/80" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">
@@ -1647,12 +1771,12 @@ export default function AccountingReportsPage() {
                   <ScrollArea className="max-h-[500px]">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">اسم الحساب</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">النوع</TableHead>
-                          <TableHead className="text-right">مدين</TableHead>
-                          <TableHead className="text-right">دائن</TableHead>
-                          <TableHead className="text-right">الرصيد</TableHead>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-right font-bold">اسم الحساب</TableHead>
+                          <TableHead className="text-right font-bold hidden sm:table-cell">النوع</TableHead>
+                          <TableHead className="text-right font-bold">مدين</TableHead>
+                          <TableHead className="text-right font-bold">دائن</TableHead>
+                          <TableHead className="text-right font-bold">الرصيد</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1759,7 +1883,8 @@ export default function AccountingReportsPage() {
           {/* ==================== BALANCE SHEET TAB ==================== */}
           <TabsContent value="balance-sheet" className="space-y-4 mt-4">
             {/* Filters */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1816,15 +1941,14 @@ export default function AccountingReportsPage() {
             {/* Balance Sheet Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Assets Side */}
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
+                <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669)' }} />
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs ${getAccountTypeColor('asset')}`}
-                    >
-                      الأصول
-                    </Badge>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                      <Landmark className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    الأصول
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1866,15 +1990,14 @@ export default function AccountingReportsPage() {
 
               {/* Liabilities + Equity Side */}
               <div className="space-y-4">
-                <Card className="border-0 shadow-md">
+                <Card className="border-0 shadow-md overflow-hidden">
+                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #f43f5e, #e11d48)' }} />
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs ${getAccountTypeColor('liability')}`}
-                      >
-                        الخصوم
-                      </Badge>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}>
+                        <CircleDollarSign className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      الخصوم
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1914,15 +2037,14 @@ export default function AccountingReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-md">
+                <Card className="border-0 shadow-md overflow-hidden">
+                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9)' }} />
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs ${getAccountTypeColor('equity')}`}
-                      >
-                        حقوق الملكية
-                      </Badge>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                        <Landmark className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      حقوق الملكية
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1976,11 +2098,11 @@ export default function AccountingReportsPage() {
                 </Card>
 
                 {/* Grand Total Liabilities + Equity */}
-                <Card className="border-0 shadow-md bg-primary/5">
+                <Card className="border-0 shadow-md" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between font-bold text-lg">
                       <span>الخصوم + حقوق الملكية + صافي الربح</span>
-                      <span className="text-primary">
+                      <span>
                         {formatCurrency(Math.abs(liabilitiesEquityProfit))}
                       </span>
                     </div>
@@ -1991,11 +2113,11 @@ export default function AccountingReportsPage() {
 
             {/* Empty State */}
             {!balanceSheetLoading && balanceSheetData.length === 0 && (
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-md overflow-hidden">
                 <CardContent className="p-0">
                   <div className="flex flex-col items-center justify-center py-20 px-4">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                      <PieChart className="w-12 h-12 text-primary/60" />
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                      <PieChart className="w-12 h-12 text-white/80" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">

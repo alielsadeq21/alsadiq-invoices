@@ -39,6 +39,10 @@ import {
   Eye,
   ArrowRight,
   ChevronLeft,
+  FileText,
+  MapPin,
+  Calendar,
+  Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -336,14 +340,35 @@ export default function ReturnsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">المرتجعات</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            إجمالي: {totalCount} مرتجع
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+              flexShrink: 0,
+            }}
+          >
+            <RotateCcw className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">المرتجعات</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: 'rgba(244,63,94,0.1)', color: '#e11d48' }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#e11d48' }}></span>
+                {totalCount} مرتجع
+              </span>
+            </div>
+          </div>
         </div>
         {hasPermission('returns', 'create') && (
-          <Button onClick={openCreateDialog} className="gap-2 shadow-md">
+          <Button
+            onClick={openCreateDialog}
+            className="gap-2 shadow-lg text-white font-semibold px-5 h-11 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+          >
             <Plus className="w-4 h-4" />
             مرتجع جديد
           </Button>
@@ -351,38 +376,65 @@ export default function ReturnsPage() {
       </div>
 
       {/* Search */}
-      <Card className="border-0 shadow-md">
+      <Card
+        className="border-0 shadow-md overflow-hidden"
+        style={{ borderTop: '3px solid', borderImage: 'linear-gradient(to left, #f43f5e, #fb7185) 1' }}
+      >
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-400" />
             <Input
               placeholder="بحث برقم المرتجع..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pr-10"
+              className="pr-10 h-11 bg-gray-50/80 border-gray-200/60 focus:bg-white transition-colors"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Returns Table */}
-      <Card className="border-0 shadow-md">
+      {/* Returns Content */}
+      <Card className="border-0 shadow-md overflow-hidden">
+        {/* Gradient accent bar at top */}
+        <div
+          style={{
+            height: '3px',
+            background: 'linear-gradient(to left, #f43f5e, #fb7185, #fda4af)',
+          }}
+        />
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              جاري التحميل...
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="relative">
+                <div
+                  className="w-10 h-10 rounded-full border-3 border-t-transparent animate-spin"
+                  style={{ borderColor: '#fda4af', borderTopColor: 'transparent' }}
+                />
+              </div>
+              <p className="text-muted-foreground text-sm font-medium">جاري التحميل...</p>
             </div>
           ) : returns.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                <RotateCcw className="w-12 h-12 text-primary/60" />
+              <div
+                className="w-24 h-24 rounded-2xl flex items-center justify-center mb-5 shadow-lg"
+                style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.15), rgba(251,113,133,0.15))' }}
+              >
+                <RotateCcw
+                  className="w-12 h-12"
+                  style={{ color: '#e11d48' }}
+                />
               </div>
               <h3 className="text-xl font-bold mb-2">لا توجد مرتجعات</h3>
-              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
                 لم يتم تسجيل أي مرتجعات بعد. يمكنك إنشاء مرتجع من أي فاتورة نشطة لإدارة الاسترجاعات.
               </p>
               {hasPermission('returns', 'create') && (
-                <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg">
+                <Button
+                  onClick={openCreateDialog}
+                  className="gap-2 shadow-lg text-white font-semibold px-6 h-11 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+                  size="lg"
+                >
                   <Plus className="w-5 h-5" />
                   إنشاء مرتجع جديد
                 </Button>
@@ -390,56 +442,175 @@ export default function ReturnsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">رقم المرتجع</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">الفاتورة الأصلية</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">الفرع</TableHead>
-                      <TableHead className="text-right hidden md:table-cell">التاريخ</TableHead>
-                      <TableHead className="text-right">الإجمالي</TableHead>
-                      <TableHead className="text-center">عرض</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {returns.map((ret) => (
-                      <TableRow key={ret.id}>
-                        <TableCell className="font-medium">{ret.return_number}</TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {(ret as any).original_invoice?.invoice_number || '—'}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
+              {/* Mobile Card Layout */}
+              <div className="sm:hidden p-3 space-y-3">
+                {returns.map((ret) => (
+                  <div
+                    key={ret.id}
+                    className="relative rounded-xl bg-white border border-gray-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                    style={{ borderRight: '4px solid #f43f5e' }}
+                  >
+                    <div className="p-3 space-y-3">
+                      {/* Return number row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+                        >
+                          <RotateCcw className="w-4 h-4 text-white" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p className="font-bold text-sm truncate">{ret.return_number}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <FileText className="w-3 h-3" />
+                            {(ret as any).original_invoice?.invoice_number || '—'}
+                          </p>
+                        </div>
+                        <div
+                          className="text-left flex-shrink-0"
+                        >
+                          <p className="font-bold text-sm" style={{ color: '#e11d48' }}>
+                            {formatCurrency(ret.total)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Details row */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <span
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md"
+                          style={{ background: 'rgba(244,63,94,0.06)', color: '#9f1239' }}
+                        >
+                          <MapPin className="w-3 h-3" />
                           {(ret as any).branches?.name || '—'}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">{formatDate(ret.return_date)}</TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(ret.total)}</TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => viewReturnDetail(ret)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md"
+                          style={{ background: 'rgba(59,130,246,0.06)', color: '#1e40af' }}
+                        >
+                          <Calendar className="w-3 h-3" />
+                          {formatDate(ret.return_date)}
+                        </span>
+                      </div>
+
+                      {/* Action button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-9 text-xs font-medium gap-1.5 transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                        onClick={() => viewReturnDetail(ret)}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        عرض التفاصيل
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table */}
+              <div className="hidden sm:block">
+                <div style={{ overflowX: 'auto' }}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow
+                        className="border-b-0"
+                        style={{ background: 'linear-gradient(to left, rgba(244,63,94,0.04), rgba(251,113,133,0.04))' }}
+                      >
+                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4" style={{ color: '#9f1239' }}>
+                          رقم المرتجع
+                        </TableHead>
+                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4 hidden sm:table-cell" style={{ color: '#9f1239' }}>
+                          الفاتورة الأصلية
+                        </TableHead>
+                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4 hidden md:table-cell" style={{ color: '#9f1239' }}>
+                          الفرع
+                        </TableHead>
+                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4 hidden md:table-cell" style={{ color: '#9f1239' }}>
+                          التاريخ
+                        </TableHead>
+                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4" style={{ color: '#9f1239' }}>
+                          الإجمالي
+                        </TableHead>
+                        <TableHead className="text-center font-bold text-xs uppercase tracking-wider py-4" style={{ color: '#9f1239' }}>
+                          عرض
+                        </TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {returns.map((ret) => (
+                        <TableRow
+                          key={ret.id}
+                          className="transition-all duration-150 group"
+                          style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}
+                        >
+                          <TableCell>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+                                style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-white" />
+                              </div>
+                              <span className="font-semibold text-sm">{ret.return_number}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                              <FileText className="w-3.5 h-3.5 text-gray-400" />
+                              {(ret as any).original_invoice?.invoice_number || '—'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                              {(ret as any).branches?.name || '—'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                              {formatDate(ret.return_date)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className="font-bold text-sm px-2.5 py-1 rounded-md"
+                              style={{ background: 'rgba(244,63,94,0.08)', color: '#e11d48' }}
+                            >
+                              {formatCurrency(ret.total)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-lg transition-all duration-200 hover:bg-rose-50 hover:text-rose-600"
+                              onClick={() => viewReturnDetail(ret)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    صفحة {page} من {totalPages}
+                <div
+                  className="flex items-center justify-between px-4 py-3 border-t"
+                  style={{ borderColor: 'rgba(0,0,0,0.06)', background: 'rgba(244,63,94,0.02)' }}
+                >
+                  <p className="text-sm text-muted-foreground font-medium">
+                    صفحة <span style={{ color: '#e11d48', fontWeight: 700 }}>{page}</span> من {totalPages}
                   </p>
-                  <div className="flex items-center gap-1">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 rounded-lg transition-all duration-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
                       onClick={() => setPage(Math.max(1, page - 1))}
                       disabled={page <= 1}
                     >
@@ -448,7 +619,7 @@ export default function ReturnsPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 rounded-lg transition-all duration-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
                       onClick={() => setPage(Math.min(totalPages, page + 1))}
                       disabled={page >= totalPages}
                     >
@@ -464,23 +635,28 @@ export default function ReturnsPage() {
 
       {/* Create Return Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="w-5 h-5 text-primary" />
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+              >
+                <RotateCcw className="w-4 h-4 text-white" />
+              </div>
               إنشاء مرتجع جديد
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>رقم المرتجع</Label>
-                <Input value={returnNumber} disabled className="bg-muted" />
+                <Label className="font-semibold text-sm">رقم المرتجع</Label>
+                <Input value={returnNumber} disabled className="bg-muted h-10 font-mono" />
               </div>
               <div className="space-y-2">
-                <Label>الفاتورة الأصلية *</Label>
+                <Label className="font-semibold text-sm">الفاتورة الأصلية *</Label>
                 <Select value={selectedInvoiceId} onValueChange={selectInvoice}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="اختر الفاتورة" />
                   </SelectTrigger>
                   <SelectContent>
@@ -496,7 +672,7 @@ export default function ReturnsPage() {
 
             {invoiceItems.length > 0 && (
               <div className="space-y-3">
-                <Label>أصناف المرتجع</Label>
+                <Label className="font-semibold text-sm">أصناف المرتجع</Label>
                 <div className="overflow-x-auto border rounded-lg">
                   <Table>
                     <TableHeader>
@@ -521,7 +697,7 @@ export default function ReturnsPage() {
                                 type="checkbox"
                                 checked={item.checked}
                                 onChange={(e) => toggleReturnItem(index, e.target.checked)}
-                                className="w-4 h-4 accent-primary"
+                                className="w-4 h-4 accent-rose-500"
                               />
                             </TableCell>
                             <TableCell className="font-medium">{item.item_name}</TableCell>
@@ -544,7 +720,7 @@ export default function ReturnsPage() {
                             </TableCell>
                             <TableCell className="text-center hidden md:table-cell">
                               {item.checked && item.unit_count > 1 ? (
-                                <span className="font-bold text-primary text-sm">
+                                <span className="font-bold text-sm" style={{ color: '#e11d48' }}>
                                   {totalPieces.toLocaleString('ar-EG')}
                                 </span>
                               ) : '—'}
@@ -558,33 +734,45 @@ export default function ReturnsPage() {
                   </Table>
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <span className="font-bold">إجمالي المرتجع</span>
-                    {returnTotalPieces > 0 && (
-                      <span className="text-sm text-muted-foreground">
-                        ({returnTotalPieces.toLocaleString('ar-EG')} قطعة)
-                      </span>
-                    )}
+                <div
+                  className="flex items-center justify-between p-4 rounded-xl"
+                  style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.06), rgba(251,113,133,0.06))' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Receipt className="w-5 h-5" style={{ color: '#e11d48' }} />
+                    <div>
+                      <span className="font-bold text-sm">إجمالي المرتجع</span>
+                      {returnTotalPieces > 0 && (
+                        <span className="text-xs text-muted-foreground mr-2">
+                          ({returnTotalPieces.toLocaleString('ar-EG')} قطعة)
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-lg font-bold text-primary">{formatCurrency(returnTotal)}</span>
+                  <span className="text-lg font-bold" style={{ color: '#e11d48' }}>{formatCurrency(returnTotal)}</span>
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label>ملاحظات</Label>
+              <Label className="font-semibold text-sm">ملاحظات</Label>
               <Textarea
                 value={returnNotes}
                 onChange={(e) => setReturnNotes(e.target.value)}
                 placeholder="ملاحظات إضافية..."
                 rows={2}
+                className="resize-none"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
-            <Button onClick={handleSaveReturn} disabled={saving}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-10">إلغاء</Button>
+            <Button
+              onClick={handleSaveReturn}
+              disabled={saving}
+              className="h-10 text-white font-semibold px-5 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+            >
               {saving ? 'جاري الحفظ...' : 'حفظ المرتجع'}
             </Button>
           </DialogFooter>
@@ -593,32 +781,71 @@ export default function ReturnsPage() {
 
       {/* Return Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>تفاصيل المرتجع {selectedReturn?.return_number}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+              >
+                <Eye className="w-4 h-4 text-white" />
+              </div>
+              تفاصيل المرتجع {selectedReturn?.return_number}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">الفرع:</span>
-                <p className="font-medium">{(selectedReturn as any)?.branches?.name || '—'}</p>
+            {/* Info Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div
+                className="p-3 rounded-xl"
+                style={{ background: 'rgba(244,63,94,0.05)', border: '1px solid rgba(244,63,94,0.1)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+                  <MapPin className="w-3.5 h-3.5" style={{ color: '#e11d48' }} />
+                  <span className="text-xs text-muted-foreground">الفرع</span>
+                </div>
+                <p className="font-semibold text-sm">{(selectedReturn as any)?.branches?.name || '—'}</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">التاريخ:</span>
-                <p className="font-medium">{selectedReturn ? formatDate(selectedReturn.return_date) : ''}</p>
+              <div
+                className="p-3 rounded-xl"
+                style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.1)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+                  <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs text-muted-foreground">التاريخ</span>
+                </div>
+                <p className="font-semibold text-sm">{selectedReturn ? formatDate(selectedReturn.return_date) : ''}</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">الفاتورة الأصلية:</span>
-                <p className="font-medium">{(selectedReturn as any)?.original_invoice?.invoice_number || '—'}</p>
+              <div
+                className="p-3 rounded-xl"
+                style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.1)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+                  <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-xs text-muted-foreground">الفاتورة الأصلية</span>
+                </div>
+                <p className="font-semibold text-sm">{(selectedReturn as any)?.original_invoice?.invoice_number || '—'}</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">الإجمالي:</span>
-                <p className="font-bold text-primary">{selectedReturn ? formatCurrency(selectedReturn.total) : ''}</p>
+              <div
+                className="p-3 rounded-xl"
+                style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.15)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+                  <Receipt className="w-3.5 h-3.5" style={{ color: '#e11d48' }} />
+                  <span className="text-xs text-muted-foreground">الإجمالي</span>
+                </div>
+                <p className="font-bold text-sm" style={{ color: '#e11d48' }}>{selectedReturn ? formatCurrency(selectedReturn.total) : ''}</p>
               </div>
             </div>
 
             {returnItems.length > 0 && (
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-xl overflow-hidden">
+                <div
+                  className="px-4 py-2.5"
+                  style={{ background: 'linear-gradient(to left, rgba(244,63,94,0.06), rgba(251,113,133,0.06))' }}
+                >
+                  <p className="font-semibold text-sm" style={{ color: '#9f1239' }}>أصناف المرتجع</p>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -643,7 +870,7 @@ export default function ReturnsPage() {
                           </TableCell>
                           <TableCell className="text-center hidden sm:table-cell">
                             {unitCount > 1 ? (
-                              <span className="font-bold text-primary text-sm">
+                              <span className="font-bold text-sm" style={{ color: '#e11d48' }}>
                                 {totalPieces.toLocaleString('ar-EG')}
                               </span>
                             ) : '—'}
@@ -658,8 +885,12 @@ export default function ReturnsPage() {
             )}
 
             {selectedReturn?.notes && (
-              <div className="p-3 bg-muted rounded-lg text-sm">
-                <span className="font-semibold">ملاحظات:</span> {selectedReturn.notes}
+              <div
+                className="p-3 rounded-xl text-sm"
+                style={{ background: 'rgba(244,63,94,0.04)', border: '1px solid rgba(244,63,94,0.1)' }}
+              >
+                <span className="font-semibold" style={{ color: '#9f1239' }}>ملاحظات:</span>{' '}
+                <span className="text-gray-600">{selectedReturn.notes}</span>
               </div>
             )}
           </div>
