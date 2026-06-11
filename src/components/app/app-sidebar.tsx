@@ -102,7 +102,7 @@ export default function AppSidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed right-0 top-0 h-full w-72 bg-sidebar text-sidebar-foreground z-50 shadow-2xl flex flex-col transition-transform duration-300',
+          'fixed right-0 top-0 h-screen w-72 bg-sidebar text-sidebar-foreground z-50 shadow-2xl flex flex-col overflow-hidden transition-transform duration-300',
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
