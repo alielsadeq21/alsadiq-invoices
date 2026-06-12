@@ -864,15 +864,15 @@ export default function ProductsPage() {
 
       {/* ─── Add/Edit Dialog ────────────────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Package className="w-5 h-5 text-primary" />
               {editingProduct ? 'تعديل الصنف' : 'إضافة صنف جديد'}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-2">
+          <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-2">
             {/* ─── Section 1: Basic Info ────────────────────────────── */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -1159,7 +1159,7 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="px-6 pb-6 pt-3 shrink-0 border-t gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               إلغاء
             </Button>
@@ -1182,7 +1182,7 @@ export default function ProductsPage() {
 
       {/* ─── New Category Dialog ──────────────────────────────────────────── */}
       <Dialog open={newCatDialog} onOpenChange={setNewCatDialog}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[90vw] max-w-sm">
           <DialogHeader>
             <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <FolderPlus className="w-5 h-5 text-primary" />

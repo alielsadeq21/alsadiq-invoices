@@ -905,8 +905,8 @@ export default function ExpensesPage() {
 
       {/* Create/Edit Expense Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
                 <Receipt className="w-4 h-4 text-white" />
@@ -914,7 +914,7 @@ export default function ExpensesPage() {
               {isEditing ? 'تعديل المصروف' : 'تسجيل مصروف جديد'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto px-6 space-y-4 pb-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>رقم المصروف</Label>
@@ -1013,7 +1013,7 @@ export default function ExpensesPage() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 pb-6 pt-3 shrink-0 border-t">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
             <Button onClick={handleSave} disabled={saving} className="text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
               {saving ? (
