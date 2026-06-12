@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
 import type { Role, Permissions, PagePermissions } from '@/lib/types';
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -48,6 +47,8 @@ import {
   Lock,
   Loader2,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -98,8 +99,30 @@ const ACTION_LABELS: Record<string, string> = {
   transfer: 'تحويل',
 };
 
+// All possible action keys for the grid header
+const ALL_ACTIONS: (keyof PagePermissions)[] = ['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'];
+
 interface RoleWithCount extends Role {
   user_count?: number;
+}
+
+// Clean permissions object - remove undefined values and ensure proper structure for Supabase JSONB
+function cleanPermissionsForSave(perms: Permissions): Record<string, Record<string, boolean>> {
+  const cleaned: Record<string, Record<string, boolean>> = {};
+  for (const [pageKey, pagePerms] of Object.entries(perms)) {
+    if (!pagePerms || typeof pagePerms !== 'object') continue;
+    const cleanPage: Record<string, boolean> = {};
+    for (const [actionKey, value] of Object.entries(pagePerms)) {
+      if (typeof value === 'boolean') {
+        cleanPage[actionKey] = value;
+      }
+    }
+    // Only include pages that have at least one permission set
+    if (Object.keys(cleanPage).length > 0) {
+      cleaned[pageKey] = cleanPage;
+    }
+  }
+  return cleaned;
 }
 
 export default function RolesPage() {
@@ -122,12 +145,27 @@ export default function RolesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingRole, setDeletingRole] = useState<RoleWithCount | null>(null);
 
+  // Mobile: track expanded permission sections
+  const [expandedMobilePages, setExpandedMobilePages] = useState<Set<string>>(new Set());
+
+  const toggleMobilePage = (pageKey: string) => {
+    setExpandedMobilePages((prev) => {
+      const next = new Set(prev);
+      if (next.has(pageKey)) {
+        next.delete(pageKey);
+      } else {
+        next.add(pageKey);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
     loadRoles();
   }, [isAdmin]);
 
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -135,32 +173,42 @@ export default function RolesPage() {
         .select('*')
         .order('is_system', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Load roles error:', error);
+        throw error;
+      }
 
       // Get user counts per role
       const rolesWithCounts: RoleWithCount[] = [];
       if (data) {
         for (const role of data) {
-          const { count } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('role_id', role.id);
+          try {
+            const { count } = await supabase
+              .from('users')
+              .select('*', { count: 'exact', head: true })
+              .eq('role_id', role.id);
 
-          rolesWithCounts.push({
-            ...role,
-            user_count: count || 0,
-          });
+            rolesWithCounts.push({
+              ...role,
+              user_count: count || 0,
+            });
+          } catch {
+            rolesWithCounts.push({
+              ...role,
+              user_count: 0,
+            });
+          }
         }
       }
 
       setRoles(rolesWithCounts);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load roles:', err);
       toast.error('حدث خطأ أثناء تحميل البيانات');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const logAction = async (action: string, details: Record<string, unknown>) => {
     try {
@@ -173,7 +221,7 @@ export default function RolesPage() {
   const openAddDialog = () => {
     setEditingRole(null);
     setForm({ display_name: '', description: '' });
-    // Initialize permissions with all pages having empty actions
+    // Initialize permissions with all pages having all actions set to false
     const perms: Permissions = {};
     PERMISSION_PAGES.forEach((page) => {
       const pagePerms: PagePermissions = {};
@@ -183,6 +231,7 @@ export default function RolesPage() {
       perms[page.key] = pagePerms;
     });
     setEditPermissions(perms);
+    setExpandedMobilePages(new Set());
     setDialogOpen(true);
   };
 
@@ -198,26 +247,28 @@ export default function RolesPage() {
       const existingPerms = role.permissions?.[page.key] as PagePermissions | undefined;
       const pagePerms: PagePermissions = {};
       page.actions.forEach((action) => {
-        pagePerms[action] = existingPerms?.[action] || false;
+        pagePerms[action] = existingPerms?.[action] === true;
       });
       perms[page.key] = pagePerms;
     });
     setEditPermissions(perms);
+    setExpandedMobilePages(new Set());
     setDialogOpen(true);
   };
 
   const togglePermission = (pageKey: keyof Permissions, action: keyof PagePermissions) => {
     setEditPermissions((prev) => {
-      const pagePerms = { ...(prev[pageKey] as PagePermissions || {}) };
-      pagePerms[action] = !pagePerms[action];
+      const currentPerms = prev[pageKey] as PagePermissions | undefined;
+      const pagePerms = { ...(currentPerms || {}) };
+      const newVal = !pagePerms[action];
+      pagePerms[action] = newVal;
 
-      // If turning on view, ensure it's set. If turning off view, turn off all others
-      if (action === 'view' && !pagePerms[action]) {
-        // Turning off view -> turn off all actions for this page
+      // If turning off view, turn off all others
+      if (action === 'view' && !newVal) {
         Object.keys(pagePerms).forEach((key) => {
           pagePerms[key as keyof PagePermissions] = false;
         });
-      } else if (action !== 'view' && pagePerms[action]) {
+      } else if (action !== 'view' && newVal) {
         // Turning on a non-view action -> ensure view is on
         pagePerms.view = true;
       }
@@ -247,22 +298,35 @@ export default function RolesPage() {
     setSaving(true);
     try {
       // For admin role, always use full permissions
-      const finalPermissions = isAdminRole ? DEFAULT_ADMIN_PERMISSIONS : editPermissions;
+      const rawPermissions = isAdminRole ? DEFAULT_ADMIN_PERMISSIONS : editPermissions;
+      // Clean permissions to remove undefined/null values that cause Supabase JSONB issues
+      const finalPermissions = cleanPermissionsForSave(rawPermissions);
 
       if (editingRole) {
-        const { error } = await supabase
+        // UPDATE existing role
+        const updateData: Record<string, unknown> = {
+          display_name: form.display_name.trim(),
+          description: form.description.trim() || null,
+          permissions: finalPermissions,
+        };
+
+        // Also update updated_at if the column exists
+        updateData.updated_at = new Date().toISOString();
+
+        console.log('Updating role:', editingRole.id, 'with data:', JSON.stringify(updateData, null, 2));
+
+        const { data: updateResult, error } = await supabase
           .from('roles')
-          .update({
-            display_name: form.display_name.trim(),
-            description: form.description.trim() || null,
-            permissions: finalPermissions as Record<string, unknown>,
-          })
-          .eq('id', editingRole.id);
+          .update(updateData)
+          .eq('id', editingRole.id)
+          .select();
 
         if (error) {
-          console.error('Role update error:', error.message, error.code, error.details);
-          throw new Error(error.message || 'فشل تحديث الدور');
+          console.error('Role update Supabase error:', JSON.stringify(error, null, 2));
+          throw error;
         }
+
+        console.log('Role updated successfully:', updateResult);
 
         await logAction('update_role', {
           role_id: editingRole.id,
@@ -272,12 +336,18 @@ export default function RolesPage() {
 
         toast.success('تم تحديث الدور بنجاح');
       } else {
+        // ADD new role
+
         // Check for duplicate display name
-        const { data: existing } = await supabase
+        const { data: existing, error: dupCheckError } = await supabase
           .from('roles')
           .select('id')
           .eq('display_name', form.display_name.trim())
           .maybeSingle();
+
+        if (dupCheckError) {
+          console.error('Duplicate check error:', dupCheckError);
+        }
 
         if (existing) {
           toast.error('اسم الدور موجود بالفعل');
@@ -285,55 +355,31 @@ export default function RolesPage() {
           return;
         }
 
-        // Generate a name key from display_name
-        const nameKey = form.display_name.trim()
-          .replace(/\s+/g, '_')
-          .replace(/[أإآا]/g, 'a')
-          .replace(/ب/g, 'b')
-          .replace(/ت/g, 't')
-          .replace(/ث/g, 'th')
-          .replace(/ج/g, 'j')
-          .replace(/ح/g, 'h')
-          .replace(/خ/g, 'kh')
-          .replace(/د/g, 'd')
-          .replace(/ذ/g, 'dh')
-          .replace(/ر/g, 'r')
-          .replace(/ز/g, 'z')
-          .replace(/س/g, 's')
-          .replace(/ش/g, 'sh')
-          .replace(/ص/g, 's')
-          .replace(/ض/g, 'd')
-          .replace(/ط/g, 't')
-          .replace(/ظ/g, 'z')
-          .replace(/ع/g, 'a')
-          .replace(/غ/g, 'gh')
-          .replace(/ف/g, 'f')
-          .replace(/ق/g, 'q')
-          .replace(/ك/g, 'k')
-          .replace(/ل/g, 'l')
-          .replace(/م/g, 'm')
-          .replace(/ن/g, 'n')
-          .replace(/ه/g, 'h')
-          .replace(/و/g, 'w')
-          .replace(/ي/g, 'y')
-          .replace(/ء/g, '')
-          .replace(/ة/g, 'a')
-          .replace(/ى/g, 'a')
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+        // Generate a unique name key - use timestamp + random to avoid collisions
+        // The 'name' column must be unique, so we generate a URL-safe identifier
+        const nameKey = 'custom_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
-        const { error } = await supabase.from('roles').insert({
+        const insertData = {
           name: nameKey,
           display_name: form.display_name.trim(),
           description: form.description.trim() || null,
-          permissions: finalPermissions as Record<string, unknown>,
+          permissions: finalPermissions,
           is_system: false,
-        });
+        };
+
+        console.log('Inserting new role:', JSON.stringify(insertData, null, 2));
+
+        const { data: insertResult, error } = await supabase
+          .from('roles')
+          .insert(insertData)
+          .select();
 
         if (error) {
-          console.error('Role insert error:', error.message, error.code, error.details);
-          throw new Error(error.message || 'فشل إضافة الدور');
+          console.error('Role insert Supabase error:', JSON.stringify(error, null, 2));
+          throw error;
         }
+
+        console.log('Role inserted successfully:', insertResult);
 
         await logAction('create_role', {
           role_name: form.display_name.trim(),
@@ -346,15 +392,25 @@ export default function RolesPage() {
       setDialogOpen(false);
       loadRoles();
     } catch (err: unknown) {
-      console.error('Role save error:', err);
-      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء الحفظ';
-      if (message.includes('row-level security') || message.includes('RLS') || message.includes('policy')) {
-        toast.error('ليس لديك صلاحية تعديل الأدوار. تأكد من صلاحيات المدير.');
-      } else if (message.includes('duplicate') || message.includes('unique')) {
-        toast.error('اسم الدور موجود بالفعل');
-      } else {
-        toast.error(message || 'حدث خطأ أثناء الحفظ');
+      console.error('Role save full error:', err);
+      let message = 'حدث خطأ أثناء الحفظ';
+
+      if (err && typeof err === 'object') {
+        const supabaseErr = err as { message?: string; code?: string; details?: string };
+        if (supabaseErr.message) {
+          message = supabaseErr.message;
+        }
+        if (supabaseErr.code === '23505') {
+          message = 'اسم الدور أو المعرف موجود بالفعل';
+        }
+        if (supabaseErr.message?.includes('row-level security') || supabaseErr.message?.includes('RLS') || supabaseErr.message?.includes('policy')) {
+          message = 'ليس لديك صلاحية تعديل الأدوار. تأكد من صلاحيات المدير.';
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
       }
+
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -394,7 +450,7 @@ export default function RolesPage() {
       setDeletingRole(null);
       loadRoles();
     } catch (err) {
-      console.error(err);
+      console.error('Delete role error:', err);
       toast.error('حدث خطأ أثناء الحذف');
     }
   };
@@ -403,9 +459,9 @@ export default function RolesPage() {
     if (!role.permissions) return 0;
     let count = 0;
     Object.values(role.permissions).forEach((pagePerms) => {
-      if (pagePerms) {
+      if (pagePerms && typeof pagePerms === 'object') {
         Object.values(pagePerms).forEach((val) => {
-          if (val) count++;
+          if (val === true) count++;
         });
       }
     });
@@ -427,29 +483,29 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-              <Shield className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">إدارة الأدوار والصلاحيات</h1>
-              <p className="text-muted-foreground text-sm mt-0.5">
+              <h1 className="text-lg sm:text-2xl font-bold">إدارة الأدوار والصلاحيات</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
                 إجمالي الأدوار: <span className="font-semibold text-foreground">{roles.length}</span>
               </p>
             </div>
           </div>
-          <Button onClick={openAddDialog} className="gap-2 shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+          <Button onClick={openAddDialog} className="gap-2 shadow-lg w-full sm:w-auto" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
             <Plus className="w-4 h-4" />
             إضافة دور
           </Button>
         </div>
       </motion.div>
 
-      {/* Roles Table */}
+      {/* Roles List */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
         <Card className="border-0 shadow-md overflow-hidden">
           <CardContent className="p-0">
@@ -567,76 +623,81 @@ export default function RolesPage() {
                 </div>
 
                 {/* Mobile Card Layout */}
-                <div className="sm:hidden divide-y">
-                  {roles.map((role) => {
-                    const isAdminRole = role.name === 'admin';
-                    return (
-                      <motion.div
-                        key={role.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="p-3 border-r-4 hover:bg-muted/30 transition-all"
-                        style={{ borderRightColor: isAdminRole ? '#D4A843' : '#ef4444' }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={isAdminRole ? { background: 'linear-gradient(135deg, #D4A843, #b8922e)' } : { background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
-                              <Shield className="w-5 h-5 text-white" />
+                <div className="sm:hidden">
+                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #ef4444, #dc2626, #b91c1c)' }} />
+                  <div className="divide-y">
+                    {roles.map((role) => {
+                      const isAdminRole = role.name === 'admin';
+                      return (
+                        <motion.div
+                          key={role.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="p-4 border-r-4 hover:bg-muted/30 transition-all"
+                          style={{ borderRightColor: isAdminRole ? '#D4A843' : '#ef4444' }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-sm shrink-0" style={isAdminRole ? { background: 'linear-gradient(135deg, #D4A843, #b8922e)' } : { background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+                                <Shield className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm">{role.display_name}</p>
+                                {role.description && (
+                                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{role.description}</p>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-sm">{role.display_name}</p>
-                              {role.description && (
-                                <p className="text-xs text-muted-foreground mt-0.5">{role.description}</p>
-                              )}
-                            </div>
+                            {role.is_system ? (
+                              <Badge variant="secondary" className="text-[10px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 shrink-0">
+                                <Lock className="w-3 h-3 ml-0.5" />
+                                نظام
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground shrink-0">
+                                مخصص
+                              </Badge>
+                            )}
                           </div>
-                          {role.is_system ? (
-                            <Badge variant="secondary" className="text-[10px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
-                              <Lock className="w-3 h-3 ml-0.5" />
-                              نظام
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
-                              مخصص
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {role.user_count || 0} مستخدم
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            {getEnabledCount(role)} صلاحية
-                          </span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            onClick={() => openEditDialog(role)}
-                          >
-                            <Edit className="w-3.5 h-3.5 text-red-600" />
-                          </Button>
-                          {!role.is_system && (
+                          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" />
+                              {role.user_count || 0} مستخدم
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              {getEnabledCount(role)} صلاحية
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center justify-end gap-2">
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:bg-red-50 dark:hover:bg-red-900/20"
-                              onClick={() => {
-                                setDeletingRole(role);
-                                setDeleteDialogOpen(true);
-                              }}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              onClick={() => openEditDialog(role)}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Edit className="w-3.5 h-3.5" />
+                              تعديل
                             </Button>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                            {!role.is_system && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                                onClick={() => {
+                                  setDeletingRole(role);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                حذف
+                              </Button>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             )}
@@ -656,7 +717,7 @@ export default function RolesPage() {
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
-            <div className="space-y-6 py-4">
+            <div className="space-y-6 py-4 px-1">
               {/* Basic Info */}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -685,7 +746,7 @@ export default function RolesPage() {
 
               {/* Permissions Matrix */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
                       <Lock className="w-3.5 h-3.5 text-white" />
@@ -718,8 +779,8 @@ export default function RolesPage() {
                       <div className="bg-muted/50">
                         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) repeat(8, minmax(50px, 60px))', gap: 0 }} className="text-xs font-medium p-3">
                           <div className="text-right">الصفحة</div>
-                          {['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'].map((action) => {
-                            const isUsed = PERMISSION_PAGES.some((p) => p.actions.includes(action as keyof PagePermissions));
+                          {ALL_ACTIONS.map((action) => {
+                            const isUsed = PERMISSION_PAGES.some((p) => p.actions.includes(action));
                             if (!isUsed) return <div key={action} />;
                             return (
                               <div key={action} className="text-center">
@@ -734,8 +795,8 @@ export default function RolesPage() {
                       <div className="divide-y">
                         {PERMISSION_PAGES.map((page) => {
                           const pagePerms = editPermissions[page.key] as PagePermissions | undefined;
-                          const allEnabled = page.actions.every((a) => pagePerms?.[a]);
-                          const someEnabled = page.actions.some((a) => pagePerms?.[a]);
+                          const allEnabled = page.actions.every((a) => pagePerms?.[a] === true);
+                          const someEnabled = page.actions.some((a) => pagePerms?.[a] === true);
 
                           return (
                             <div key={page.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) repeat(8, minmax(50px, 60px))', gap: 0 }} className="p-2 items-center hover:bg-red-50/50 dark:hover:bg-red-900/5 transition-colors">
@@ -751,16 +812,16 @@ export default function RolesPage() {
                                 />
                                 <span className="text-sm font-medium truncate">{page.label}</span>
                               </div>
-                              {['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'].map((action) => {
-                                if (!page.actions.includes(action as keyof PagePermissions)) {
+                              {ALL_ACTIONS.map((action) => {
+                                if (!page.actions.includes(action)) {
                                   return <div key={action} />;
                                 }
-                                const isChecked = pagePerms?.[action as keyof PagePermissions] || false;
+                                const isChecked = pagePerms?.[action] === true;
                                 return (
                                   <div key={action} style={{ display: 'flex', justifyContent: 'center' }}>
                                     <Switch
                                       checked={isChecked}
-                                      onCheckedChange={() => togglePermission(page.key, action as keyof PagePermissions)}
+                                      onCheckedChange={() => togglePermission(page.key, action)}
                                       className="scale-75"
                                     />
                                   </div>
@@ -776,13 +837,19 @@ export default function RolesPage() {
                     <div className="sm:hidden space-y-2">
                       {PERMISSION_PAGES.map((page) => {
                         const pagePerms = editPermissions[page.key] as PagePermissions | undefined;
-                        const allEnabled = page.actions.every((a) => pagePerms?.[a]);
-                        const someEnabled = page.actions.some((a) => pagePerms?.[a]);
-                        const enabledCount = page.actions.filter((a) => pagePerms?.[a]).length;
+                        const allEnabled = page.actions.every((a) => pagePerms?.[a] === true);
+                        const someEnabled = page.actions.some((a) => pagePerms?.[a] === true);
+                        const enabledCount = page.actions.filter((a) => pagePerms?.[a] === true).length;
+                        const isExpanded = expandedMobilePages.has(page.key);
 
                         return (
-                          <div key={page.key} className="rounded-lg border bg-card p-3">
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <div key={page.key} className="rounded-lg border bg-card overflow-hidden">
+                            <button
+                              type="button"
+                              className="w-full p-3 text-right"
+                              onClick={() => toggleMobilePage(page.key)}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+                            >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <input
                                   type="checkbox"
@@ -790,37 +857,50 @@ export default function RolesPage() {
                                   ref={(el) => {
                                     if (el) el.indeterminate = someEnabled && !allEnabled;
                                   }}
-                                  onChange={(e) => toggleAllForPage(page.key, page, e.target.checked)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    toggleAllForPage(page.key, page, e.target.checked);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
                                   className="rounded border-muted-foreground/30 w-4 h-4"
                                 />
                                 <span className="text-sm font-semibold">{page.label}</span>
                               </div>
-                              <span className="text-[10px] text-muted-foreground">
-                                {enabledCount}/{page.actions.length}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', paddingRight: '1.5rem' }}>
-                              {page.actions.map((action) => {
-                                const isChecked = pagePerms?.[action] || false;
-                                return (
-                                  <div
-                                    key={action}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                                    className="cursor-pointer select-none"
-                                    onClick={() => togglePermission(page.key, action)}
-                                  >
-                                    <Switch
-                                      checked={isChecked}
-                                      onCheckedChange={() => togglePermission(page.key, action)}
-                                      className="scale-75"
-                                    />
-                                    <span className={`text-[11px] ${isChecked ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                                      {ACTION_LABELS[action]}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {enabledCount}/{page.actions.length}
+                                </span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="px-3 pb-3 border-t" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.5rem' }}>
+                                {page.actions.map((action) => {
+                                  const isChecked = pagePerms?.[action] === true;
+                                  return (
+                                    <div
+                                      key={action}
+                                      style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                                      className="cursor-pointer select-none"
+                                      onClick={() => togglePermission(page.key, action)}
+                                    >
+                                      <Switch
+                                        checked={isChecked}
+                                        onCheckedChange={() => togglePermission(page.key, action)}
+                                        className="scale-[0.7]"
+                                      />
+                                      <span className={`text-[12px] ${isChecked ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                        {ACTION_LABELS[action]}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -830,12 +910,12 @@ export default function RolesPage() {
               </div>
             </div>
           </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="flex-row gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+            <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none gap-1" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {editingRole ? 'تحديث' : 'إضافة'}
             </Button>
           </DialogFooter>
