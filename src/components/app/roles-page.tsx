@@ -255,12 +255,14 @@ export default function RolesPage() {
           .update({
             display_name: form.display_name.trim(),
             description: form.description.trim() || null,
-            permissions: finalPermissions,
-            updated_at: new Date().toISOString(),
+            permissions: finalPermissions as Record<string, unknown>,
           })
           .eq('id', editingRole.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Role update error:', error.message, error.code, error.details);
+          throw new Error(error.message || 'فشل تحديث الدور');
+        }
 
         await logAction('update_role', {
           role_id: editingRole.id,
@@ -324,11 +326,14 @@ export default function RolesPage() {
           name: nameKey,
           display_name: form.display_name.trim(),
           description: form.description.trim() || null,
-          permissions: finalPermissions,
+          permissions: finalPermissions as Record<string, unknown>,
           is_system: false,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Role insert error:', error.message, error.code, error.details);
+          throw new Error(error.message || 'فشل إضافة الدور');
+        }
 
         await logAction('create_role', {
           role_name: form.display_name.trim(),
@@ -340,9 +345,16 @@ export default function RolesPage() {
 
       setDialogOpen(false);
       loadRoles();
-    } catch (err) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء الحفظ');
+    } catch (err: unknown) {
+      console.error('Role save error:', err);
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء الحفظ';
+      if (message.includes('row-level security') || message.includes('RLS') || message.includes('policy')) {
+        toast.error('ليس لديك صلاحية تعديل الأدوار. تأكد من صلاحيات المدير.');
+      } else if (message.includes('duplicate') || message.includes('unique')) {
+        toast.error('اسم الدور موجود بالفعل');
+      } else {
+        toast.error(message || 'حدث خطأ أثناء الحفظ');
+      }
     } finally {
       setSaving(false);
     }
@@ -690,7 +702,7 @@ export default function RolesPage() {
 
                 {editingRole?.name === 'admin' ? (
                   <div className="rounded-xl border bg-muted/30 p-4">
-                    <div className="flex items-center gap-2 mb-3">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                       <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                       <span className="font-medium">جميع الصلاحيات مفعلة</span>
                     </div>
@@ -699,65 +711,121 @@ export default function RolesPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-xl border overflow-hidden">
-                    {/* Table Header */}
-                    <div className="bg-muted/50">
-                      <div className="grid grid-cols-[minmax(120px,1fr)_repeat(8,minmax(50px,60px))] gap-0 text-xs font-medium p-3">
-                        <div className="text-right">الصفحة</div>
-                        {['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'].map((action) => {
-                          // Check if any page uses this action
-                          const isUsed = PERMISSION_PAGES.some((p) => p.actions.includes(action as keyof PagePermissions));
-                          if (!isUsed) return <div key={action} />;
+                  <>
+                    {/* Desktop: Table Grid Layout */}
+                    <div className="hidden sm:block rounded-xl border overflow-hidden">
+                      {/* Table Header */}
+                      <div className="bg-muted/50">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) repeat(8, minmax(50px, 60px))', gap: 0 }} className="text-xs font-medium p-3">
+                          <div className="text-right">الصفحة</div>
+                          {['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'].map((action) => {
+                            const isUsed = PERMISSION_PAGES.some((p) => p.actions.includes(action as keyof PagePermissions));
+                            if (!isUsed) return <div key={action} />;
+                            return (
+                              <div key={action} className="text-center">
+                                {ACTION_LABELS[action]}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Table Body */}
+                      <div className="divide-y">
+                        {PERMISSION_PAGES.map((page) => {
+                          const pagePerms = editPermissions[page.key] as PagePermissions | undefined;
+                          const allEnabled = page.actions.every((a) => pagePerms?.[a]);
+                          const someEnabled = page.actions.some((a) => pagePerms?.[a]);
+
                           return (
-                            <div key={action} className="text-center">
-                              {ACTION_LABELS[action]}
+                            <div key={page.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) repeat(8, minmax(50px, 60px))', gap: 0 }} className="p-2 items-center hover:bg-red-50/50 dark:hover:bg-red-900/5 transition-colors">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingRight: '0.5rem' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={allEnabled}
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = someEnabled && !allEnabled;
+                                  }}
+                                  onChange={(e) => toggleAllForPage(page.key, page, e.target.checked)}
+                                  className="rounded border-muted-foreground/30"
+                                />
+                                <span className="text-sm font-medium truncate">{page.label}</span>
+                              </div>
+                              {['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'].map((action) => {
+                                if (!page.actions.includes(action as keyof PagePermissions)) {
+                                  return <div key={action} />;
+                                }
+                                const isChecked = pagePerms?.[action as keyof PagePermissions] || false;
+                                return (
+                                  <div key={action} style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <Switch
+                                      checked={isChecked}
+                                      onCheckedChange={() => togglePermission(page.key, action as keyof PagePermissions)}
+                                      className="scale-75"
+                                    />
+                                  </div>
+                                );
+                              })}
                             </div>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* Table Body */}
-                    <div className="divide-y">
+                    {/* Mobile: Card Layout for Permissions */}
+                    <div className="sm:hidden space-y-2">
                       {PERMISSION_PAGES.map((page) => {
                         const pagePerms = editPermissions[page.key] as PagePermissions | undefined;
                         const allEnabled = page.actions.every((a) => pagePerms?.[a]);
                         const someEnabled = page.actions.some((a) => pagePerms?.[a]);
+                        const enabledCount = page.actions.filter((a) => pagePerms?.[a]).length;
 
                         return (
-                          <div key={page.key} className="grid grid-cols-[minmax(120px,1fr)_repeat(8,minmax(50px,60px))] gap-0 p-2 items-center hover:bg-red-50/50 dark:hover:bg-red-900/5 transition-colors">
-                            <div className="flex items-center gap-2 pr-2">
-                              <input
-                                type="checkbox"
-                                checked={allEnabled}
-                                ref={(el) => {
-                                  if (el) el.indeterminate = someEnabled && !allEnabled;
-                                }}
-                                onChange={(e) => toggleAllForPage(page.key, page, e.target.checked)}
-                                className="rounded border-muted-foreground/30"
-                              />
-                              <span className="text-sm font-medium truncate">{page.label}</span>
+                          <div key={page.key} className="rounded-lg border bg-card p-3">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={allEnabled}
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = someEnabled && !allEnabled;
+                                  }}
+                                  onChange={(e) => toggleAllForPage(page.key, page, e.target.checked)}
+                                  className="rounded border-muted-foreground/30 w-4 h-4"
+                                />
+                                <span className="text-sm font-semibold">{page.label}</span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {enabledCount}/{page.actions.length}
+                              </span>
                             </div>
-                            {['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'].map((action) => {
-                              if (!page.actions.includes(action as keyof PagePermissions)) {
-                                return <div key={action} />;
-                              }
-                              const isChecked = pagePerms?.[action as keyof PagePermissions] || false;
-                              return (
-                                <div key={action} className="flex justify-center">
-                                  <Switch
-                                    checked={isChecked}
-                                    onCheckedChange={() => togglePermission(page.key, action as keyof PagePermissions)}
-                                    className="scale-75"
-                                  />
-                                </div>
-                              );
-                            })}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', paddingRight: '1.5rem' }}>
+                              {page.actions.map((action) => {
+                                const isChecked = pagePerms?.[action] || false;
+                                return (
+                                  <div
+                                    key={action}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                    className="cursor-pointer select-none"
+                                    onClick={() => togglePermission(page.key, action)}
+                                  >
+                                    <Switch
+                                      checked={isChecked}
+                                      onCheckedChange={() => togglePermission(page.key, action)}
+                                      className="scale-75"
+                                    />
+                                    <span className={`text-[11px] ${isChecked ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                      {ACTION_LABELS[action]}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
