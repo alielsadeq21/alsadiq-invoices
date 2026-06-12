@@ -1,0 +1,1668 @@
+     1→import { formatCurrency, formatDate, numberToArabicWords } from './utils';
+     2→import type { Invoice, InvoiceItem, Settings } from './types';
+     3→
+     4→/**
+     5→ * Invoice Template Generator
+     6→ * Generates a complete, self-contained HTML document for printing and PDF export.
+     7→ * Uses pure CSS (no Tailwind dependency) so it works in any context.
+     8→ */
+     9→
+    10→interface InvoiceDocumentData {
+    11→  invoice: Invoice;
+    12→  items: InvoiceItem[];
+    13→  branchName: string;
+    14→  customerName?: string;
+    15→  settings: Settings | null;
+    16→  userFullName: string;
+    17→}
+    18→
+    19→function formatTime(time: string | null): string {
+    20→  if (!time) return '';
+    21→  const [h, m] = time.split(':');
+    22→  const hour = parseInt(h);
+    23→  const ampm = hour >= 12 ? 'م' : 'ص';
+    24→  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    25→  return `${displayHour}:${m} ${ampm}`;
+    26→}
+    27→
+    28→/**
+    29→ * Checks if any item has unit_count > 1, meaning we should show the unit_count columns
+    30→ */
+    31→function hasUnitCount(items: InvoiceItem[]): boolean {
+    32→  return items.some(item => Number(item.unit_count) > 1);
+    33→}
+    34→
+    35→function getInvoiceCSS(showUnitCount: boolean): string {
+    36→  const unitCountColWidth = showUnitCount ? '70px' : '0px';
+    37→  const totalPiecesColWidth = showUnitCount ? '90px' : '0px';
+    38→
+    39→  return `
+    40→    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+    41→
+    42→    *, *::before, *::after {
+    43→      margin: 0;
+    44→      padding: 0;
+    45→      box-sizing: border-box;
+    46→      -webkit-print-color-adjust: exact !important;
+    47→      print-color-adjust: exact !important;
+    48→      color-adjust: exact !important;
+    49→    }
+    50→
+    51→    body {
+    52→      font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
+    53→      color: #1a1a2e;
+    54→      background: #ffffff;
+    55→      direction: rtl;
+    56→      line-height: 1.6;
+    57→      margin: 0;
+    58→      padding: 0;
+    59→    }
+    60→
+    61→    @page {
+    62→      size: A4;
+    63→      margin: 8mm;
+    64→    }
+    65→
+    66→    .invoice-container {
+    67→      width: 100%;
+    68→      max-width: 210mm;
+    69→      margin: 0 auto;
+    70→      padding: 4mm 6mm;
+    71→      position: relative;
+    72→    }
+    73→
+    74→    /* ===== HEADER ===== */
+    75→    .inv-header {
+    76→      display: flex;
+    77→      align-items: stretch;
+    78→      border: 2.5px solid #0D7C66;
+    79→      border-radius: 12px;
+    80→      overflow: hidden;
+    81→      margin-bottom: 14px;
+    82→    }
+    83→
+    84→    .inv-header-logo {
+    85→      background: #0D7C66;
+    86→      padding: 18px 22px;
+    87→      display: flex;
+    88→      align-items: center;
+    89→      justify-content: center;
+    90→      min-width: 110px;
+    91→    }
+    92→
+    93→    .inv-header-logo .logo-text {
+    94→      font-size: 56px;
+    95→      font-weight: 800;
+    96→      color: #D4A843;
+    97→      line-height: 1;
+    98→      user-select: none;
+    99→    }
+   100→
+   101→    .inv-header-logo img {
+   102→      width: 70px;
+   103→      height: 70px;
+   104→      object-fit: contain;
+   105→    }
+   106→
+   107→    .inv-header-info {
+   108→      flex: 1;
+   109→      padding: 12px 20px;
+   110→      display: flex;
+   111→      flex-direction: column;
+   112→      justify-content: center;
+   113→    }
+   114→
+   115→    .inv-header-info h1 {
+   116→      font-size: 22px;
+   117→      font-weight: 700;
+   118→      color: #0D7C66;
+   119→      margin-bottom: 4px;
+   120→    }
+   121→
+   122→    .inv-header-info .contact-line {
+   123→      font-size: 11px;
+   124→      color: #555;
+   125→      line-height: 1.8;
+   126→    }
+   127→
+   128→    .inv-header-info .contact-line span {
+   129→      margin-left: 18px;
+   130→      white-space: nowrap;
+   131→    }
+   132→
+   133→    .inv-header-title {
+   134→      background: linear-gradient(135deg, #0D7C66, #0A5E4D);
+   135→      padding: 16px 24px;
+   136→      display: flex;
+   137→      flex-direction: column;
+   138→      align-items: center;
+   139→      justify-content: center;
+   140→      min-width: 170px;
+   141→    }
+   142→
+   143→    .inv-header-title h2 {
+   144→      font-size: 18px;
+   145→      font-weight: 700;
+   146→      color: #ffffff;
+   147→      margin-bottom: 3px;
+   148→    }
+   149→
+   150→    .inv-header-title .inv-num {
+   151→      font-size: 14px;
+   152→      color: #D4A843;
+   153→      font-weight: 600;
+   154→    }
+   155→
+   156→    .inv-header-title .inv-date {
+   157→      font-size: 11px;
+   158→      color: rgba(255, 255, 255, 0.85);
+   159→      margin-top: 3px;
+   160→    }
+   161→
+   162→    /* ===== GOLD DIVIDER ===== */
+   163→    .gold-divider {
+   164→      height: 3px;
+   165→      background: linear-gradient(90deg, #0D7C66, #D4A843, #0D7C66);
+   166→      border-radius: 2px;
+   167→      margin-bottom: 14px;
+   168→    }
+   169→
+   170→    /* ===== INVOICE INFO GRID ===== */
+   171→    .inv-info-grid {
+   172→      display: grid;
+   173→      grid-template-columns: repeat(4, 1fr);
+   174→      gap: 0;
+   175→      border: 1px solid #ddd;
+   176→      border-radius: 10px;
+   177→      overflow: hidden;
+   178→      margin-bottom: 14px;
+   179→    }
+   180→
+   181→    .inv-info-cell {
+   182→      padding: 10px 14px;
+   183→      border-left: 1px solid #e5e5e5;
+   184→    }
+   185→
+   186→    .inv-info-cell:last-child {
+   187→      border-left: none;
+   188→    }
+   189→
+   190→    .inv-info-cell .label {
+   191→      font-size: 10px;
+   192→      color: #888;
+   193→      font-weight: 600;
+   194→      margin-bottom: 3px;
+   195→    }
+   196→
+   197→    .inv-info-cell .value {
+   198→      font-size: 13px;
+   199→      color: #1a1a2e;
+   200→      font-weight: 600;
+   201→    }
+   202→
+   203→    /* ===== ITEMS TABLE ===== */
+   204→    .inv-table {
+   205→      width: 100%;
+   206→      border-collapse: collapse;
+   207→      margin-bottom: 14px;
+   208→      border-radius: 10px;
+   209→      overflow: hidden;
+   210→      border: 1.5px solid #0D7C66;
+   211→    }
+   212→
+   213→    .inv-table thead tr {
+   214→      background: #0D7C66;
+   215→    }
+   216→
+   217→    .inv-table thead th {
+   218→      padding: 11px 10px;
+   219→      color: #ffffff;
+   220→      font-size: 12px;
+   221→      font-weight: 600;
+   222→      text-align: right;
+   223→      border-left: 1px solid rgba(255, 255, 255, 0.2);
+   224→    }
+   225→
+   226→    .inv-table thead th:last-child {
+   227→      border-left: none;
+   228→    }
+   229→
+   230→    .inv-table thead th.col-num {
+   231→      width: 40px;
+   232→      text-align: center;
+   233→    }
+   234→
+   235→    .inv-table thead th.col-name {
+   236→      text-align: right;
+   237→    }
+   238→
+   239→    .inv-table thead th.col-qty {
+   240→      width: 80px;
+   241→      text-align: center;
+   242→    }
+   243→
+   244→    .inv-table thead th.col-unit-count {
+   245→      width: ${unitCountColWidth};
+   246→      text-align: center;
+   247→      ${showUnitCount ? '' : 'display:none;'}
+   248→    }
+   249→
+   250→    .inv-table thead th.col-total-pieces {
+   251→      width: ${totalPiecesColWidth};
+   252→      text-align: center;
+   253→      ${showUnitCount ? '' : 'display:none;'}
+   254→    }
+   255→
+   256→    .inv-table thead th.col-price {
+   257→      width: 120px;
+   258→      text-align: center;
+   259→    }
+   260→
+   261→    .inv-table thead th.col-total {
+   262→      width: 120px;
+   263→      text-align: left;
+   264→    }
+   265→
+   266→    .inv-table tbody td {
+   267→      padding: 10px 10px;
+   268→      font-size: 12px;
+   269→      border-bottom: 1px solid #e5e5e5;
+   270→      border-left: 1px solid #e5e5e5;
+   271→    }
+   272→
+   273→    .inv-table tbody td:last-child {
+   274→      border-left: none;
+   275→    }
+   276→
+   277→    .inv-table tbody tr.even-row {
+   278→      background: #f7faf9;
+   279→    }
+   280→
+   281→    .inv-table tbody td.col-num {
+   282→      text-align: center;
+   283→      color: #888;
+   284→    }
+   285→
+   286→    .inv-table tbody td.col-name {
+   287→      font-weight: 500;
+   288→      color: #1a1a2e;
+   289→    }
+   290→
+   291→    .inv-table tbody td.col-qty {
+   292→      text-align: center;
+   293→    }
+   294→
+   295→    .inv-table tbody td.col-unit-count {
+   296→      text-align: center;
+   297→      color: #0D7C66;
+   298→      font-weight: 600;
+   299→      ${showUnitCount ? '' : 'display:none;'}
+   300→    }
+   301→
+   302→    .inv-table tbody td.col-total-pieces {
+   303→      text-align: center;
+   304→      font-weight: 700;
+   305→      color: #0D7C66;
+   306→      ${showUnitCount ? '' : 'display:none;'}
+   307→    }
+   308→
+   309→    .inv-table tbody td.col-price {
+   310→      text-align: center;
+   311→    }
+   312→
+   313→    .inv-table tbody td.col-total {
+   314→      text-align: left;
+   315→      font-weight: 700;
+   316→      color: #0D7C66;
+   317→    }
+   318→
+   319→    /* ===== TOTALS ===== */
+   320→    .inv-totals-row {
+   321→      display: flex;
+   322→      justify-content: flex-end;
+   323→      margin-bottom: 14px;
+   324→    }
+   325→
+   326→    .inv-totals-box {
+   327→      width: 290px;
+   328→      border: 1px solid #ddd;
+   329→      border-radius: 10px;
+   330→      overflow: hidden;
+   331→    }
+   332→
+   333→    .inv-totals-box .total-row {
+   334→      display: flex;
+   335→      justify-content: space-between;
+   336→      align-items: center;
+   337→      padding: 9px 14px;
+   338→      font-size: 12px;
+   339→      border-bottom: 1px solid #eee;
+   340→    }
+   341→
+   342→    .inv-totals-box .total-row:last-child {
+   343→      border-bottom: none;
+   344→    }
+   345→
+   346→    .inv-totals-box .total-row .total-label {
+   347→      color: #666;
+   348→    }
+   349→
+   350→    .inv-totals-box .total-row .total-value {
+   351→      font-weight: 600;
+   352→      color: #1a1a2e;
+   353→    }
+   354→
+   355→    .inv-totals-box .grand-total {
+   356→      background: #0D7C66;
+   357→      padding: 12px 14px;
+   358→      display: flex;
+   359→      justify-content: space-between;
+   360→      align-items: center;
+   361→    }
+   362→
+   363→    .inv-totals-box .grand-total .total-label {
+   364→      color: #ffffff;
+   365→      font-size: 14px;
+   366→      font-weight: 700;
+   367→    }
+   368→
+   369→    .inv-totals-box .grand-total .total-value {
+   370→      color: #ffffff;
+   371→      font-size: 16px;
+   372→      font-weight: 800;
+   373→    }
+   374→
+   375→    /* ===== NOTES ===== */
+   376→    .inv-notes {
+   377→      padding: 10px 14px;
+   378→      background: #FFF9E6;
+   379→      border: 1px solid #F0D060;
+   380→      border-radius: 8px;
+   381→      margin-bottom: 14px;
+   382→      font-size: 12px;
+   383→    }
+   384→
+   385→    .inv-notes .notes-label {
+   386→      font-weight: 700;
+   387→      color: #8B7020;
+   388→    }
+   389→
+   390→    .inv-notes .notes-text {
+   391→      color: #6B5510;
+   392→      margin-top: 2px;
+   393→    }
+   394→
+   395→    /* ===== CANCEL ===== */
+   396→    .inv-cancel {
+   397→      padding: 10px 14px;
+   398→      background: #FFF0F0;
+   399→      border: 1px solid #E8A0A0;
+   400→      border-radius: 8px;
+   401→      margin-bottom: 14px;
+   402→      font-size: 12px;
+   403→    }
+   404→
+   405→    .inv-cancel .cancel-label {
+   406→      font-weight: 700;
+   407→      color: #8B2020;
+   408→    }
+   409→
+   410→    .inv-cancel .cancel-text {
+   411→      color: #6B1010;
+   412→      margin-top: 2px;
+   413→    }
+   414→
+   415→    /* ===== AMOUNT IN WORDS ===== */
+   416→    .inv-amount-words {
+   417→      padding: 10px 14px;
+   418→      background: #f0faf7;
+   419→      border: 1px solid #b8e0d5;
+   420→      border-radius: 8px;
+   421→      margin-bottom: 14px;
+   422→      font-size: 12px;
+   423→    }
+   424→
+   425→    .inv-amount-words .amount-label {
+   426→      font-weight: 700;
+   427→      color: #0D7C66;
+   428→    }
+   429→
+   430→    .inv-amount-words .amount-text {
+   431→      color: #1a1a2e;
+   432→      font-weight: 500;
+   433→    }
+   434→
+   435→    /* ===== SIGNATURES ===== */
+   436→    .inv-signatures {
+   437→      display: grid;
+   438→      grid-template-columns: repeat(3, 1fr);
+   439→      gap: 16px;
+   440→      margin-bottom: 16px;
+   441→    }
+   442→
+   443→    .sig-box {
+   444→      border: 1px solid #ccc;
+   445→      border-radius: 8px;
+   446→      padding: 10px;
+   447→      text-align: center;
+   448→    }
+   449→
+   450→    .sig-box .sig-label {
+   451→      font-size: 11px;
+   452→      color: #0D7C66;
+   453→      font-weight: 700;
+   454→      margin-bottom: 30px;
+   455→    }
+   456→
+   457→    .sig-box .sig-line {
+   458→      border-top: 1px dashed #999;
+   459→      padding-top: 6px;
+   460→      font-size: 10px;
+   461→      color: #888;
+   462→    }
+   463→
+   464→    /* ===== FOOTER ===== */
+   465→    .inv-footer {
+   466→      text-align: center;
+   467→      padding-top: 10px;
+   468→      border-top: 2px solid #0D7C66;
+   469→    }
+   470→
+   471→    .inv-footer .footer-text {
+   472→      font-size: 11px;
+   473→      color: #888;
+   474→    }
+   475→
+   476→    .inv-footer .footer-brand {
+   477→      font-size: 10px;
+   478→      color: #aaa;
+   479→      margin-top: 4px;
+   480→    }
+   481→
+   482→    /* ===== WATERMARK ===== */
+   483→    .watermark {
+   484→      position: fixed;
+   485→      top: 50%;
+   486→      left: 50%;
+   487→      transform: translate(-50%, -50%) rotate(-30deg);
+   488→      font-size: 80px;
+   489→      font-weight: 800;
+   490→      color: rgba(220, 50, 50, 0.08);
+   491→      pointer-events: none;
+   492→      z-index: 0;
+   493→    }
+   494→
+   495→    .watermark.cancelled {
+   496→      color: rgba(220, 50, 50, 0.12);
+   497→    }
+   498→
+   499→    /* ===== ITEMS COUNT ===== */
+   500→    .items-count {
+   501→      text-align: left;
+   502→      font-size: 11px;
+   503→      color: #888;
+   504→      margin-bottom: 14px;
+   505→      display: flex;
+   506→      justify-content: space-between;
+   507→    }
+   508→
+   509→    .items-count .total-pieces {
+   510→      color: #0D7C66;
+   511→      font-weight: 600;
+   512→    }
+   513→
+   514→    /* ===== PRINT MEDIA ===== */
+   515→    @media print {
+   516→      body {
+   517→        margin: 0;
+   518→        background: white !important;
+   519→      }
+   520→      .invoice-container {
+   521→        padding: 0;
+   522→        max-width: 100%;
+   523→      }
+   524→
+   525→      /* ===== HIGH-CONTRAST B&W OVERRIDES ===== */
+   526→      .inv-header {
+   527→        border-color: #000 !important;
+   528→        border-width: 3px !important;
+   529→      }
+   530→      .inv-header-logo {
+   531→        background: #000 !important;
+   532→      }
+   533→      .inv-header-logo .logo-text {
+   534→        color: #fff !important;
+   535→      }
+   536→      .inv-header-logo img {
+   537→        filter: brightness(0) invert(1) !important;
+   538→      }
+   539→      .inv-header-info h1 {
+   540→        color: #000 !important;
+   541→      }
+   542→      .inv-header-title {
+   543→        background: #222 !important;
+   544→      }
+   545→      .inv-header-title h2 {
+   546→        color: #fff !important;
+   547→      }
+   548→      .inv-header-title .inv-num {
+   549→        color: #ccc !important;
+   550→      }
+   551→      .inv-header-title .inv-date {
+   552→        color: #999 !important;
+   553→      }
+   554→      .gold-divider {
+   555→        background: #333 !important;
+   556→      }
+   557→      .inv-info-grid {
+   558→        border-color: #333 !important;
+   559→      }
+   560→      .inv-info-cell {
+   561→        border-left-color: #ccc !important;
+   562→      }
+   563→      .inv-info-cell .label {
+   564→        color: #555 !important;
+   565→      }
+   566→      .inv-info-cell .value {
+   567→        color: #000 !important;
+   568→      }
+   569→      .inv-table {
+   570→        border-color: #000 !important;
+   571→      }
+   572→      .inv-table thead tr {
+   573→        background: #000 !important;
+   574→      }
+   575→      .inv-table thead th {
+   576→        color: #fff !important;
+   577→        border-left-color: rgba(255,255,255,0.3) !important;
+   578→      }
+   579→      .inv-table tbody td {
+   580→        border-bottom-color: #999 !important;
+   581→        border-left-color: #999 !important;
+   582→        color: #000 !important;
+   583→      }
+   584→      .inv-table tbody tr.even-row {
+   585→        background: #f0f0f0 !important;
+   586→      }
+   587→      .inv-table tbody td.col-unit-count,
+   588→      .inv-table tbody td.col-total-pieces {
+   589→        color: #000 !important;
+   590→        font-weight: 700 !important;
+   591→      }
+   592→      .inv-table tbody td.col-total {
+   593→        color: #000 !important;
+   594→        font-weight: 800 !important;
+   595→      }
+   596→      .inv-totals-box {
+   597→        border-color: #333 !important;
+   598→      }
+   599→      .inv-totals-box .total-row {
+   600→        border-bottom-color: #ccc !important;
+   601→      }
+   602→      .inv-totals-box .total-row .total-label {
+   603→        color: #333 !important;
+   604→      }
+   605→      .inv-totals-box .total-row .total-value {
+   606→        color: #000 !important;
+   607→      }
+   608→      .inv-totals-box .grand-total {
+   609→        background: #000 !important;
+   610→      }
+   611→      .inv-totals-box .grand-total .total-label,
+   612→      .inv-totals-box .grand-total .total-value {
+   613→        color: #fff !important;
+   614→      }
+   615→      .inv-amount-words {
+   616→        background: #eee !important;
+   617→        border-color: #999 !important;
+   618→      }
+   619→      .inv-amount-words .amount-label {
+   620→        color: #000 !important;
+   621→      }
+   622→      .inv-amount-words .amount-text {
+   623→        color: #000 !important;
+   624→      }
+   625→      .inv-notes {
+   626→        background: #f5f5f5 !important;
+   627→        border-color: #999 !important;
+   628→      }
+   629→      .inv-notes .notes-label {
+   630→        color: #333 !important;
+   631→      }
+   632→      .inv-notes .notes-text {
+   633→        color: #000 !important;
+   634→      }
+   635→      .inv-cancel {
+   636→        background: #f0f0f0 !important;
+   637→        border-color: #999 !important;
+   638→      }
+   639→      .inv-cancel .cancel-label {
+   640→        color: #000 !important;
+   641→      }
+   642→      .inv-cancel .cancel-text {
+   643→        color: #333 !important;
+   644→      }
+   645→      .inv-signatures .sig-box {
+   646→        border-color: #666 !important;
+   647→      }
+   648→      .inv-signatures .sig-label {
+   649→        color: #000 !important;
+   650→      }
+   651→      .inv-signatures .sig-line {
+   652→        border-top-color: #666 !important;
+   653→        color: #333 !important;
+   654→      }
+   655→      .inv-footer {
+   656→        border-top-color: #000 !important;
+   657→      }
+   658→      .inv-footer .footer-text {
+   659→        color: #333 !important;
+   660→      }
+   661→      .inv-footer .footer-brand {
+   662→        color: #666 !important;
+   663→      }
+   664→      .watermark.cancelled {
+   665→        color: rgba(0,0,0,0.12) !important;
+   666→      }
+   667→      .items-count {
+   668→        color: #333 !important;
+   669→      }
+   670→      .items-count .total-pieces {
+   671→        color: #000 !important;
+   672→      }
+   673→    }
+   674→  `;
+   675→}
+   676→
+   677→export function generateInvoiceDocument(data: InvoiceDocumentData): string {
+   678→  const { invoice, items, branchName, customerName, settings, userFullName } = data;
+   679→
+   680→  const invoiceTime = formatTime(invoice.invoice_time);
+   681→  const factoryName = settings?.factory_name || 'مصنع الصادق';
+   682→  const factoryAddress = settings?.address || '';
+   683→  const factoryPhone = settings?.phone || '';
+   684→  const factoryEmail = settings?.email || '';
+   685→  const taxNumber = settings?.tax_number || '';
+   686→  const commercialRegister = settings?.commercial_register || '';
+   687→  const invoiceFooter = settings?.invoice_footer || 'شكراً لتعاملكم معنا';
+   688→
+   689→  const showUnitCount = hasUnitCount(items);
+   690→
+   691→  const logoSection = settings?.logo_url
+   692→    ? `<img src="${settings.logo_url}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
+   693→    : `<span class="logo-text">ص</span>`;
+   694→
+   695→  const isCancelled = invoice.status === 'cancelled';
+   696→  const watermarkHtml = isCancelled
+   697→    ? '<div class="watermark cancelled">ملغاة</div>'
+   698→    : '';
+   699→
+   700→  const notesHtml = invoice.notes
+   701→    ? `<div class="inv-notes"><span class="notes-label">ملاحظات: </span><span class="notes-text">${invoice.notes}</span></div>`
+   702→    : '';
+   703→
+   704→  const cancelHtml = invoice.cancel_reason
+   705→    ? `<div class="inv-cancel"><span class="cancel-label">سبب الإلغاء: </span><span class="cancel-text">${invoice.cancel_reason}</span></div>`
+   706→    : '';
+   707→
+   708→  const taxRow = invoice.tax_rate > 0
+   709→    ? `<div class="total-row"><span class="total-label">الضريبة (${invoice.tax_rate}%)</span><span class="total-value">${formatCurrency(invoice.tax_amount)}</span></div>`
+   710→    : '';
+   711→
+   712→  // Calculate total pieces
+   713→  const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
+   714→
+   715→  const itemsRows = items.map((item, index) => {
+   716→    const unitCount = Number(item.unit_count) || 1;
+   717→    const itemTotalPieces = Number(item.quantity) * unitCount;
+   718→    return `
+   719→      <tr class="${index % 2 === 1 ? 'even-row' : ''}">
+   720→        <td class="col-num">${index + 1}</td>
+   721→        <td class="col-name">${item.item_name}</td>
+   722→        <td class="col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+   723→        <td class="col-unit-count">${unitCount > 1 ? unitCount.toLocaleString('ar-EG') : '—'}</td>
+   724→        <td class="col-total-pieces">${unitCount > 1 ? itemTotalPieces.toLocaleString('ar-EG') : '—'}</td>
+   725→        <td class="col-price">${formatCurrency(Number(item.unit_price))}</td>
+   726→        <td class="col-total">${formatCurrency(Number(item.total_price))}</td>
+   727→      </tr>`;
+   728→  }).join('');
+   729→
+   730→  return `<!DOCTYPE html>
+   731→<html dir="rtl" lang="ar">
+   732→<head>
+   733→  <meta charset="UTF-8">
+   734→  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   735→  <title>فاتورة صرف - ${invoice.invoice_number}</title>
+   736→  <style>${getInvoiceCSS(showUnitCount)}</style>
+   737→</head>
+   738→<body>
+   739→  ${watermarkHtml}
+   740→  <div class="invoice-container">
+   741→    <!-- HEADER -->
+   742→    <div class="inv-header">
+   743→      <div class="inv-header-logo">
+   744→        ${logoSection}
+   745→      </div>
+   746→      <div class="inv-header-info">
+   747→        <h1>${factoryName}</h1>
+   748→        <div class="contact-line">
+   749→          ${factoryAddress ? `<span>${factoryAddress}</span>` : ''}
+   750→          ${factoryPhone ? `<span>هاتف: ${factoryPhone}</span>` : ''}
+   751→          ${factoryEmail ? `<span>${factoryEmail}</span>` : ''}
+   752→        </div>
+   753→        <div class="contact-line">
+   754→          ${taxNumber ? `<span>الرقم الضريبي: ${taxNumber}</span>` : ''}
+   755→          ${commercialRegister ? `<span>السجل التجاري: ${commercialRegister}</span>` : ''}
+   756→        </div>
+   757→      </div>
+   758→      <div class="inv-header-title">
+   759→        <h2>فاتورة صرف</h2>
+   760→        <span class="inv-num">${invoice.invoice_number}</span>
+   761→        <span class="inv-date">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</span>
+   762→      </div>
+   763→    </div>
+   764→
+   765→    <!-- GOLD DIVIDER -->
+   766→    <div class="gold-divider"></div>
+   767→
+   768→    <!-- INVOICE INFO (No status - only shown in app UI, not on printed invoice) -->
+   769→    <div class="inv-info-grid" style="grid-template-columns: repeat(4, 1fr);">
+   770→      <div class="inv-info-cell">
+   771→        <div class="label">الفرع</div>
+   772→        <div class="value">${branchName}</div>
+   773→      </div>
+   774→      <div class="inv-info-cell">
+   775→        <div class="label">العميل</div>
+   776→        <div class="value">${customerName || '—'}</div>
+   777→      </div>
+   778→      <div class="inv-info-cell">
+   779→        <div class="label">المستلم</div>
+   780→        <div class="value">${invoice.receiver_name || '—'}</div>
+   781→      </div>
+   782→      <div class="inv-info-cell">
+   783→        <div class="label">السائق</div>
+   784→        <div class="value">${invoice.driver_name || '—'}${invoice.driver_phone ? ` <span style="color:#999;font-size:11px;">(${invoice.driver_phone})</span>` : ''}</div>
+   785→      </div>
+   786→    </div>
+   787→
+   788→    <!-- ITEMS TABLE -->
+   789→    <table class="inv-table">
+   790→      <thead>
+   791→        <tr>
+   792→          <th class="col-num">#</th>
+   793→          <th class="col-name">الصنف</th>
+   794→          <th class="col-qty">الكمية</th>
+   795→          <th class="col-unit-count">عدد/وحدة</th>
+   796→          <th class="col-total-pieces">إجمالي القطع</th>
+   797→          <th class="col-price">سعر الوحدة</th>
+   798→          <th class="col-total">الإجمالي</th>
+   799→        </tr>
+   800→      </thead>
+   801→      <tbody>
+   802→        ${itemsRows}
+   803→      </tbody>
+   804→    </table>
+   805→
+   806→    <!-- ITEMS COUNT -->
+   807→    <div class="items-count">
+   808→      <span>عدد الأصناف: ${items.length}</span>
+   809→      ${showUnitCount ? `<span class="total-pieces">إجمالي القطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
+   810→    </div>
+   811→
+   812→    <!-- TOTALS -->
+   813→    <div class="inv-totals-row">
+   814→      <div class="inv-totals-box">
+   815→        <div class="total-row">
+   816→          <span class="total-label">المجموع الفرعي</span>
+   817→          <span class="total-value">${formatCurrency(invoice.subtotal)}</span>
+   818→        </div>
+   819→        ${taxRow}
+   820→        <div class="grand-total">
+   821→          <span class="total-label">الإجمالي النهائي</span>
+   822→          <span class="total-value">${formatCurrency(invoice.total)}</span>
+   823→        </div>
+   824→      </div>
+   825→    </div>
+   826→
+   827→    <!-- NOTES -->
+   828→    ${notesHtml}
+   829→
+   830→    <!-- CANCEL REASON -->
+   831→    ${cancelHtml}
+   832→
+   833→    <!-- AMOUNT IN WORDS -->
+   834→    <div class="inv-amount-words">
+   835→      <span class="amount-label">المبلغ: </span>
+   836→      <span class="amount-text">${numberToArabicWords(Number(invoice.total))}</span>
+   837→    </div>
+   838→
+   839→    <!-- SIGNATURES -->
+   840→    <div class="inv-signatures">
+   841→      <div class="sig-box">
+   842→        <div class="sig-label">المحاسب</div>
+   843→        <div class="sig-line">${userFullName}</div>
+   844→      </div>
+   845→      <div class="sig-box">
+   846→        <div class="sig-label">المستلم</div>
+   847→        <div class="sig-line">${invoice.receiver_name || ''}</div>
+   848→      </div>
+   849→      <div class="sig-box">
+   850→        <div class="sig-label">السائق</div>
+   851→        <div class="sig-line">${invoice.driver_name || ''}</div>
+   852→      </div>
+   853→    </div>
+   854→
+   855→    <!-- FOOTER -->
+   856→    <div class="inv-footer">
+   857→      <p class="footer-text">${invoiceFooter}</p>
+   858→      <p class="footer-brand">${factoryName} - نظام علي الصادق</p>
+   859→    </div>
+   860→  </div>
+   861→</body>
+   862→</html>`;
+   863→}
+   864→
+   865→/**
+   866→ * Extracts the body content and CSS from the generated document.
+   867→ * Used for the PDF approach where we inject into a hidden div.
+   868→ */
+   869→export function extractInvoiceParts(htmlDoc: string): { css: string; body: string } {
+   870→  const styleMatch = htmlDoc.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+   871→  const bodyMatch = htmlDoc.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+   872→
+   873→  return {
+   874→    css: styleMatch ? styleMatch[1] : '',
+   875→    body: bodyMatch ? bodyMatch[1] : '',
+   876→  };
+   877→}
+   878→
+   879→/**
+   880→ * Generates a professional thermal receipt HTML document for 80mm thermal printers.
+   881→ * Features: brand header, items table, decorative separators, signatures.
+   882→ */
+   883→export function generateThermalDocument(data: InvoiceDocumentData): string {
+   884→  const { invoice, items, branchName, customerName, settings, userFullName } = data;
+   885→
+   886→  const invoiceTime = formatTime(invoice.invoice_time);
+   887→  const factoryName = settings?.factory_name || 'مصنع الصادق';
+   888→  const factoryPhone = settings?.phone || '';
+   889→  const factoryAddress = settings?.address || '';
+   890→  const factoryEmail = settings?.email || '';
+   891→  const taxNumber = settings?.tax_number || '';
+   892→  const commercialRegister = settings?.commercial_register || '';
+   893→  const invoiceFooter = settings?.invoice_footer || 'شكراً لتعاملكم معنا';
+   894→  const showUnitCount = hasUnitCount(items);
+   895→
+   896→  const logoSection = settings?.logo_url
+   897→    ? `<img src="${settings.logo_url}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
+   898→    : `<span class="r-logo-text">ص</span>`;
+   899→
+   900→  const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
+   901→  const isCancelled = invoice.status === 'cancelled';
+   902→
+   903→  // Items table rows
+   904→  const itemsRows = items.map((item, index) => {
+   905→    const unitCount = Number(item.unit_count) || 1;
+   906→    const itemTotalPieces = Number(item.quantity) * unitCount;
+   907→    const hasUnitInfo = showUnitCount && unitCount > 1;
+   908→    return `
+   909→      <tr class="${index % 2 === 1 ? 'r-row-alt' : ''}">
+   910→        <td class="r-col-num">${index + 1}</td>
+   911→        <td class="r-col-name">${item.item_name}</td>
+   912→        <td class="r-col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+   913→        ${hasUnitInfo ? `<td class="r-col-uc">${unitCount}</td>` : ''}
+   914→        <td class="r-col-price">${formatCurrency(Number(item.unit_price))}</td>
+   915→        <td class="r-col-total">${formatCurrency(Number(item.total_price))}</td>
+   916→      </tr>
+   917→      ${hasUnitInfo ? `<tr class="${index % 2 === 1 ? 'r-row-alt' : ''}"><td></td><td colspan="5" class="r-sub-row">إجمالي القطع: ${itemTotalPieces.toLocaleString('ar-EG')}</td></tr>` : ''}`;
+   918→  }).join('');
+   919→
+   920→  const taxRow = invoice.tax_rate > 0
+   921→    ? `<div class="r-total-row"><span class="r-total-label">الضريبة (${invoice.tax_rate}%)</span><span class="r-total-val">${formatCurrency(invoice.tax_amount)}</span></div>`
+   922→    : '';
+   923→
+   924→  // Cancelled watermark
+   925→  const watermarkHtml = isCancelled
+   926→    ? '<div class="r-watermark">ملغاة</div>'
+   927→    : '';
+   928→
+   929→  // Notes
+   930→  const notesHtml = invoice.notes
+   931→    ? `<div class="r-notes"><strong>ملاحظات:</strong> ${invoice.notes}</div>`
+   932→    : '';
+   933→
+   934→  // Cancel reason
+   935→  const cancelHtml = invoice.cancel_reason
+   936→    ? `<div class="r-cancel"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>`
+   937→    : '';
+   938→
+   939→  return `<!DOCTYPE html>
+   940→<html dir="rtl" lang="ar">
+   941→<head>
+   942→  <meta charset="UTF-8">
+   943→  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   944→  <title>فاتورة حرارية - ${invoice.invoice_number}</title>
+   945→  <style>
+   946→    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+   947→
+   948→    *, *::before, *::after {
+   949→      margin: 0;
+   950→      padding: 0;
+   951→      box-sizing: border-box;
+   952→      -webkit-print-color-adjust: exact !important;
+   953→      print-color-adjust: exact !important;
+   954→      color-adjust: exact !important;
+   955→    }
+   956→
+   957→    body {
+   958→      font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
+   959→      color: #000;
+   960→      background: #fff;
+   961→      direction: rtl;
+   962→      line-height: 1.4;
+   963→      margin: 0;
+   964→      padding: 0;
+   965→      font-size: 10px;
+   966→    }
+   967→
+   968→    @page {
+   969→      size: 80mm auto;
+   970→      margin: 0;
+   971→    }
+   972→
+   973→    .r-container {
+   974→      width: 80mm;
+   975→      margin: 0 auto;
+   976→      padding: 0;
+   977→    }
+   978→
+   979→    /* ===== TOP BRAND BAR ===== */
+   980→    .r-brand-bar {
+   981→      background: #0D7C66;
+   982→      padding: 4mm 3mm 3mm 3mm;
+   983→      text-align: center;
+   984→      position: relative;
+   985→    }
+   986→
+   987→    .r-brand-bar::after {
+   988→      content: '';
+   989→      position: absolute;
+   990→      bottom: 0;
+   991→      left: 0;
+   992→      right: 0;
+   993→      height: 2px;
+   994→      background: #D4A843;
+   995→    }
+   996→
+   997→    .r-brand-logo {
+   998→      display: inline-block;
+   999→      vertical-align: middle;
+  1000→    }
+  1001→
+  1002→    .r-logo-text {
+  1003→      font-size: 28px;
+  1004→      font-weight: 800;
+  1005→      color: #D4A843;
+  1006→      line-height: 1;
+  1007→    }
+  1008→
+  1009→    .r-brand-bar img {
+  1010→      width: 32px;
+  1011→      height: 32px;
+  1012→      object-fit: contain;
+  1013→      vertical-align: middle;
+  1014→    }
+  1015→
+  1016→    .r-brand-name {
+  1017→      font-size: 13px;
+  1018→      font-weight: 800;
+  1019→      color: #fff;
+  1020→      margin-top: 2px;
+  1021→    }
+  1022→
+  1023→    .r-brand-info {
+  1024→      font-size: 7.5px;
+  1025→      color: rgba(255,255,255,0.8);
+  1026→      line-height: 1.5;
+  1027→      margin-top: 1px;
+  1028→    }
+  1029→
+  1030→    /* ===== INVOICE TITLE BOX ===== */
+  1031→    .r-title-box {
+  1032→      border: 2px solid #0D7C66;
+  1033→      border-top: none;
+  1034→      text-align: center;
+  1035→      padding: 2mm 0;
+  1036→      background: linear-gradient(to left, rgba(13,124,102,0.05), rgba(212,168,67,0.05), rgba(13,124,102,0.05));
+  1037→    }
+  1038→
+  1039→    .r-title-text {
+  1040→      font-size: 13px;
+  1041→      font-weight: 800;
+  1042→      color: #0D7C66;
+  1043→      letter-spacing: 1px;
+  1044→    }
+  1045→
+  1046→    /* ===== DECORATIVE SEPARATORS ===== */
+  1047→    .r-sep-double {
+  1048→      border: none;
+  1049→      border-top: 2px double #0D7C66;
+  1050→      margin: 2mm 3mm;
+  1051→    }
+  1052→
+  1053→    .r-sep-dashed {
+  1054→      border: none;
+  1055→      border-top: 1px dashed #999;
+  1056→      margin: 2mm 3mm;
+  1057→    }
+  1058→
+  1059→    .r-sep-star {
+  1060→      text-align: center;
+  1061→      color: #0D7C66;
+  1062→      font-size: 9px;
+  1063→      margin: 2mm 3mm;
+  1064→      line-height: 1;
+  1065→      position: relative;
+  1066→    }
+  1067→
+  1068→    .r-sep-star::before,
+  1069→    .r-sep-star::after {
+  1070→      content: '';
+  1071→      position: absolute;
+  1072→      top: 50%;
+  1073→      width: calc(50% - 12px);
+  1074→      border-top: 1px solid #0D7C66;
+  1075→    }
+  1076→
+  1077→    .r-sep-star::before { right: 0; }
+  1078→    .r-sep-star::after { left: 0; }
+  1079→
+  1080→    .r-sep-thick {
+  1081→      border: none;
+  1082→      border-top: 2.5px solid #000;
+  1083→      margin: 2mm 3mm;
+  1084→    }
+  1085→
+  1086→    /* ===== INVOICE INFO TABLE ===== */
+  1087→    .r-info-table {
+  1088→      width: calc(100% - 6mm);
+  1089→      margin: 0 3mm;
+  1090→      border-collapse: collapse;
+  1091→      font-size: 9px;
+  1092→    }
+  1093→
+  1094→    .r-info-table tr {
+  1095→      border-bottom: 1px dotted #ccc;
+  1096→    }
+  1097→
+  1098→    .r-info-table tr:last-child {
+  1099→      border-bottom: none;
+  1100→    }
+  1101→
+  1102→    .r-info-table td {
+  1103→      padding: 1.5px 0;
+  1104→      vertical-align: top;
+  1105→    }
+  1106→
+  1107→    .r-info-label {
+  1108→      font-weight: 700;
+  1109→      color: #0D7C66;
+  1110→      width: 28%;
+  1111→      white-space: nowrap;
+  1112→    }
+  1113→
+  1114→    .r-info-value {
+  1115→      color: #000;
+  1116→      font-weight: 600;
+  1117→    }
+  1118→
+  1119→    /* ===== ITEMS TABLE ===== */
+  1120→    .r-items-table {
+  1121→      width: calc(100% - 6mm);
+  1122→      margin: 0 3mm;
+  1123→      border-collapse: collapse;
+  1124→      font-size: 9px;
+  1125→      border-top: 1.5px solid #0D7C66;
+  1126→      border-bottom: 1.5px solid #0D7C66;
+  1127→    }
+  1128→
+  1129→    .r-items-table thead tr {
+  1130→      background: #0D7C66;
+  1131→    }
+  1132→
+  1133→    .r-items-table thead th {
+  1134→      padding: 3px 2px;
+  1135→      color: #fff;
+  1136→      font-size: 8px;
+  1137→      font-weight: 700;
+  1138→      text-align: center;
+  1139→      border-left: 1px solid rgba(255,255,255,0.2);
+  1140→    }
+  1141→
+  1142→    .r-items-table thead th:last-child {
+  1143→      border-left: none;
+  1144→    }
+  1145→
+  1146→    .r-items-table thead th.r-th-name {
+  1147→      text-align: right;
+  1148→    }
+  1149→
+  1150→    .r-items-table tbody td {
+  1151→      padding: 2.5px 2px;
+  1152→      border-bottom: 1px dotted #ddd;
+  1153→    }
+  1154→
+  1155→    .r-items-table tbody tr:last-child td {
+  1156→      border-bottom: none;
+  1157→    }
+  1158→
+  1159→    .r-row-alt {
+  1160→      background: #f5f9f8;
+  1161→    }
+  1162→
+  1163→    .r-col-num {
+  1164→      text-align: center;
+  1165→      color: #888;
+  1166→      width: 8%;
+  1167→    }
+  1168→
+  1169→    .r-col-name {
+  1170→      text-align: right;
+  1171→      font-weight: 600;
+  1172→      width: 28%;
+  1173→    }
+  1174→
+  1175→    .r-col-qty {
+  1176→      text-align: center;
+  1177→      width: 14%;
+  1178→    }
+  1179→
+  1180→    .r-col-uc {
+  1181→      text-align: center;
+  1182→      color: #0D7C66;
+  1183→      font-weight: 600;
+  1184→      width: 10%;
+  1185→    }
+  1186→
+  1187→    .r-col-price {
+  1188→      text-align: center;
+  1189→      width: 18%;
+  1190→    }
+  1191→
+  1192→    .r-col-total {
+  1193→      text-align: left;
+  1194→      font-weight: 700;
+  1195→      color: #0D7C66;
+  1196→      width: 22%;
+  1197→    }
+  1198→
+  1199→    .r-sub-row {
+  1200→      font-size: 7.5px;
+  1201→      color: #0D7C66;
+  1202→      font-weight: 600;
+  1203→      padding: 0 2px !important;
+  1204→      border-bottom: 1px dotted #ddd !important;
+  1205→    }
+  1206→
+  1207→    /* ===== ITEMS COUNT ===== */
+  1208→    .r-items-count {
+  1209→      width: calc(100% - 6mm);
+  1210→      margin: 1mm 3mm 0;
+  1211→      display: flex;
+  1212→      justify-content: space-between;
+  1213→      font-size: 8px;
+  1214→      color: #888;
+  1215→    }
+  1216→
+  1217→    .r-items-count .r-pieces-count {
+  1218→      color: #0D7C66;
+  1219→      font-weight: 700;
+  1220→    }
+  1221→
+  1222→    /* ===== TOTALS SECTION ===== */
+  1223→    .r-totals {
+  1224→      width: calc(100% - 6mm);
+  1225→      margin: 0 3mm;
+  1226→    }
+  1227→
+  1228→    .r-total-row {
+  1229→      display: flex;
+  1230→      justify-content: space-between;
+  1231→      align-items: center;
+  1232→      padding: 2px 0;
+  1233→      font-size: 10px;
+  1234→    }
+  1235→
+  1236→    .r-total-label {
+  1237→      color: #555;
+  1238→    }
+  1239→
+  1240→    .r-total-val {
+  1241→      font-weight: 600;
+  1242→    }
+  1243→
+  1244→    /* ===== GRAND TOTAL BOX ===== */
+  1245→    .r-grand-total-box {
+  1246→      border: 2px solid #000;
+  1247→      padding: 3mm;
+  1248→      margin: 2mm 3mm;
+  1249→      text-align: center;
+  1250→      background: #0D7C66;
+  1251→      position: relative;
+  1252→    }
+  1253→
+  1254→    .r-grand-total-box::before {
+  1255→      content: '';
+  1256→      position: absolute;
+  1257→      top: 2px;
+  1258→      left: 2px;
+  1259→      right: 2px;
+  1260→      bottom: 2px;
+  1261→      border: 1px solid #D4A843;
+  1262→    }
+  1263→
+  1264→    .r-grand-label {
+  1265→      font-size: 11px;
+  1266→      font-weight: 700;
+  1267→      color: #fff;
+  1268→      display: block;
+  1269→    }
+  1270→
+  1271→    .r-grand-value {
+  1272→      font-size: 18px;
+  1273→      font-weight: 800;
+  1274→      color: #D4A843;
+  1275→      display: block;
+  1276→      margin-top: 1px;
+  1277→    }
+  1278→
+  1279→    /* ===== AMOUNT IN WORDS ===== */
+  1280→    .r-amount-words {
+  1281→      width: calc(100% - 6mm);
+  1282→      margin: 2mm 3mm;
+  1283→      padding: 2mm;
+  1284→      background: #f0faf7;
+  1285→      border: 1px solid #b8e0d5;
+  1286→      border-radius: 2px;
+  1287→      font-size: 8px;
+  1288→      color: #0D7C66;
+  1289→      font-weight: 600;
+  1290→      text-align: center;
+  1291→    }
+  1292→
+  1293→    /* ===== NOTES ===== */
+  1294→    .r-notes {
+  1295→      width: calc(100% - 6mm);
+  1296→      margin: 2mm 3mm;
+  1297→      padding: 2mm;
+  1298→      background: #FFF9E6;
+  1299→      border: 1px solid #E8D060;
+  1300→      border-radius: 2px;
+  1301→      font-size: 8px;
+  1302→      color: #6B5510;
+  1303→    }
+  1304→
+  1305→    .r-cancel {
+  1306→      width: calc(100% - 6mm);
+  1307→      margin: 2mm 3mm;
+  1308→      padding: 2mm;
+  1309→      background: #FFF0F0;
+  1310→      border: 1px solid #E8A0A0;
+  1311→      border-radius: 2px;
+  1312→      font-size: 8px;
+  1313→      color: #8B2020;
+  1314→    }
+  1315→
+  1316→    /* ===== SIGNATURES ===== */
+  1317→    .r-signatures {
+  1318→      display: flex;
+  1319→      justify-content: space-between;
+  1320→      width: calc(100% - 6mm);
+  1321→      margin: 3mm 3mm 2mm;
+  1322→    }
+  1323→
+  1324→    .r-sig {
+  1325→      text-align: center;
+  1326→      width: 30%;
+  1327→    }
+  1328→
+  1329→    .r-sig-line {
+  1330→      border-bottom: 1px dashed #000;
+  1331→      margin-bottom: 2px;
+  1332→      height: 14mm;
+  1333→    }
+  1334→
+  1335→    .r-sig-label {
+  1336→      font-size: 8px;
+  1337→      font-weight: 700;
+  1338→      color: #0D7C66;
+  1339→    }
+  1340→
+  1341→    .r-sig-name {
+  1342→      font-size: 7px;
+  1343→      color: #666;
+  1344→    }
+  1345→
+  1346→    /* ===== FOOTER ===== */
+  1347→    .r-footer {
+  1348→      text-align: center;
+  1349→      margin: 0 3mm;
+  1350→      padding: 2mm 0 3mm;
+  1351→      border-top: 2px solid #0D7C66;
+  1352→    }
+  1353→
+  1354→    .r-footer-msg {
+  1355→      font-size: 9px;
+  1356→      color: #555;
+  1357→    }
+  1358→
+  1359→    .r-footer-brand {
+  1360→      font-size: 7px;
+  1361→      color: #999;
+  1362→      margin-top: 1px;
+  1363→    }
+  1364→
+  1365→    /* ===== BOTTOM BRAND BAR ===== */
+  1366→    .r-bottom-bar {
+  1367→      background: #0D7C66;
+  1368→      height: 3mm;
+  1369→    }
+  1370→
+  1371→    /* ===== WATERMARK ===== */
+  1372→    .r-watermark {
+  1373→      position: absolute;
+  1374→      top: 50%;
+  1375→      left: 50%;
+  1376→      transform: translate(-50%, -50%) rotate(-25deg);
+  1377→      font-size: 40px;
+  1378→      font-weight: 800;
+  1379→      color: rgba(220, 50, 50, 0.1);
+  1380→      pointer-events: none;
+  1381→      z-index: 10;
+  1382→      white-space: nowrap;
+  1383→    }
+  1384→
+  1385→    /* ===== PRINT MEDIA ===== */
+  1386→    @media print {
+  1387→      body { margin: 0; background: white !important; }
+  1388→      .r-container { padding: 0; width: 100%; }
+  1389→      .r-watermark { color: rgba(0,0,0,0.12) !important; }
+  1390→
+  1391→      /* ===== HIGH-CONTRAST B&W OVERRIDES ===== */
+  1392→      .r-brand-bar {
+  1393→        background: #000 !important;
+  1394→      }
+  1395→      .r-logo-text {
+  1396→        color: #fff !important;
+  1397→      }
+  1398→      .r-brand-bar img {
+  1399→        filter: brightness(0) invert(1) !important;
+  1400→      }
+  1401→      .r-brand-name {
+  1402→        color: #fff !important;
+  1403→      }
+  1404→      .r-brand-info {
+  1405→        color: rgba(255,255,255,0.8) !important;
+  1406→      }
+  1407→      .r-brand-bar::after {
+  1408→        background: #666 !important;
+  1409→      }
+  1410→      .r-title-box {
+  1411→        border-color: #000 !important;
+  1412→        background: #f5f5f5 !important;
+  1413→      }
+  1414→      .r-title-text {
+  1415→        color: #000 !important;
+  1416→      }
+  1417→      .r-sep-double {
+  1418→        border-top-color: #000 !important;
+  1419→      }
+  1420→      .r-sep-star {
+  1421→        color: #000 !important;
+  1422→      }
+  1423→      .r-sep-star::before,
+  1424→      .r-sep-star::after {
+  1425→        border-top-color: #000 !important;
+  1426→      }
+  1427→      .r-sep-thick {
+  1428→        border-top-color: #000 !important;
+  1429→      }
+  1430→      .r-info-label {
+  1431→        color: #000 !important;
+  1432→        font-weight: 800 !important;
+  1433→      }
+  1434→      .r-info-value {
+  1435→        color: #000 !important;
+  1436→        font-weight: 700 !important;
+  1437→      }
+  1438→      .r-items-table {
+  1439→        border-top-color: #000 !important;
+  1440→        border-bottom-color: #000 !important;
+  1441→      }
+  1442→      .r-items-table thead tr {
+  1443→        background: #000 !important;
+  1444→      }
+  1445→      .r-items-table thead th {
+  1446→        color: #fff !important;
+  1447→        border-left-color: rgba(255,255,255,0.3) !important;
+  1448→      }
+  1449→      .r-items-table tbody td {
+  1450→        border-bottom-color: #999 !important;
+  1451→        color: #000 !important;
+  1452→      }
+  1453→      .r-row-alt {
+  1454→        background: #f0f0f0 !important;
+  1455→      }
+  1456→      .r-col-num {
+  1457→        color: #555 !important;
+  1458→      }
+  1459→      .r-col-name {
+  1460→        color: #000 !important;
+  1461→        font-weight: 700 !important;
+  1462→      }
+  1463→      .r-col-uc {
+  1464→        color: #000 !important;
+  1465→        font-weight: 700 !important;
+  1466→      }
+  1467→      .r-col-total {
+  1468→        color: #000 !important;
+  1469→        font-weight: 800 !important;
+  1470→      }
+  1471→      .r-sub-row {
+  1472→        color: #000 !important;
+  1473→        font-weight: 700 !important;
+  1474→      }
+  1475→      .r-items-count .r-pieces-count {
+  1476→        color: #000 !important;
+  1477→        font-weight: 800 !important;
+  1478→      }
+  1479→      .r-total-label {
+  1480→        color: #333 !important;
+  1481→      }
+  1482→      .r-total-val {
+  1483→        color: #000 !important;
+  1484→        font-weight: 700 !important;
+  1485→      }
+  1486→      .r-grand-total-box {
+  1487→        border-color: #000 !important;
+  1488→        background: #000 !important;
+  1489→      }
+  1490→      .r-grand-total-box::before {
+  1491→        border-color: #666 !important;
+  1492→      }
+  1493→      .r-grand-label {
+  1494→        color: #fff !important;
+  1495→      }
+  1496→      .r-grand-value {
+  1497→        color: #fff !important;
+  1498→      }
+  1499→      .r-amount-words {
+  1500→        background: #eee !important;
+  1501→        border-color: #999 !important;
+  1502→        color: #000 !important;
+  1503→        font-weight: 700 !important;
+  1504→      }
+  1505→      .r-notes {
+  1506→        background: #f5f5f5 !important;
+  1507→        border-color: #999 !important;
+  1508→        color: #000 !important;
+  1509→      }
+  1510→      .r-cancel {
+  1511→        background: #f0f0f0 !important;
+  1512→        border-color: #999 !important;
+  1513→        color: #000 !important;
+  1514→      }
+  1515→      .r-sig-label {
+  1516→        color: #000 !important;
+  1517→        font-weight: 800 !important;
+  1518→      }
+  1519→      .r-sig-name {
+  1520→        color: #333 !important;
+  1521→      }
+  1522→      .r-footer {
+  1523→        border-top-color: #000 !important;
+  1524→      }
+  1525→      .r-footer-msg {
+  1526→        color: #333 !important;
+  1527→      }
+  1528→      .r-footer-brand {
+  1529→        color: #666 !important;
+  1530→      }
+  1531→      .r-bottom-bar {
+  1532→        background: #000 !important;
+  1533→      }
+  1534→    }
+  1535→  </style>
+  1536→</head>
+  1537→<body>
+  1538→  <div class="r-container" style="position:relative;">
+  1539→    ${watermarkHtml}
+  1540→
+  1541→    <!-- ===== TOP BRAND BAR ===== -->
+  1542→    <div class="r-brand-bar">
+  1543→      <div class="r-brand-logo">${logoSection}</div>
+  1544→      <div class="r-brand-name">${factoryName}</div>
+  1545→      <div class="r-brand-info">
+  1546→        ${factoryAddress ? `${factoryAddress}` : ''}
+  1547→        ${factoryPhone ? `${factoryAddress ? ' &bull; ' : ''}هاتف: ${factoryPhone}` : ''}
+  1548→        ${factoryEmail ? `${factoryAddress || factoryPhone ? ' &bull; ' : ''}${factoryEmail}` : ''}
+  1549→      </div>
+  1550→      <div class="r-brand-info">
+  1551→        ${taxNumber ? `ض: ${taxNumber}` : ''}
+  1552→        ${commercialRegister ? `${taxNumber ? ' &bull; ' : ''}سجل: ${commercialRegister}` : ''}
+  1553→      </div>
+  1554→    </div>
+  1555→
+  1556→    <!-- ===== INVOICE TITLE BOX ===== -->
+  1557→    <div class="r-title-box">
+  1558→      <span class="r-title-text">فاتورة صرف</span>
+  1559→    </div>
+  1560→
+  1561→    <hr class="r-sep-double">
+  1562→
+  1563→    <!-- ===== INVOICE INFO ===== -->
+  1564→    <table class="r-info-table">
+  1565→      <tr>
+  1566→        <td class="r-info-label">رقم الفاتورة</td>
+  1567→        <td class="r-info-value">${invoice.invoice_number}</td>
+  1568→      </tr>
+  1569→      <tr>
+  1570→        <td class="r-info-label">التاريخ</td>
+  1571→        <td class="r-info-value">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</td>
+  1572→      </tr>
+  1573→      <tr>
+  1574→        <td class="r-info-label">الفرع</td>
+  1575→        <td class="r-info-value">${branchName}</td>
+  1576→      </tr>
+  1577→      ${customerName ? `<tr><td class="r-info-label">العميل</td><td class="r-info-value">${customerName}</td></tr>` : ''}
+  1578→      ${invoice.receiver_name ? `<tr><td class="r-info-label">المستلم</td><td class="r-info-value">${invoice.receiver_name}</td></tr>` : ''}
+  1579→      ${invoice.driver_name ? `<tr><td class="r-info-label">السائق</td><td class="r-info-value">${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</td></tr>` : ''}
+  1580→    </table>
+  1581→
+  1582→    <hr class="r-sep-double">
+  1583→
+  1584→    <!-- ===== ITEMS TABLE ===== -->
+  1585→    <table class="r-items-table">
+  1586→      <thead>
+  1587→        <tr>
+  1588→          <th>#</th>
+  1589→          <th class="r-th-name">الصنف</th>
+  1590→          <th>الكمية</th>
+  1591→          ${showUnitCount ? '<th>عدد</th>' : ''}
+  1592→          <th>السعر</th>
+  1593→          <th>الإجمالي</th>
+  1594→        </tr>
+  1595→      </thead>
+  1596→      <tbody>
+  1597→        ${itemsRows}
+  1598→      </tbody>
+  1599→    </table>
+  1600→
+  1601→    <!-- Items count -->
+  1602→    <div class="r-items-count">
+  1603→      <span>أصناف: ${items.length}</span>
+  1604→      ${showUnitCount ? `<span class="r-pieces-count">قطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
+  1605→    </div>
+  1606→
+  1607→    <div class="r-sep-star">✦</div>
+  1608→
+  1609→    <!-- ===== TOTALS ===== -->
+  1610→    <div class="r-totals">
+  1611→      <div class="r-total-row">
+  1612→        <span class="r-total-label">المجموع الفرعي</span>
+  1613→        <span class="r-total-val">${formatCurrency(invoice.subtotal)}</span>
+  1614→      </div>
+  1615→      ${taxRow}
+  1616→    </div>
+  1617→
+  1618→    <!-- ===== GRAND TOTAL BOX ===== -->
+  1619→    <div class="r-grand-total-box">
+  1620→      <span class="r-grand-label">الإجمالي النهائي</span>
+  1621→      <span class="r-grand-value">${formatCurrency(invoice.total)}</span>
+  1622→    </div>
+  1623→
+  1624→    <!-- ===== AMOUNT IN WORDS ===== -->
+  1625→    <div class="r-amount-words">
+  1626→      المبلغ: ${numberToArabicWords(Number(invoice.total))}
+  1627→    </div>
+  1628→
+  1629→    <hr class="r-sep-dashed">
+  1630→
+  1631→    <!-- ===== NOTES ===== -->
+  1632→    ${notesHtml}
+  1633→    ${cancelHtml}
+  1634→
+  1635→    <!-- ===== SIGNATURES ===== -->
+  1636→    <div class="r-signatures">
+  1637→      <div class="r-sig">
+  1638→        <div class="r-sig-label">المحاسب</div>
+  1639→        <div class="r-sig-line"></div>
+  1640→        <div class="r-sig-name">${userFullName}</div>
+  1641→      </div>
+  1642→      <div class="r-sig">
+  1643→        <div class="r-sig-label">المستلم</div>
+  1644→        <div class="r-sig-line"></div>
+  1645→        <div class="r-sig-name">${invoice.receiver_name || ''}</div>
+  1646→      </div>
+  1647→      <div class="r-sig">
+  1648→        <div class="r-sig-label">السائق</div>
+  1649→        <div class="r-sig-line"></div>
+  1650→        <div class="r-sig-name">${invoice.driver_name || ''}</div>
+  1651→      </div>
+  1652→    </div>
+  1653→
+  1654→    <hr class="r-sep-star">
+  1655→
+  1656→    <!-- ===== FOOTER ===== -->
+  1657→    <div class="r-footer">
+  1658→      <p class="r-footer-msg">${invoiceFooter}</p>
+  1659→      <p class="r-footer-brand">${factoryName} - نظام علي الصادق</p>
+  1660→    </div>
+  1661→
+  1662→    <!-- ===== BOTTOM BRAND BAR ===== -->
+  1663→    <div class="r-bottom-bar"></div>
+  1664→  </div>
+  1665→</body>
+  1666→</html>`;
+  1667→}
+  1668→
