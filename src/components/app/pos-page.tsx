@@ -466,7 +466,7 @@ export default function PosPage() {
         await supabase.from('inventory_transactions').insert({
           product_id: item.product_id,
           branch_id: branchId,
-          transaction_type: 'sale',
+          transaction_type: 'out',
           quantity: -totalPieces,
           reference_type: 'invoice',
           reference_id: invData.id,
