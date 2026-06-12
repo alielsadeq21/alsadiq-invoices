@@ -2,7 +2,7 @@
   "name": "alsadeq-invoice-system",
   "version": "1.0.0",
   "private": true,
-  "description": "نظام فواتير الصرف - مصنع الصادق",
+  "description": "نظام علي الصادق فقط - مصنع الصادق",
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",

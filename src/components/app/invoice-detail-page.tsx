@@ -562,7 +562,7 @@ export default function InvoiceDetailPage() {
               <p className="text-[11px] text-gray-400">شكراً لتعاملكم معنا</p>
             )}
             <p className="text-[10px] text-gray-300 mt-1">
-              {settings?.factory_name || 'مصنع الصادق'} - نظام فواتير الصرف
+              {settings?.factory_name || 'مصنع الصادق'} - نظام علي الصادق فقط
             </p>
           </div>
         </div>

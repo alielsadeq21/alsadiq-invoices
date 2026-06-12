@@ -78,7 +78,7 @@ export default function LoginPage() {
               )}
             </motion.div>
             <h1 className="text-2xl font-bold text-foreground">{factoryName}</h1>
-            <p className="text-muted-foreground text-sm mt-1">نظام فواتير الصرف</p>
+            <p className="text-muted-foreground text-sm mt-1">نظام علي الصادق فقط</p>
           </CardHeader>
           <CardContent className="pt-4 pb-8 px-8">
             {autoLogoutReason && (

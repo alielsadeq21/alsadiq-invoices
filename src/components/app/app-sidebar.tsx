@@ -193,7 +193,7 @@ export default function AppSidebar() {
               <h2 className="font-bold text-sm truncate">
                 {settings?.factory_name || 'مصنع الصادق'}
               </h2>
-              <p className="text-[11px] text-sidebar-foreground/50">نظام فواتير الصرف</p>
+              <p className="text-[11px] text-sidebar-foreground/50">نظام علي الصادق فقط</p>
             </div>
             <Button
               variant="ghost"
