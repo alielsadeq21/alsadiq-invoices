@@ -32,6 +32,7 @@ import InventoryCountsPage from '@/components/app/inventory-counts-page';
 import AccountingReportsPage from '@/components/app/accounting-reports-page';
 import SalesPage from '@/components/app/sales-page';
 import PosPage from '@/components/app/pos-page';
+import ReservationsPage from '@/components/app/reservations-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo, forceChangePassword } = useAppStore();
@@ -109,6 +110,8 @@ export default function Home() {
         return <SalesPage />;
       case 'pos':
         return <PosPage />;
+      case 'reservations':
+        return <ReservationsPage />;
       default:
         return <DashboardPage />;
     }

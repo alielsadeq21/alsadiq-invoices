@@ -63,6 +63,7 @@ interface PermissionPage {
 const PERMISSION_PAGES: PermissionPage[] = [
   { key: 'dashboard', label: 'لوحة التحكم', actions: ['view'] },
   { key: 'pos', label: 'نقطة البيع', actions: ['view', 'create', 'print'] },
+  { key: 'reservations', label: 'الحجوزات والمناسبات', actions: ['view', 'create', 'edit', 'delete', 'print'] },
   { key: 'sales', label: 'المبيعات', actions: ['view', 'export'] },
   { key: 'branches', label: 'الفروع', actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'products', label: 'المنتجات', actions: ['view', 'create', 'edit', 'delete'] },

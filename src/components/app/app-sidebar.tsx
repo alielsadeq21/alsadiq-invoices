@@ -37,6 +37,7 @@ import {
   BookOpenCheck,
   TrendingUp,
   ShoppingCart,
+  CalendarHeart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -60,6 +61,7 @@ const navGroups = [
     title: 'المبيعات والمالية',
     items: [
       { id: 'pos', label: 'نقطة البيع', icon: ShoppingCart, color: 'from-green-500 to-green-600' },
+      { id: 'reservations', label: 'الحجوزات والمناسبات', icon: CalendarHeart, color: 'from-purple-500 to-purple-600' },
       { id: 'sales', label: 'المبيعات', icon: TrendingUp, color: 'from-emerald-400 to-emerald-600' },
       { id: 'invoices', label: 'الفواتير', icon: FileText, color: 'from-emerald-500 to-emerald-600' },
       { id: 'returns', label: 'المرتجعات', icon: RotateCcw, color: 'from-rose-500 to-rose-600' },

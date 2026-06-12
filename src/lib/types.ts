@@ -53,6 +53,7 @@ export interface Permissions {
   accounting_reports?: PagePermissions;
   sales?: PagePermissions;
   pos?: PagePermissions;
+  reservations?: PagePermissions;
 }
 
 export interface Role {
@@ -282,6 +283,42 @@ export interface Expense {
   expense_categories?: ExpenseCategory;
 }
 
+// Reservation Types
+export interface ReservationItem {
+  product_id: string | null;
+  item_name: string;
+  quantity: number;
+  unit_count: number;
+  unit_price: number;
+  total_price: number;
+}
+
+export interface Reservation {
+  id: string;
+  reservation_number: string;
+  customer_id: string | null;
+  customer_name: string;
+  customer_phone: string | null;
+  branch_id: string | null;
+  event_type: string;
+  event_date: string;
+  event_time: string | null;
+  notes: string | null;
+  items: ReservationItem[];
+  total_amount: number;
+  advance_payment: number;
+  remaining_amount: number;
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  cancel_reason: string | null;
+  reminder_1_sent: boolean;
+  reminder_2_sent: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  branches?: Branch;
+  customers?: { name: string; phone: string | null } | null;
+}
+
 // Phase 3 Types
 
 export interface ChartOfAccount {
@@ -441,6 +478,7 @@ export const DEFAULT_ADMIN_PERMISSIONS: Permissions = {
   accounting_reports: { view: true, export: true },
   sales: { view: true, export: true },
   pos: { view: true, create: true, print: true },
+  reservations: { view: true, create: true, edit: true, delete: true, print: true },
 };
 
 export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
@@ -455,6 +493,7 @@ export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
   reports: { view: true, export: true },
   settings: { view: true },
   sales: { view: true, export: true },
+  reservations: { view: true, create: true, edit: true, print: true },
 };
 
 export const DEFAULT_WAREHOUSE_KEEPER_PERMISSIONS: Permissions = {
@@ -466,6 +505,7 @@ export const DEFAULT_CASHIER_PERMISSIONS: Permissions = {
   invoices: { view: true, print: true },
   returns: { view: true, create: true },
   customers: { view: true, create: true },
+  reservations: { view: true, create: true, print: true },
 };
 
 export const DEFAULT_ACCOUNTANT_PERMISSIONS: Permissions = {
