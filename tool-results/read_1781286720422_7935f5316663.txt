@@ -1,0 +1,1065 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { Expense, ExpenseCategory, Branch, PaymentMethod } from '@/lib/types';
+     7→import { formatCurrency, formatDate, generateExpenseNumber, generateJournalEntryNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
+     8→import { Card, CardContent } from '@/components/ui/card';
+     9→import { Button } from '@/components/ui/button';
+    10→import { Input } from '@/components/ui/input';
+    11→import { Label } from '@/components/ui/label';
+    12→import { Textarea } from '@/components/ui/textarea';
+    13→import { Badge } from '@/components/ui/badge';
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from '@/components/ui/select';
+    21→import {
+    22→  Dialog,
+    23→  DialogContent,
+    24→  DialogHeader,
+    25→  DialogTitle,
+    26→  DialogFooter,
+    27→} from '@/components/ui/dialog';
+    28→import {
+    29→  AlertDialog,
+    30→  AlertDialogContent,
+    31→  AlertDialogHeader,
+    32→  AlertDialogFooter,
+    33→  AlertDialogTitle,
+    34→  AlertDialogDescription,
+    35→  AlertDialogAction,
+    36→  AlertDialogCancel,
+    37→} from '@/components/ui/alert-dialog';
+    38→import {
+    39→  Table,
+    40→  TableBody,
+    41→  TableCell,
+    42→  TableHead,
+    43→  TableHeader,
+    44→  TableRow,
+    45→} from '@/components/ui/table';
+    46→import {
+    47→  Receipt,
+    48→  Plus,
+    49→  Search,
+    50→  ChevronRight,
+    51→  ChevronLeft,
+    52→  Printer,
+    53→  Pencil,
+    54→  Trash2,
+    55→  Loader2,
+    56→  Building2,
+    57→  Tags,
+    58→  Calendar,
+    59→  Banknote,
+    60→} from 'lucide-react';
+    61→import { motion } from 'framer-motion';
+    62→import { toast } from 'sonner';
+    63→
+    64→const PAGE_SIZE = 10;
+    65→
+    66→const defaultMethodLabels: Record<string, string> = {
+    67→  cash: 'كاش',
+    68→  bank_transfer: 'تحويل بنكي',
+    69→  cheque: 'شيك',
+    70→};
+    71→
+    72→const defaultMethodColors: Record<string, string> = {
+    73→  cash: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+    74→  bank_transfer: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    75→  cheque: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    76→};
+    77→
+    78→interface ExpenseFormData {
+    79→  id: string;
+    80→  expense_number: string;
+    81→  branch_id: string;
+    82→  category_id: string;
+    83→  description: string;
+    84→  amount: string;
+    85→  expense_date: string;
+    86→  payment_method: string;
+    87→  notes: string;
+    88→}
+    89→
+    90→const emptyFormData: ExpenseFormData = {
+    91→  id: '',
+    92→  expense_number: '',
+    93→  branch_id: '',
+    94→  category_id: '',
+    95→  description: '',
+    96→  amount: '',
+    97→  expense_date: '',
+    98→  payment_method: 'cash',
+    99→  notes: '',
+   100→};
+   101→
+   102→export default function ExpensesPage() {
+   103→  const { user, isAdmin, hasPermission, settings } = useAppStore();
+   104→  const [expenses, setExpenses] = useState<Expense[]>([]);
+   105→  const [branches, setBranches] = useState<Branch[]>([]);
+   106→  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+   107→  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+   108→  const [loading, setLoading] = useState(true);
+   109→  const [search, setSearch] = useState('');
+   110→  const [branchFilter, setBranchFilter] = useState('all');
+   111→  const [categoryFilter, setCategoryFilter] = useState('all');
+   112→  const [dateFrom, setDateFrom] = useState('');
+   113→  const [dateTo, setDateTo] = useState('');
+   114→  const [page, setPage] = useState(1);
+   115→  const [totalCount, setTotalCount] = useState(0);
+   116→
+   117→  // Create/Edit dialog
+   118→  const [dialogOpen, setDialogOpen] = useState(false);
+   119→  const [saving, setSaving] = useState(false);
+   120→  const [isEditing, setIsEditing] = useState(false);
+   121→  const [formData, setFormData] = useState<ExpenseFormData>(emptyFormData);
+   122→
+   123→  // Delete confirmation
+   124→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   125→  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+   126→  const [deleting, setDeleting] = useState(false);
+   127→
+   128→  useEffect(() => {
+   129→    loadBranches();
+   130→    loadCategories();
+   131→    loadPaymentMethods();
+   132→  }, []);
+   133→
+   134→  useEffect(() => {
+   135→    loadExpenses();
+   136→  }, [page, search, branchFilter, categoryFilter, dateFrom, dateTo]);
+   137→
+   138→  const loadBranches = async () => {
+   139→    let query = supabase.from('branches').select('*').eq('is_active', true).order('name');
+   140→    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+   141→    const { data } = await query;
+   142→    if (data) setBranches(data as Branch[]);
+   143→  };
+   144→
+   145→  const loadCategories = async () => {
+   146→    const { data } = await supabase
+   147→      .from('expense_categories')
+   148→      .select('*')
+   149→      .eq('is_active', true)
+   150→      .order('name');
+   151→    if (data) setCategories(data as ExpenseCategory[]);
+   152→  };
+   153→
+   154→  const loadPaymentMethods = async () => {
+   155→    try {
+   156→      const { data, error } = await supabase.from('payment_methods').select('*').order('sort_order');
+   157→      if (!error && data && data.length > 0) {
+   158→        setPaymentMethods(data as PaymentMethod[]);
+   159→      } else {
+   160→        setPaymentMethods([
+   161→          { id: 'cash', name: 'كاش', is_default: true, sort_order: 1, created_at: '' },
+   162→          { id: 'bank_transfer', name: 'تحويل بنكي', is_default: false, sort_order: 2, created_at: '' },
+   163→          { id: 'cheque', name: 'شيك', is_default: false, sort_order: 3, created_at: '' },
+   164→        ]);
+   165→      }
+   166→    } catch {
+   167→      setPaymentMethods([
+   168→        { id: 'cash', name: 'كاش', is_default: true, sort_order: 1, created_at: '' },
+   169→        { id: 'bank_transfer', name: 'تحويل بنكي', is_default: false, sort_order: 2, created_at: '' },
+   170→        { id: 'cheque', name: 'شيك', is_default: false, sort_order: 3, created_at: '' },
+   171→      ]);
+   172→    }
+   173→  };
+   174→
+   175→  const getMethodLabel = (method: string): string => {
+   176→    const found = paymentMethods.find(m => m.id === method || m.name === method);
+   177→    if (found) return found.name;
+   178→    return defaultMethodLabels[method] || method;
+   179→  };
+   180→
+   181→  const getMethodColor = (method: string): string => {
+   182→    if (defaultMethodColors[method]) return defaultMethodColors[method];
+   183→    return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+   184→  };
+   185→
+   186→  const loadExpenses = async () => {
+   187→    setLoading(true);
+   188→    try {
+   189→      let query = supabase
+   190→        .from('expenses')
+   191→        .select('*, branches(name), expense_categories(name)', { count: 'exact' })
+   192→        .order('created_at', { ascending: false });
+   193→
+   194→      if (search) {
+   195→        query = query.or(`expense_number.ilike.%${search}%,description.ilike.%${search}%`);
+   196→      }
+   197→      if (branchFilter !== 'all') {
+   198→        query = query.eq('branch_id', branchFilter);
+   199→      }
+   200→      if (categoryFilter !== 'all') {
+   201→        query = query.eq('category_id', categoryFilter);
+   202→      }
+   203→      if (dateFrom) {
+   204→        query = query.gte('expense_date', dateFrom);
+   205→      }
+   206→      if (dateTo) {
+   207→        query = query.lte('expense_date', dateTo);
+   208→      }
+   209→
+   210→      // Branch user: always filter by their branch
+   211→      if (!isAdmin && user?.branch_id) {
+   212→        query = query.eq('branch_id', user.branch_id);
+   213→      }
+   214→
+   215→      const from = (page - 1) * PAGE_SIZE;
+   216→      query = query.range(from, from + PAGE_SIZE - 1);
+   217→
+   218→      const { data, count, error } = await query;
+   219→      if (!error && data) {
+   220→        setExpenses(data as unknown as Expense[]);
+   221→        setTotalCount(count || 0);
+   222→      }
+   223→    } catch (err) {
+   224→      console.error(err);
+   225→    } finally {
+   226→      setLoading(false);
+   227→    }
+   228→  };
+   229→
+   230→  const openCreateDialog = async () => {
+   231→    setIsEditing(false);
+   232→    const year = getCurrentYear();
+   233→    const { data: lastExp } = await supabase
+   234→      .from('expenses')
+   235→      .select('expense_number')
+   236→      .like('expense_number', `EXP-${year}-%`)
+   237→      .order('expense_number', { ascending: false })
+   238→      .limit(1);
+   239→
+   240→    let lastNum = 0;
+   241→    if (lastExp && lastExp.length > 0) {
+   242→      const parts = lastExp[0].expense_number.split('-');
+   243→      lastNum = parseInt(parts[parts.length - 1]) || 0;
+   244→    }
+   245→
+   246→    const defaultMethod = paymentMethods.find(m => m.is_default);
+   247→
+   248→    setFormData({
+   249→      id: '',
+   250→      expense_number: generateExpenseNumber(lastNum, year),
+   251→      branch_id: !isAdmin && user?.branch_id ? user.branch_id : '',
+   252→      category_id: '',
+   253→      description: '',
+   254→      amount: '',
+   255→      expense_date: getTodayISO(),
+   256→      payment_method: defaultMethod?.id || 'cash',
+   257→      notes: '',
+   258→    });
+   259→    setDialogOpen(true);
+   260→  };
+   261→
+   262→  const openEditDialog = (expense: Expense) => {
+   263→    setIsEditing(true);
+   264→    setFormData({
+   265→      id: expense.id,
+   266→      expense_number: expense.expense_number,
+   267→      branch_id: expense.branch_id,
+   268→      category_id: expense.category_id || '',
+   269→      description: expense.description,
+   270→      amount: String(expense.amount),
+   271→      expense_date: expense.expense_date,
+   272→      payment_method: expense.payment_method,
+   273→      notes: expense.notes || '',
+   274→    });
+   275→    setDialogOpen(true);
+   276→  };
+   277→
+   278→  const handleSave = async () => {
+   279→    if (!formData.branch_id) {
+   280→      toast.error('يرجى اختيار الفرع');
+   281→      return;
+   282→    }
+   283→    if (!formData.description.trim()) {
+   284→      toast.error('يرجى إدخال الوصف');
+   285→      return;
+   286→    }
+   287→    if (!formData.amount || Number(formData.amount) <= 0) {
+   288→      toast.error('يرجى إدخال مبلغ صحيح');
+   289→      return;
+   290→    }
+   291→    if (!formData.expense_date) {
+   292→      toast.error('يرجى تحديد التاريخ');
+   293→      return;
+   294→    }
+   295→
+   296→    setSaving(true);
+   297→    try {
+   298→      const payload = {
+   299→        branch_id: formData.branch_id,
+   300→        category_id: formData.category_id || null,
+   301→        description: formData.description.trim(),
+   302→        amount: Number(formData.amount),
+   303→        expense_date: formData.expense_date,
+   304→        payment_method: formData.payment_method,
+   305→        notes: formData.notes.trim() || null,
+   306→        updated_at: new Date().toISOString(),
+   307→      };
+   308→
+   309→      if (isEditing) {
+   310→        const { error } = await supabase
+   311→          .from('expenses')
+   312→          .update(payload)
+   313→          .eq('id', formData.id);
+   314→
+   315→        if (error) throw error;
+   316→
+   317→        await supabase.from('audit_log').insert({
+   318→          action: 'edit_expense',
+   319→          details: { expense_number: formData.expense_number, amount: Number(formData.amount) },
+   320→        });
+   321→
+   322→        toast.success('تم تعديل المصروف بنجاح');
+   323→      } else {
+   324→        const { error } = await supabase.from('expenses').insert({
+   325→          expense_number: formData.expense_number,
+   326→          ...payload,
+   327→          created_by: user?.id || null,
+   328→        });
+   329→
+   330→        if (error) throw error;
+   331→
+   332→        await supabase.from('audit_log').insert({
+   333→          action: 'create_expense',
+   334→          details: { expense_number: formData.expense_number, amount: Number(formData.amount), branch_id: formData.branch_id },
+   335→        });
+   336→
+   337→        // ===== ربط المصروفات بالقيود المحاسبية: إنشاء قيد تلقائي =====
+   338→        try {
+   339→          const year = getCurrentYear();
+   340→          const { data: lastEntry } = await supabase
+   341→            .from('journal_entries')
+   342→            .select('entry_number')
+   343→            .like('entry_number', `JE-${year}-%`)
+   344→            .order('entry_number', { ascending: false })
+   345→            .limit(1);
+   346→
+   347→          let lastNum = 0;
+   348→          if (lastEntry && lastEntry.length > 0) {
+   349→            const parts = lastEntry[0].entry_number.split('-');
+   350→            lastNum = parseInt(parts[parts.length - 1]) || 0;
+   351→          }
+   352→
+   353→          const categoryName = categories.find(c => c.id === formData.category_id)?.name || 'مصروفات عامة';
+   354→          const entryNumber = generateJournalEntryNumber(lastNum, year);
+   355→          const amount = Number(formData.amount);
+   356→
+   357→          // Create journal entry: debit the expense account, credit the cash/bank account
+   358→          const { data: newEntry, error: jeError } = await supabase
+   359→            .from('journal_entries')
+   360→            .insert({
+   361→              entry_number: entryNumber,
+   362→              entry_date: formData.expense_date,
+   363→              description: `قيد مصروف: ${formData.description} (${categoryName})`,
+   364→              total_debit: amount,
+   365→              total_credit: amount,
+   366→              is_posted: true,
+   367→              notes: `قيد تلقائي من مصروف رقم ${formData.expense_number}`,
+   368→              created_by: user?.id || null,
+   369→            })
+   370→            .select('id')
+   371→            .single();
+   372→
+   373→          if (!jeError && newEntry) {
+   374→            // Create journal entry lines
+   375→            const methodLabel = formData.payment_method === 'cash' ? 'الصندوق' :
+   376→                              formData.payment_method === 'bank_transfer' ? 'البنك' : 'الشيكات';
+   377→            await supabase.from('journal_entry_lines').insert([
+   378→              {
+   379→                journal_entry_id: newEntry.id,
+   380→                account_name: categoryName,
+   381→                debit: amount,
+   382→                credit: 0,
+   383→                description: formData.description,
+   384→              },
+   385→              {
+   386→                journal_entry_id: newEntry.id,
+   387→                account_name: methodLabel,
+   388→                debit: 0,
+   389→                credit: amount,
+   390→                description: `مقابل مصروف: ${formData.description}`,
+   391→              },
+   392→            ]);
+   393→
+   394→            // Link expense to journal entry
+   395→            await supabase
+   396→              .from('expenses')
+   397→              .update({ journal_entry_id: newEntry.id })
+   398→              .eq('id', (await supabase.from('expenses').select('id').eq('expense_number', formData.expense_number).single()).data?.id);
+   399→
+   400→            toast.success('تم تسجيل المصروف وإنشاء القيد المحاسبي تلقائياً');
+   401→          } else {
+   402→            toast.success('تم تسجيل المصروف (لم يتم إنشاء قيد محاسبي)');
+   403→          }
+   404→        } catch (jeErr) {
+   405→          console.error('Journal entry error:', jeErr);
+   406→          toast.success('تم تسجيل المصروف (خطأ في إنشاء القيد المحاسبي)');
+   407→        }
+   408→      }
+   409→
+   410→      setDialogOpen(false);
+   411→      loadExpenses();
+   412→    } catch (err) {
+   413→      console.error(err);
+   414→      toast.error(isEditing ? 'حدث خطأ أثناء تعديل المصروف' : 'حدث خطأ أثناء حفظ المصروف');
+   415→    } finally {
+   416→      setSaving(false);
+   417→    }
+   418→  };
+   419→
+   420→  const handleDelete = async () => {
+   421→    if (!expenseToDelete) return;
+   422→    setDeleting(true);
+   423→    try {
+   424→      const { error } = await supabase
+   425→        .from('expenses')
+   426→        .delete()
+   427→        .eq('id', expenseToDelete.id);
+   428→
+   429→      if (error) throw error;
+   430→
+   431→      await supabase.from('audit_log').insert({
+   432→        action: 'delete_expense',
+   433→        details: { expense_number: expenseToDelete.expense_number, amount: Number(expenseToDelete.amount) },
+   434→      });
+   435→
+   436→      toast.success('تم حذف المصروف بنجاح');
+   437→      setDeleteDialogOpen(false);
+   438→      setExpenseToDelete(null);
+   439→      loadExpenses();
+   440→    } catch (err) {
+   441→      console.error(err);
+   442→      toast.error('حدث خطأ أثناء حذف المصروف');
+   443→    } finally {
+   444→      setDeleting(false);
+   445→    }
+   446→  };
+   447→
+   448→  const confirmDelete = (expense: Expense) => {
+   449→    setExpenseToDelete(expense);
+   450→    setDeleteDialogOpen(true);
+   451→  };
+   452→
+   453→  const handlePrint = (expense: Expense) => {
+   454→    const branchName = (expense as any).branches?.name || '—';
+   455→    const categoryName = (expense as any).expense_categories?.name || '—';
+   456→    const factoryName = settings?.factory_name || 'مصنع الصادق';
+   457→    const methodLabel = getMethodLabel(expense.payment_method);
+   458→
+   459→    const htmlDoc = `
+   460→<!DOCTYPE html>
+   461→<html dir="rtl" lang="ar">
+   462→<head>
+   463→  <meta charset="UTF-8">
+   464→  <title>إيصال مصروف - ${expense.expense_number}</title>
+   465→  <style>
+   466→    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+   467→    * { margin: 0; padding: 0; box-sizing: border-box; }
+   468→    body { font-family: 'Cairo', sans-serif; background: #fff; color: #1a1a1a; padding: 20px; }
+   469→    .rcpt-container { max-width: 700px; margin: 0 auto; border: 2px solid #1a1a1a; padding: 30px; }
+   470→    .header { text-align: center; border-bottom: 2px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 20px; }
+   471→    .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+   472→    .header p { font-size: 13px; color: #555; }
+   473→    .title-row { text-align: center; margin-bottom: 20px; }
+   474→    .title-row h2 { font-size: 20px; font-weight: 700; background: #1a1a1a; color: #fff; display: inline-block; padding: 6px 24px; border-radius: 4px; }
+   475→    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 30px; margin-bottom: 20px; }
+   476→    .info-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ccc; }
+   477→    .info-item .label { color: #666; font-size: 13px; }
+   478→    .info-item .value { font-weight: 600; font-size: 14px; }
+   479→    .amount-section { text-align: center; padding: 20px; border: 2px solid #1a1a1a; border-radius: 8px; margin: 20px 0; background: #f9f9f9; }
+   480→    .amount-label { font-size: 14px; color: #666; margin-bottom: 6px; }
+   481→    .amount-value { font-size: 28px; font-weight: 700; color: #c0392b; }
+   482→    .notes-section { margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+   483→    .notes-section .notes-label { font-weight: 600; margin-bottom: 4px; font-size: 13px; }
+   484→    .notes-section .notes-text { font-size: 13px; color: #555; }
+   485→    .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 10px; }
+   486→    @media print { body { padding: 0; } .rcpt-container { border: none; } }
+   487→  </style>
+   488→</head>
+   489→<body>
+   490→  <div class="rcpt-container">
+   491→    <div class="header">
+   492→      <h1>${factoryName}</h1>
+   493→      <p>إيصال صرف مصروفات</p>
+   494→    </div>
+   495→    <div class="title-row">
+   496→      <h2>${expense.expense_number}</h2>
+   497→    </div>
+   498→    <div class="info-grid">
+   499→      <div class="info-item">
+   500→        <span class="label">الفرع</span>
+   501→        <span class="value">${branchName}</span>
+   502→      </div>
+   503→      <div class="info-item">
+   504→        <span class="label">التصنيف</span>
+   505→        <span class="value">${categoryName}</span>
+   506→      </div>
+   507→      <div class="info-item">
+   508→        <span class="label">التاريخ</span>
+   509→        <span class="value">${formatDate(expense.expense_date)}</span>
+   510→      </div>
+   511→      <div class="info-item">
+   512→        <span class="label">طريقة الدفع</span>
+   513→        <span class="value">${methodLabel}</span>
+   514→      </div>
+   515→    </div>
+   516→    <div class="info-item" style="margin-bottom:10px;">
+   517→      <span class="label">الوصف</span>
+   518→      <span class="value">${expense.description}</span>
+   519→    </div>
+   520→    <div class="amount-section">
+   521→      <div class="amount-label">المبلغ</div>
+   522→      <div class="amount-value">${formatCurrency(expense.amount)}</div>
+   523→    </div>
+   524→    ${expense.notes ? `
+   525→    <div class="notes-section">
+   526→      <div class="notes-label">ملاحظات:</div>
+   527→      <div class="notes-text">${expense.notes}</div>
+   528→    </div>` : ''}
+   529→    <div class="footer">
+   530→      تم الطباعة بتاريخ ${new Date().toLocaleDateString('ar-EG')} - ${factoryName}
+   531→    </div>
+   532→  </div>
+   533→</body>
+   534→</html>`;
+   535→
+   536→    const printWindow = window.open('', '_blank', 'width=800,height=1000');
+   537→    if (!printWindow) {
+   538→      toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+   539→      return;
+   540→    }
+   541→
+   542→    printWindow.document.write(htmlDoc);
+   543→    printWindow.document.close();
+   544→
+   545→    setTimeout(() => {
+   546→      printWindow.focus();
+   547→      printWindow.print();
+   548→    }, 1200);
+   549→  };
+   550→
+   551→  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+   552→
+   553→  const clearFilters = () => {
+   554→    setSearch('');
+   555→    setBranchFilter('all');
+   556→    setCategoryFilter('all');
+   557→    setDateFrom('');
+   558→    setDateTo('');
+   559→    setPage(1);
+   560→  };
+   561→
+   562→  const hasActiveFilters = search || branchFilter !== 'all' || categoryFilter !== 'all' || dateFrom || dateTo;
+   563→
+   564→  return (
+   565→    <div className="space-y-6">
+   566→      {/* Header */}
+   567→      <motion.div
+   568→        initial={{ opacity: 0, y: 20 }}
+   569→        animate={{ opacity: 1, y: 0 }}
+   570→        transition={{ duration: 0.3 }}
+   571→        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+   572→      >
+   573→        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+   574→          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   575→            <Receipt className="w-6 h-6 text-white" />
+   576→          </div>
+   577→          <div>
+   578→            <h1 className="text-2xl font-bold">المصروفات</h1>
+   579→            <p className="text-muted-foreground text-sm mt-1">
+   580→              إجمالي المصروفات ({totalCount} مصروف)
+   581→            </p>
+   582→          </div>
+   583→        </div>
+   584→        {hasPermission('expenses', 'create') && (
+   585→          <Button onClick={openCreateDialog} className="gap-2 shadow-lg text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   586→            <Plus className="w-4 h-4" />
+   587→            مصروف جديد
+   588→          </Button>
+   589→        )}
+   590→      </motion.div>
+   591→
+   592→      {/* Filters */}
+   593→      <motion.div
+   594→        initial={{ opacity: 0, y: 20 }}
+   595→        animate={{ opacity: 1, y: 0 }}
+   596→        transition={{ duration: 0.3, delay: 0.1 }}
+   597→      >
+   598→        <Card className="border-0 shadow-md overflow-hidden">
+   599→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c, #f97316)' }} />
+   600→          <CardContent className="p-4">
+   601→            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   602→              <div className="relative col-span-2 sm:col-span-1">
+   603→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   604→                <Input
+   605→                  placeholder="بحث برقم المصروف أو الوصف..."
+   606→                  value={search}
+   607→                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   608→                  className="pr-10"
+   609→                />
+   610→              </div>
+   611→              {isAdmin && (
+   612→                <div>
+   613→                  <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
+   614→                    <SelectTrigger>
+   615→                      <SelectValue placeholder="كل الفروع" />
+   616→                    </SelectTrigger>
+   617→                    <SelectContent>
+   618→                      <SelectItem value="all">كل الفروع</SelectItem>
+   619→                      {branches.map((b) => (
+   620→                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   621→                      ))}
+   622→                    </SelectContent>
+   623→                  </Select>
+   624→                </div>
+   625→              )}
+   626→              <div>
+   627→                <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
+   628→                  <SelectTrigger>
+   629→                    <SelectValue placeholder="كل التصنيفات" />
+   630→                  </SelectTrigger>
+   631→                  <SelectContent>
+   632→                    <SelectItem value="all">كل التصنيفات</SelectItem>
+   633→                    {categories.map((c) => (
+   634→                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+   635→                    ))}
+   636→                  </SelectContent>
+   637→                </Select>
+   638→              </div>
+   639→              <div>
+   640→                <Input
+   641→                  type="date"
+   642→                  value={dateFrom}
+   643→                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+   644→                  placeholder="من تاريخ"
+   645→                />
+   646→              </div>
+   647→              <div>
+   648→                <Input
+   649→                  type="date"
+   650→                  value={dateTo}
+   651→                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+   652→                  placeholder="إلى تاريخ"
+   653→                />
+   654→              </div>
+   655→              {hasActiveFilters && (
+   656→                <div className="flex items-end col-span-2 sm:col-span-1">
+   657→                  <Button variant="outline" onClick={clearFilters} className="gap-2 w-full">
+   658→                    مسح الفلاتر
+   659→                  </Button>
+   660→                </div>
+   661→              )}
+   662→            </div>
+   663→          </CardContent>
+   664→        </Card>
+   665→      </motion.div>
+   666→
+   667→      {/* Expenses Table / Cards */}
+   668→      <motion.div
+   669→        initial={{ opacity: 0, y: 20 }}
+   670→        animate={{ opacity: 1, y: 0 }}
+   671→        transition={{ duration: 0.3, delay: 0.2 }}
+   672→      >
+   673→        <Card className="border-0 shadow-md overflow-hidden">
+   674→          <CardContent className="p-0">
+   675→            {loading ? (
+   676→              <div className="flex items-center justify-center py-12">
+   677→                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   678→                <span className="mr-2 text-muted-foreground">جاري التحميل...</span>
+   679→              </div>
+   680→            ) : expenses.length === 0 ? (
+   681→              /* Empty State */
+   682→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   683→                <div className="w-24 h-24 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   684→                  <Receipt className="w-12 h-12 text-white" />
+   685→                </div>
+   686→                <h3 className="text-xl font-bold mb-2">لا توجد مصروفات</h3>
+   687→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   688→                  لم يتم تسجيل أي مصروفات بعد. ابدأ بتسجيل أول مصروف لتتبع نفقات المصنع.
+   689→                </p>
+   690→                {hasPermission('expenses', 'create') && (
+   691→                  <Button onClick={openCreateDialog} className="gap-2 shadow-lg text-white" size="lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   692→                    <Plus className="w-5 h-5" />
+   693→                    تسجيل مصروف جديد
+   694→                  </Button>
+   695→                )}
+   696→              </div>
+   697→            ) : (
+   698→              <>
+   699→                {/* Desktop Table */}
+   700→                <div className="hidden sm:block">
+   701→                  {/* Gradient accent bar */}
+   702→                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c, #f97316)' }} />
+   703→                  <div className="overflow-x-auto">
+   704→                    <Table>
+   705→                      <TableHeader>
+   706→                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+   707→                          <TableHead className="text-right font-semibold">رقم المصروف</TableHead>
+   708→                          <TableHead className="text-right hidden md:table-cell font-semibold">الفرع</TableHead>
+   709→                          <TableHead className="text-right hidden sm:table-cell font-semibold">التصنيف</TableHead>
+   710→                          <TableHead className="text-right font-semibold">الوصف</TableHead>
+   711→                          <TableHead className="text-right font-semibold">المبلغ</TableHead>
+   712→                          <TableHead className="text-right hidden lg:table-cell font-semibold">التاريخ</TableHead>
+   713→                          <TableHead className="text-center hidden md:table-cell font-semibold">طريقة الدفع</TableHead>
+   714→                          <TableHead className="text-center font-semibold">إجراءات</TableHead>
+   715→                        </TableRow>
+   716→                      </TableHeader>
+   717→                      <TableBody>
+   718→                        {expenses.map((expense) => (
+   719→                          <TableRow key={expense.id} className="transition-colors hover:bg-orange-50/50 dark:hover:bg-orange-950/10">
+   720→                            <TableCell>
+   721→                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+   722→                                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   723→                                  <Receipt className="w-3.5 h-3.5 text-white" />
+   724→                                </div>
+   725→                                <span className="font-medium text-sm">{expense.expense_number}</span>
+   726→                              </div>
+   727→                            </TableCell>
+   728→                            <TableCell className="hidden md:table-cell">{(expense as any).branches?.name || '—'}</TableCell>
+   729→                            <TableCell className="hidden sm:table-cell">{(expense as any).expense_categories?.name || '—'}</TableCell>
+   730→                            <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
+   731→                            <TableCell>
+   732→                              <span className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(expense.amount)}</span>
+   733→                            </TableCell>
+   734→                            <TableCell className="hidden lg:table-cell">{formatDate(expense.expense_date)}</TableCell>
+   735→                            <TableCell className="text-center hidden md:table-cell">
+   736→                              <Badge variant="secondary" className={`text-[10px] font-medium ${getMethodColor(expense.payment_method)}`}>
+   737→                                {getMethodLabel(expense.payment_method)}
+   738→                              </Badge>
+   739→                            </TableCell>
+   740→                            <TableCell className="text-center">
+   741→                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+   742→                                {hasPermission('expenses', 'print') && (
+   743→                                  <Button
+   744→                                    variant="ghost"
+   745→                                    size="icon"
+   746→                                    className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600"
+   747→                                    onClick={() => handlePrint(expense)}
+   748→                                    title="طباعة"
+   749→                                  >
+   750→                                    <Printer className="w-3.5 h-3.5" />
+   751→                                  </Button>
+   752→                                )}
+   753→                                {hasPermission('expenses', 'edit') && (
+   754→                                  <Button
+   755→                                    variant="ghost"
+   756→                                    size="icon"
+   757→                                    className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-600"
+   758→                                    onClick={() => openEditDialog(expense)}
+   759→                                    title="تعديل"
+   760→                                  >
+   761→                                    <Pencil className="w-3.5 h-3.5" />
+   762→                                  </Button>
+   763→                                )}
+   764→                                {hasPermission('expenses', 'delete') && (
+   765→                                  <Button
+   766→                                    variant="ghost"
+   767→                                    size="icon"
+   768→                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30"
+   769→                                    onClick={() => confirmDelete(expense)}
+   770→                                    title="حذف"
+   771→                                  >
+   772→                                    <Trash2 className="w-3.5 h-3.5" />
+   773→                                  </Button>
+   774→                                )}
+   775→                              </div>
+   776→                            </TableCell>
+   777→                          </TableRow>
+   778→                        ))}
+   779→                      </TableBody>
+   780→                    </Table>
+   781→                  </div>
+   782→                </div>
+   783→
+   784→                {/* Mobile Card Layout */}
+   785→                <div className="sm:hidden p-3 space-y-3">
+   786→                  {expenses.map((expense) => (
+   787→                    <motion.div
+   788→                      key={expense.id}
+   789→                      initial={{ opacity: 0, y: 10 }}
+   790→                      animate={{ opacity: 1, y: 0 }}
+   791→                      className="rounded-xl border border-border/50 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5"
+   792→                      style={{ borderRight: '4px solid #f97316' }}
+   793→                    >
+   794→                      <div className="p-3 sm:p-4 space-y-3">
+   795→                        {/* Top row: expense number + amount */}
+   796→                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+   797→                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+   798→                            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   799→                              <Receipt className="w-4 h-4 text-white" />
+   800→                            </div>
+   801→                            <div>
+   802→                              <p className="font-bold text-sm">{expense.expense_number}</p>
+   803→                              <p className="text-xs text-muted-foreground">{formatDate(expense.expense_date)}</p>
+   804→                            </div>
+   805→                          </div>
+   806→                          <div className="text-left">
+   807→                            <p className="font-bold text-lg text-orange-600 dark:text-orange-400">{formatCurrency(expense.amount)}</p>
+   808→                          </div>
+   809→                        </div>
+   810→
+   811→                        {/* Description */}
+   812→                        <p className="text-sm text-foreground/80 line-clamp-2 leading-relaxed">
+   813→                          {expense.description}
+   814→                        </p>
+   815→
+   816→                        {/* Info badges row */}
+   817→                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+   818→                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="rounded-md bg-muted/50 px-2 py-1">
+   819→                            <Building2 className="w-3 h-3 text-muted-foreground" />
+   820→                            <span className="text-xs text-muted-foreground">{(expense as any).branches?.name || '—'}</span>
+   821→                          </div>
+   822→                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="rounded-md bg-muted/50 px-2 py-1">
+   823→                            <Tags className="w-3 h-3 text-muted-foreground" />
+   824→                            <span className="text-xs text-muted-foreground">{(expense as any).expense_categories?.name || '—'}</span>
+   825→                          </div>
+   826→                          <Badge variant="secondary" className={`text-[10px] font-medium h-6 ${getMethodColor(expense.payment_method)}`}>
+   827→                            {getMethodLabel(expense.payment_method)}
+   828→                          </Badge>
+   829→                        </div>
+   830→
+   831→                        {/* Action buttons */}
+   832→                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', paddingTop: '4px', borderTop: '1px solid', borderTopColor: 'var(--border)' }}>
+   833→                          {hasPermission('expenses', 'print') && (
+   834→                            <Button
+   835→                              variant="outline"
+   836→                              size="sm"
+   837→                              className="h-8 gap-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200"
+   838→                              onClick={() => handlePrint(expense)}
+   839→                            >
+   840→                              <Printer className="w-3 h-3" />
+   841→                              طباعة
+   842→                            </Button>
+   843→                          )}
+   844→                          {hasPermission('expenses', 'edit') && (
+   845→                            <Button
+   846→                              variant="outline"
+   847→                              size="sm"
+   848→                              className="h-8 gap-1.5 text-xs hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-600 hover:border-amber-200"
+   849→                              onClick={() => openEditDialog(expense)}
+   850→                            >
+   851→                              <Pencil className="w-3 h-3" />
+   852→                              تعديل
+   853→                            </Button>
+   854→                          )}
+   855→                          {hasPermission('expenses', 'delete') && (
+   856→                            <Button
+   857→                              variant="outline"
+   858→                              size="sm"
+   859→                              className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200"
+   860→                              onClick={() => confirmDelete(expense)}
+   861→                            >
+   862→                              <Trash2 className="w-3 h-3" />
+   863→                              حذف
+   864→                            </Button>
+   865→                          )}
+   866→                        </div>
+   867→                      </div>
+   868→                    </motion.div>
+   869→                  ))}
+   870→                </div>
+   871→
+   872→                {/* Pagination */}
+   873→                {totalPages > 1 && (
+   874→                  <div className="flex items-center justify-between px-4 py-3 border-t">
+   875→                    <p className="text-sm text-muted-foreground">
+   876→                      صفحة {page} من {totalPages}
+   877→                    </p>
+   878→                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+   879→                      <Button
+   880→                        variant="outline"
+   881→                        size="icon"
+   882→                        className="h-8 w-8"
+   883→                        onClick={() => setPage(Math.max(1, page - 1))}
+   884→                        disabled={page <= 1}
+   885→                      >
+   886→                        <ChevronRight className="w-4 h-4" />
+   887→                      </Button>
+   888→                      <Button
+   889→                        variant="outline"
+   890→                        size="icon"
+   891→                        className="h-8 w-8"
+   892→                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+   893→                        disabled={page >= totalPages}
+   894→                      >
+   895→                        <ChevronLeft className="w-4 h-4" />
+   896→                      </Button>
+   897→                    </div>
+   898→                  </div>
+   899→                )}
+   900→              </>
+   901→            )}
+   902→          </CardContent>
+   903→        </Card>
+   904→      </motion.div>
+   905→
+   906→      {/* Create/Edit Expense Dialog */}
+   907→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   908→        <DialogContent className="w-[95vw] sm:max-w-lg">
+   909→          <DialogHeader>
+   910→            <DialogTitle className="flex items-center gap-2">
+   911→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   912→                <Receipt className="w-4 h-4 text-white" />
+   913→              </div>
+   914→              {isEditing ? 'تعديل المصروف' : 'تسجيل مصروف جديد'}
+   915→            </DialogTitle>
+   916→          </DialogHeader>
+   917→          <div className="space-y-4 py-4">
+   918→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   919→              <div className="space-y-2">
+   920→                <Label>رقم المصروف</Label>
+   921→                <Input value={formData.expense_number} disabled className="bg-muted" />
+   922→              </div>
+   923→              <div className="space-y-2">
+   924→                <Label>الفرع *</Label>
+   925→                <Select
+   926→                  value={formData.branch_id}
+   927→                  onValueChange={(v) => setFormData(prev => ({ ...prev, branch_id: v }))}
+   928→                  disabled={!isAdmin && !!user?.branch_id}
+   929→                >
+   930→                  <SelectTrigger>
+   931→                    <SelectValue placeholder="اختر الفرع" />
+   932→                  </SelectTrigger>
+   933→                  <SelectContent>
+   934→                    {branches.map((b) => (
+   935→                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   936→                    ))}
+   937→                  </SelectContent>
+   938→                </Select>
+   939→              </div>
+   940→            </div>
+   941→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   942→              <div className="space-y-2">
+   943→                <Label>التصنيف</Label>
+   944→                <Select
+   945→                  value={formData.category_id}
+   946→                  onValueChange={(v) => setFormData(prev => ({ ...prev, category_id: v }))}
+   947→                >
+   948→                  <SelectTrigger>
+   949→                    <SelectValue placeholder="اختر التصنيف" />
+   950→                  </SelectTrigger>
+   951→                  <SelectContent>
+   952→                    {categories.map((c) => (
+   953→                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+   954→                    ))}
+   955→                  </SelectContent>
+   956→                </Select>
+   957→              </div>
+   958→              <div className="space-y-2">
+   959→                <Label>طريقة الدفع</Label>
+   960→                <Select
+   961→                  value={formData.payment_method}
+   962→                  onValueChange={(v) => setFormData(prev => ({ ...prev, payment_method: v }))}
+   963→                >
+   964→                  <SelectTrigger>
+   965→                    <SelectValue />
+   966→                  </SelectTrigger>
+   967→                  <SelectContent>
+   968→                    {paymentMethods.map((m) => (
+   969→                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+   970→                    ))}
+   971→                  </SelectContent>
+   972→                </Select>
+   973→              </div>
+   974→            </div>
+   975→            <div className="space-y-2">
+   976→              <Label>الوصف *</Label>
+   977→              <Input
+   978→                value={formData.description}
+   979→                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+   980→                placeholder="وصف المصروف..."
+   981→              />
+   982→            </div>
+   983→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   984→              <div className="space-y-2">
+   985→                <Label>المبلغ (ج.م) *</Label>
+   986→                <Input
+   987→                  type="number"
+   988→                  inputMode="decimal"
+   989→                  value={formData.amount}
+   990→                  onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+   991→                  placeholder="0.00"
+   992→                  className="text-left"
+   993→                  min="0"
+   994→                  step="0.01"
+   995→                />
+   996→              </div>
+   997→              <div className="space-y-2">
+   998→                <Label>التاريخ *</Label>
+   999→                <Input
+  1000→                  type="date"
+  1001→                  value={formData.expense_date}
+  1002→                  onChange={(e) => setFormData(prev => ({ ...prev, expense_date: e.target.value }))}
+  1003→                />
+  1004→              </div>
+  1005→            </div>
+  1006→            <div className="space-y-2">
+  1007→              <Label>ملاحظات</Label>
+  1008→              <Textarea
+  1009→                value={formData.notes}
+  1010→                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+  1011→                placeholder="ملاحظات إضافية..."
+  1012→                rows={2}
+  1013→              />
+  1014→            </div>
+  1015→          </div>
+  1016→          <DialogFooter>
+  1017→            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
+  1018→            <Button onClick={handleSave} disabled={saving} className="text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+  1019→              {saving ? (
+  1020→                <>
+  1021→                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+  1022→                  جاري الحفظ...
+  1023→                </>
+  1024→              ) : isEditing ? 'حفظ التعديلات' : 'حفظ المصروف'}
+  1025→            </Button>
+  1026→          </DialogFooter>
+  1027→        </DialogContent>
+  1028→      </Dialog>
+  1029→
+  1030→      {/* Delete Confirmation Dialog */}
+  1031→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1032→        <AlertDialogContent>
+  1033→          <AlertDialogHeader>
+  1034→            <AlertDialogTitle className="flex items-center gap-2">
+  1035→              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-destructive/10">
+  1036→                <Trash2 className="w-4 h-4 text-destructive" />
+  1037→              </div>
+  1038→              تأكيد حذف المصروف
+  1039→            </AlertDialogTitle>
+  1040→            <AlertDialogDescription className="text-right">
+  1041→              هل أنت متأكد من حذف المصروف رقم &quot;{expenseToDelete?.expense_number}&quot; بمبلغ {expenseToDelete ? formatCurrency(expenseToDelete.amount) : ''}؟
+  1042→              لا يمكن التراجع عن هذا الإجراء.
+  1043→            </AlertDialogDescription>
+  1044→          </AlertDialogHeader>
+  1045→          <AlertDialogFooter>
+  1046→            <AlertDialogCancel disabled={deleting}>إلغاء</AlertDialogCancel>
+  1047→            <AlertDialogAction
+  1048→              onClick={handleDelete}
+  1049→              disabled={deleting}
+  1050→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+  1051→            >
+  1052→              {deleting ? (
+  1053→                <>
+  1054→                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+  1055→                  جاري الحذف...
+  1056→                </>
+  1057→              ) : 'حذف'}
+  1058→            </AlertDialogAction>
+  1059→          </AlertDialogFooter>
+  1060→        </AlertDialogContent>
+  1061→      </AlertDialog>
+  1062→    </div>
+  1063→  );
+  1064→}
+  1065→
