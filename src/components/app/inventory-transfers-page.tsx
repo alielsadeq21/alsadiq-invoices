@@ -187,8 +187,8 @@ export default function InventoryTransfersPage() {
       if (error) throw error;
       if (data) {
         const branches = data as BranchWithFactory[];
-        setFactoryBranches(branches.filter((b) => b.is_factory === true));
-        setDestinationBranches(branches.filter((b) => b.is_factory !== true));
+        setFactoryBranches(branches); // All branches can be source
+        setDestinationBranches(branches); // All branches can be destination
       }
     } catch (err) {
       console.error('Error loading branches:', err);
@@ -1029,7 +1029,7 @@ export default function InventoryTransfersPage() {
                 ) : (
                   <>
                     {/* Mobile Card Layout */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden">
+                    <div style={{ flexDirection: 'column', gap: '0.75rem' }} className="flex sm:hidden">
                       {transfers.map((transfer, idx) => {
                         const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
                         const borderColor = transfer.status === 'pending' ? '#f59e0b' : transfer.status === 'confirmed' ? '#10b981' : '#ef4444';
@@ -1058,7 +1058,7 @@ export default function InventoryTransfersPage() {
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="mt-0.5">
                                         <Building2 className="w-3 h-3 text-muted-foreground" />
                                         <p className="text-[11px] text-muted-foreground">
-                                          {transfer.from_branch?.name || '—'} ← {transfer.to_branch?.name || '—'}
+                                          {transfer.from_branch?.name || '—'} → {transfer.to_branch?.name || '—'}
                                         </p>
                                       </div>
                                     </div>
@@ -1287,7 +1287,7 @@ export default function InventoryTransfersPage() {
               ) : (
                 <>
                   {/* Mobile Card Layout */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden p-4 pt-0">
+                  <div style={{ flexDirection: 'column', gap: '0.75rem' }} className="flex sm:hidden p-4 pt-0">
                     {branchDebts.map((debt, idx) => {
                       const hasDebt = debt.remaining_debt > 0;
                       const statusAccent = hasDebt ? 'border-red-400' : 'border-emerald-400';
@@ -1407,13 +1407,13 @@ export default function InventoryTransfersPage() {
                   <Label>الفرع المصدر *</Label>
                   <Select
                     value={createForm.from_branch_id}
-                    onValueChange={(v) => setCreateForm({ ...createForm, from_branch_id: v })}
+                    onValueChange={(v) => setCreateForm({ ...createForm, from_branch_id: v, to_branch_id: createForm.to_branch_id === v ? '' : createForm.to_branch_id })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفرع المصدر" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[...factoryBranches, ...destinationBranches].map((b) => (
+                      {factoryBranches.map((b) => (
                         <SelectItem key={b.id} value={b.id}>{b.name}{b.is_factory ? ' (مصنع)' : ''}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1429,8 +1429,8 @@ export default function InventoryTransfersPage() {
                       <SelectValue placeholder="اختر الفرع الوجهة" />
                     </SelectTrigger>
                     <SelectContent>
-                      {destinationBranches.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                      {destinationBranches.filter((b) => b.id !== createForm.from_branch_id).map((b) => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}{b.is_factory ? ' (مصنع)' : ''}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

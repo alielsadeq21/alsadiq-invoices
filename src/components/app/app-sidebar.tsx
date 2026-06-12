@@ -36,6 +36,7 @@ import {
   ClipboardCheck,
   BookOpenCheck,
   TrendingUp,
+  ShoppingCart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +59,7 @@ const navGroups = [
   {
     title: 'المبيعات والمالية',
     items: [
+      { id: 'pos', label: 'نقطة البيع', icon: ShoppingCart, color: 'from-green-500 to-green-600' },
       { id: 'sales', label: 'المبيعات', icon: TrendingUp, color: 'from-emerald-400 to-emerald-600' },
       { id: 'invoices', label: 'الفواتير', icon: FileText, color: 'from-emerald-500 to-emerald-600' },
       { id: 'returns', label: 'المرتجعات', icon: RotateCcw, color: 'from-rose-500 to-rose-600' },
@@ -103,6 +105,7 @@ const roleDisplayNames: Record<string, string> = {
   branch_manager: 'مدير فرع',
   warehouse_keeper: 'أمين مخزن',
   accountant: 'محاسب',
+  cashier: 'كاشير',
 };
 
 export default function AppSidebar() {

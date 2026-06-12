@@ -37,6 +37,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Package, Plus, Search, Edit, Trash2, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import DataTablePagination from '@/components/ui/data-table-pagination';
 import { toast } from 'sonner';
 
@@ -261,13 +263,17 @@ export default function ProductsPage() {
       </Card>
 
       {/* Products Content */}
-      <Card className="border-0 shadow-md overflow-hidden">
-        <CardContent className="p-0">
-          {loading ? (
+      {loading ? (
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-0">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="py-12">
               <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
             </div>
-          ) : products.length === 0 ? (
+          </CardContent>
+        </Card>
+      ) : products.length === 0 ? (
+        <Card className="border-0 shadow-md overflow-hidden">
+          <CardContent className="p-0">
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} className="py-20 px-4">
               <div
                 className="w-24 h-24 rounded-full flex items-center justify-center mb-5"
@@ -291,201 +297,207 @@ export default function ProductsPage() {
                 </Button>
               )}
             </div>
-          ) : (
-            <>
-              {/* Mobile Card Layout */}
-              <div className="sm:hidden p-3 space-y-3">
-                {products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="rounded-xl border-r-4 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
-                    style={{
-                      borderRightColor: product.is_active ? '#10b981' : '#ef4444',
-                      background: 'hsl(var(--card))',
-                    }}
-                  >
-                    <div className="p-3 sm:p-4 space-y-3">
-                      {/* Product name with icon */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* ─── Mobile Card Layout ─── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden">
+            {products.map((product, index) => (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: index * 0.03 }}
+              >
+                <Card
+                  className={cn(
+                    "border-0 shadow-md overflow-hidden border-r-4 transition-all duration-200 hover:shadow-lg active:scale-[0.98]",
+                    product.is_active ? "border-r-emerald-500" : "border-r-red-500"
+                  )}
+                >
+                  <CardContent className="p-4">
+                    {/* Product name with icon + status */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                         <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                           style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}
                         >
-                          <Package className="w-5 h-5 text-primary" />
+                          <Package className="w-4 h-4 text-primary" />
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <h3 className="font-semibold text-sm truncate">{product.name}</h3>
+                        <div>
+                          <h3 className="font-bold text-sm tracking-tight">{product.name}</h3>
                           {product.category && (
-                            <span className="text-xs text-muted-foreground">{product.category}</span>
+                            <span className="text-[11px] text-muted-foreground">{product.category}</span>
                           )}
                         </div>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            product.is_active
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs shrink-0'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-xs shrink-0'
-                          }
-                        >
-                          {product.is_active ? 'نشط' : 'معطل'}
-                        </Badge>
                       </div>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 shrink-0",
+                          product.is_active
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        )}
+                      >
+                        {product.is_active ? 'نشط' : 'معطل'}
+                      </Badge>
+                    </div>
 
-                      {/* Price and unit row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div
-                          className="rounded-lg px-3 py-1.5 text-center"
-                          style={{ background: 'hsl(var(--muted))' }}
-                        >
-                          <span className="text-xs text-muted-foreground block">السعر</span>
-                          <span className="font-bold text-sm">{formatCurrency(product.unit_price)}</span>
+                    {/* Price and unit info row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="pt-2.5 border-t border-dashed">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                        <span className="text-xs text-muted-foreground">السعر:</span>
+                        <span className="font-bold text-sm">{formatCurrency(product.unit_price)}</span>
+                      </div>
+                      {product.unit_count > 1 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <span className="text-xs text-muted-foreground">عدد/وحدة:</span>
+                          <span className="font-semibold text-sm">{product.unit_count}</span>
                         </div>
-                        {product.unit_count > 1 && (
-                          <div
-                            className="rounded-lg px-3 py-1.5 text-center"
-                            style={{ background: 'hsl(var(--muted))' }}
+                      )}
+                    </div>
+
+                    {/* Toggle + Action buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-3 pt-2.5 border-t">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Switch
+                          checked={product.is_active}
+                          onCheckedChange={() => toggleProductStatus(product)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {product.is_active ? 'مفعّل' : 'معطّل'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        {hasPermission('products', 'edit') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-[11px] gap-1.5 hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-colors"
+                            onClick={() => openEditDialog(product)}
                           >
-                            <span className="text-xs text-muted-foreground block">الوحدة</span>
-                            <span className="font-semibold text-sm">{product.unit_count}</span>
-                          </div>
+                            <Edit className="w-3.5 h-3.5" />
+                            تعديل
+                          </Button>
+                        )}
+                        {hasPermission('products', 'delete') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-[11px] gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 border-destructive/30 transition-colors"
+                            onClick={() => {
+                              setDeletingProduct(product);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            حذف
+                          </Button>
                         )}
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
 
-                      {/* Toggle + Actions */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* ─── Desktop Table Layout ─── */}
+          <Card className="border-0 shadow-md overflow-hidden hidden sm:block">
+            <div className="h-1" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.3), transparent)' }} />
+            <CardContent className="p-0">
+              <div style={{ overflowX: 'auto' }}>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-right font-semibold">المنتج</TableHead>
+                      <TableHead className="text-right font-semibold hidden sm:table-cell">الفئة</TableHead>
+                      <TableHead className="text-right font-semibold hidden md:table-cell">عدد/وحدة</TableHead>
+                      <TableHead className="text-right font-semibold">سعر الوحدة</TableHead>
+                      <TableHead className="text-center font-semibold">الحالة</TableHead>
+                      <TableHead className="text-center font-semibold">تفعيل</TableHead>
+                      <TableHead className="text-center font-semibold">الإجراءات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => (
+                      <TableRow key={product.id} className="transition-colors hover:bg-muted/50">
+                        <TableCell>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div
+                              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                              style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}
+                            >
+                              <Package className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="font-medium">{product.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {product.category ? (
+                            <Badge variant="secondary" className="text-xs font-medium">
+                              {product.category}
+                            </Badge>
+                          ) : '—'}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {product.unit_count > 1 ? product.unit_count : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-bold text-sm">{formatCurrency(product.unit_price)}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge
+                            variant="secondary"
+                            className={
+                              product.is_active
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            }
+                          >
+                            {product.is_active ? 'نشط' : 'معطل'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
                           <Switch
                             checked={product.is_active}
                             onCheckedChange={() => toggleProductStatus(product)}
                           />
-                          <span className="text-xs text-muted-foreground">
-                            {product.is_active ? 'مفعّل' : 'معطّل'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          {hasPermission('products', 'edit') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(product)}
-                              className="h-9 w-9 hover:bg-primary/10 hover:text-primary transition-colors"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasPermission('products', 'delete') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setDeletingProduct(product);
-                                setDeleteDialogOpen(true);
-                              }}
-                              className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop Table */}
-              <div className="hidden sm:block">
-                <div className="h-1" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.3), transparent)' }} />
-                <div style={{ overflowX: 'auto' }}>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="text-right font-semibold">المنتج</TableHead>
-                        <TableHead className="text-right font-semibold hidden sm:table-cell">الفئة</TableHead>
-                        <TableHead className="text-right font-semibold hidden md:table-cell">عدد/وحدة</TableHead>
-                        <TableHead className="text-right font-semibold">سعر الوحدة</TableHead>
-                        <TableHead className="text-center font-semibold">الحالة</TableHead>
-                        <TableHead className="text-center font-semibold">تفعيل</TableHead>
-                        <TableHead className="text-center font-semibold">الإجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((product) => (
-                        <TableRow key={product.id} className="transition-colors hover:bg-muted/50">
-                          <TableCell>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div
-                                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                                style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}
+                        </TableCell>
+                        <TableCell>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                            {hasPermission('products', 'edit') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(product)}
+                                className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
                               >
-                                <Package className="w-4 h-4 text-primary" />
-                              </div>
-                              <span className="font-medium">{product.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell">
-                            {product.category ? (
-                              <Badge variant="secondary" className="text-xs font-medium">
-                                {product.category}
-                              </Badge>
-                            ) : '—'}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            {product.unit_count > 1 ? product.unit_count : '—'}
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-bold text-sm">{formatCurrency(product.unit_price)}</span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge
-                              variant="secondary"
-                              className={
-                                product.is_active
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                              }
-                            >
-                              {product.is_active ? 'نشط' : 'معطل'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={product.is_active}
-                              onCheckedChange={() => toggleProductStatus(product)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                              {hasPermission('products', 'edit') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openEditDialog(product)}
-                                  className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {hasPermission('products', 'delete') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setDeletingProduct(product);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                  className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {hasPermission('products', 'delete') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setDeletingProduct(product);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
 
               <DataTablePagination
@@ -497,10 +509,26 @@ export default function ProductsPage() {
                 onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
                 label="منتج"
               />
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* ─── Mobile Pagination ─── */}
+          <div className="sm:hidden">
+            <Card className="border-0 shadow-md overflow-hidden">
+              <div className="h-0.5" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.3), transparent)' }} />
+              <DataTablePagination
+                page={page}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                label="منتج"
+              />
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -52,6 +52,7 @@ export interface Permissions {
   inventory_counts?: PagePermissions;
   accounting_reports?: PagePermissions;
   sales?: PagePermissions;
+  pos?: PagePermissions;
 }
 
 export interface Role {
@@ -439,15 +440,18 @@ export const DEFAULT_ADMIN_PERMISSIONS: Permissions = {
   inventory_counts: { view: true, create: true, edit: true },
   accounting_reports: { view: true, export: true },
   sales: { view: true, export: true },
+  pos: { view: true, create: true, print: true },
 };
 
 export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
   dashboard: { view: true },
+  pos: { view: true, create: true, print: true },
   invoices: { view: true, create: true, edit: true, print: true, export: true },
   returns: { view: true, create: true, print: true, export: true },
   payments: { view: true, create: true, print: true, export: true },
   branch_accounts: { view: true },
   account_statement: { view: true, print: true, export: true },
+  customers: { view: true, create: true },
   reports: { view: true, export: true },
   settings: { view: true },
   sales: { view: true, export: true },
@@ -455,6 +459,13 @@ export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
 
 export const DEFAULT_WAREHOUSE_KEEPER_PERMISSIONS: Permissions = {
   inventory: { view: true, create: true, edit: true, adjust: true },
+};
+
+export const DEFAULT_CASHIER_PERMISSIONS: Permissions = {
+  pos: { view: true, create: true, print: true },
+  invoices: { view: true, print: true },
+  returns: { view: true, create: true },
+  customers: { view: true, create: true },
 };
 
 export const DEFAULT_ACCOUNTANT_PERMISSIONS: Permissions = {

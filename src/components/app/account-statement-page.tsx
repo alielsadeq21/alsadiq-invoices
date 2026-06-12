@@ -522,7 +522,7 @@ export default function AccountStatementPage() {
       <Card className="border-0 shadow-lg overflow-hidden relative">
         <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-teal-500 via-emerald-500 to-teal-600" />
         <CardContent className="p-3 sm:p-5 pt-4 sm:pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }} className="sm:grid-cols-2 lg:grid-cols-5 sm:gap-3">
             <div>
               <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
                 <Building2 className="w-3 h-3" />
@@ -580,11 +580,11 @@ export default function AccountStatementPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end col-span-1 sm:col-span-2 lg:col-span-1">
+            <div style={{ display: 'flex', alignItems: 'flex-end' }} className="col-span-1 sm:col-span-2 lg:col-span-1">
               <Button
                 onClick={generateStatement}
                 disabled={loading}
-                className="w-full gap-2 h-9 text-xs sm:text-sm bg-gradient-to-l from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-md shadow-teal-500/20 transition-all duration-200"
+                className="w-full gap-2 h-10 sm:h-9 text-sm sm:text-xs md:text-sm bg-gradient-to-l from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-md shadow-teal-500/20 transition-all duration-200"
               >
                 <Search className="w-4 h-4" />
                 {loading ? 'جاري التحليل...' : 'عرض الكشف'}
@@ -626,7 +626,7 @@ export default function AccountStatementPage() {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 mb-4">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }} className="sm:grid-cols-3 sm:gap-5 mb-4">
             <Card className="border-0 shadow-lg overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
               <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-red-500 to-rose-500" />
               <CardContent className="p-4 sm:p-5 bg-gradient-to-bl from-red-50/80 via-white to-white dark:from-red-950/30 dark:via-card dark:to-card">

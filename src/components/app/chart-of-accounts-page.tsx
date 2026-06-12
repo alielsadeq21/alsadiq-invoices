@@ -207,6 +207,21 @@ export default function ChartOfAccountsPage() {
 
   const treeData = useMemo(() => buildTree(filteredAccounts), [filteredAccounts, buildTree]);
 
+  // Flatten tree into a list for mobile card layout (with parent info)
+  const flattenedAccounts = useMemo(() => {
+    const flat: Array<ChartOfAccount & { depth: number; parentName: string | null }> = [];
+    const walk = (nodes: ChartOfAccount[], depth: number, parentName: string | null) => {
+      nodes.forEach((node) => {
+        flat.push({ ...node, depth, parentName });
+        if (node.children && node.children.length > 0) {
+          walk(node.children, depth + 1, node.name);
+        }
+      });
+    };
+    walk(treeData, 0, null);
+    return flat;
+  }, [treeData]);
+
   // Stats
   const stats = useMemo(() => {
     const countByType: Record<string, number> = {};
@@ -388,125 +403,6 @@ export default function ChartOfAccountsPage() {
 
     return (
       <div key={account.id}>
-        {/* Mobile Card Layout */}
-        <div
-          className="sm:hidden mb-2"
-          style={{ marginRight: depth > 0 ? `${depth * 0.75}rem` : undefined }}
-        >
-          <div
-            className="bg-card rounded-lg border shadow-sm overflow-hidden border-r-4"
-            style={{ borderRightColor: ACCOUNT_TYPE_BORDER_COLORS[account.account_type] || '#6b7280' }}
-          >
-            {/* First row: Expand chevron + Colored dot + Code + Name */}
-            <div className="flex items-center gap-2 p-3 pb-1.5" style={{ display: 'flex' }}>
-              {hasChildren ? (
-                <button
-                  onClick={() => toggleNode(account.id)}
-                  className="w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0 hover:bg-muted cursor-pointer"
-                  style={{ display: 'flex' }}
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </button>
-              ) : (
-                <span className="w-6 shrink-0" />
-              )}
-              <div
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
-              />
-              <span
-                className="font-mono text-sm font-bold"
-                style={{ color: 'transparent', background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', backgroundClip: 'text', WebkitBackgroundClip: 'text' }}
-              >
-                {account.code}
-              </span>
-              <span className="font-medium text-sm flex-1 min-w-0 truncate">
-                {account.name}
-              </span>
-            </div>
-
-            {/* Second row: Account type badge + Balance */}
-            <div className="flex items-center gap-2 px-3 pb-2 pl-11" style={{ display: 'flex' }}>
-              <Badge
-                variant="secondary"
-                className="text-[10px] text-white border-0"
-                style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', display: 'inline-flex' }}
-              >
-                {getAccountTypeLabel(account.account_type)}
-              </Badge>
-              <span
-                className={cn(
-                  'text-sm font-semibold tabular-nums',
-                  account.balance > 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : account.balance < 0
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-muted-foreground'
-                )}
-              >
-                {formatCurrency(account.balance)}
-              </span>
-            </div>
-
-            {/* Third row: System badge + children count */}
-            {(isSystem || hasChildren) && (
-              <div className="flex items-center gap-2 px-3 pb-2 pl-11" style={{ display: 'flex' }}>
-                {isSystem && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground" style={{ display: 'inline-flex' }}>
-                    <Shield className="w-3 h-3" />
-                    نظام
-                  </span>
-                )}
-                {hasChildren && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground" style={{ display: 'inline-flex' }}>
-                    {isExpanded ? (
-                      <FolderOpen className="w-3 h-3 text-amber-500" />
-                    ) : (
-                      <FolderTree className="w-3 h-3 text-amber-500" />
-                    )}
-                    {account.children!.length} حساب
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Fourth row: Action buttons - always visible on mobile */}
-            {(canEdit || (canDelete && !isSystem)) && (
-              <div className="flex items-center gap-1 px-3 pb-3 pl-11" style={{ display: 'flex' }}>
-                {canEdit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => openEditDialog(account)}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    تعديل
-                  </Button>
-                )}
-                {canDelete && !isSystem && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
-                    onClick={() => {
-                      setDeletingAccount(account);
-                      setDeleteDialogOpen(true);
-                    }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    حذف
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Desktop Row Layout */}
         <div
           className={cn(
@@ -827,11 +723,131 @@ export default function ChartOfAccountsPage() {
                 )}
               </div>
             ) : (
-              <ScrollArea className="max-h-[60vh]">
-                <div className="space-y-0.5">
-                  {treeData.map((account) => renderTreeNode(account))}
+              <>
+                {/* Mobile Card Layout - Flattened list */}
+                <div className="sm:hidden space-y-3" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                  {flattenedAccounts.map((account, index) => (
+                    <motion.div
+                      key={account.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.5) }}
+                      className="rounded-lg border shadow-sm overflow-hidden"
+                      style={{
+                        borderRightWidth: '4px',
+                        borderRightStyle: 'solid',
+                        borderRightColor: ACCOUNT_TYPE_BORDER_COLORS[account.account_type] || '#6b7280',
+                        marginRight: account.depth > 0 ? `${account.depth * 0.75}rem` : undefined,
+                      }}
+                    >
+                      {/* Row 1: Code + Name prominently */}
+                      <div className="flex items-center gap-2 p-3 pb-1" style={{ display: 'flex', alignItems: 'center' }}>
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
+                        />
+                        <span
+                          className="font-mono text-sm font-bold shrink-0"
+                          style={{ color: 'transparent', background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', backgroundClip: 'text', WebkitBackgroundClip: 'text' }}
+                        >
+                          {account.code}
+                        </span>
+                        <span className="font-semibold text-sm flex-1 min-w-0 truncate">
+                          {account.name}
+                        </span>
+                        {account.is_system && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground shrink-0" style={{ display: 'inline-flex' }}>
+                            <Shield className="w-3 h-3" />
+                            نظام
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Row 2: Account type badge + Balance */}
+                      <div className="flex items-center gap-2 px-3 pb-2" style={{ display: 'flex', alignItems: 'center' }}>
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] text-white border-0"
+                          style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', display: 'inline-flex' }}
+                        >
+                          {ACCOUNT_TYPE_ICONS[account.account_type]}
+                          <span className="mr-1">{getAccountTypeLabel(account.account_type)}</span>
+                        </Badge>
+                        <span
+                          className={cn(
+                            'text-sm font-semibold tabular-nums',
+                            account.balance > 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : account.balance < 0
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          {formatCurrency(account.balance)}
+                        </span>
+                      </div>
+
+                      {/* Row 3: Parent account name + children count */}
+                      {(account.parentName || (account.children && account.children.length > 0)) && (
+                        <div className="flex items-center gap-2 px-3 pb-2" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {account.parentName && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground" style={{ display: 'inline-flex' }}>
+                              <FolderTree className="w-3 h-3" />
+                              تحت: {account.parentName}
+                            </span>
+                          )}
+                          {account.children && account.children.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground" style={{ display: 'inline-flex' }}>
+                              <FolderOpen className="w-3 h-3 text-amber-500" />
+                              {account.children.length} حساب فرعي
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Row 4: Action buttons - always visible on mobile */}
+                      {(canEdit || (canDelete && !account.is_system)) && (
+                        <div className="flex items-center gap-1 px-3 pb-3 border-t border-border/50 pt-2" style={{ display: 'flex', alignItems: 'center' }}>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs gap-1.5"
+                              onClick={() => openEditDialog(account)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              تعديل
+                            </Button>
+                          )}
+                          {canDelete && !account.is_system && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setDeletingAccount(account);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              حذف
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
                 </div>
-              </ScrollArea>
+
+                {/* Desktop Tree Layout */}
+                <div className="hidden sm:block">
+                  <ScrollArea className="max-h-[60vh]">
+                    <div className="space-y-0.5">
+                      {treeData.map((account) => renderTreeNode(account))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
