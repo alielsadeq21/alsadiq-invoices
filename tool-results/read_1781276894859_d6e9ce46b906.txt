@@ -1,0 +1,991 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState, useCallback, useMemo } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { ChartOfAccount } from '@/lib/types';
+     7→     7→import { formatCurrency, getAccountTypeLabel, getAccountTypeColor, getCurrentYear } from '@/lib/utils';
+     8→     8→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     9→     9→import { Button } from '@/components/ui/button';
+    10→    10→import { Input } from '@/components/ui/input';
+    11→    11→import { Label } from '@/components/ui/label';
+    12→    12→import { Badge } from '@/components/ui/badge';
+    13→    13→import { ScrollArea } from '@/components/ui/scroll-area';
+    14→    14→import {
+    15→    15→  Dialog,
+    16→    16→  DialogContent,
+    17→    17→  DialogHeader,
+    18→    18→  DialogTitle,
+    19→    19→  DialogFooter,
+    20→    20→} from '@/components/ui/dialog';
+    21→    21→import {
+    22→    22→  AlertDialog,
+    23→    23→  AlertDialogAction,
+    24→    24→  AlertDialogCancel,
+    25→    25→  AlertDialogContent,
+    26→    26→  AlertDialogDescription,
+    27→    27→  AlertDialogFooter,
+    28→    28→  AlertDialogHeader,
+    29→    29→  AlertDialogTitle,
+    30→    30→} from '@/components/ui/alert-dialog';
+    31→    31→import {
+    32→    32→  Select,
+    33→    33→  SelectContent,
+    34→    34→  SelectItem,
+    35→    35→  SelectTrigger,
+    36→    36→  SelectValue,
+    37→    37→} from '@/components/ui/select';
+    38→    38→import {
+    39→    39→  Network,
+    40→    40→  Plus,
+    41→    41→  Search,
+    42→    42→  ChevronDown,
+    43→    43→  ChevronLeft,
+    44→    44→  Pencil,
+    45→    45→  Trash2,
+    46→    46→  Loader2,
+    47→    47→  X,
+    48→    48→  Landmark,
+    49→    49→  CircleDollarSign,
+    50→    50→  Wallet,
+    51→    51→  TrendingUp,
+    52→    52→  TrendingDown,
+    53→    53→  Shield,
+    54→    54→  FolderTree,
+    55→    55→  FolderOpen,
+    56→    56→} from 'lucide-react';
+    57→    57→import { toast } from 'sonner';
+    58→    58→import { motion } from 'framer-motion';
+    59→    59→import { cn } from '@/lib/utils';
+    60→    60→
+    61→    61→const ACCOUNT_TYPES: ChartOfAccount['account_type'][] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+    62→    62→
+    63→    63→const ACCOUNT_TYPE_ICONS: Record<string, React.ReactNode> = {
+    64→    64→  asset: <Landmark className="w-4 h-4" />,
+    65→    65→  liability: <CircleDollarSign className="w-4 h-4" />,
+    66→    66→  equity: <Wallet className="w-4 h-4" />,
+    67→    67→  revenue: <TrendingUp className="w-4 h-4" />,
+    68→    68→  expense: <TrendingDown className="w-4 h-4" />,
+    69→    69→};
+    70→    70→
+    71→    71→const ACCOUNT_TYPE_GRADIENTS: Record<string, string> = {
+    72→    72→  asset: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+    73→    73→  liability: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+    74→    74→  equity: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+    75→    75→  revenue: 'linear-gradient(135deg, #10b981, #059669)',
+    76→    76→  expense: 'linear-gradient(135deg, #f59e0b, #d97706)',
+    77→    77→};
+    78→    78→
+    79→    79→const ACCOUNT_TYPE_BORDER_COLORS: Record<string, string> = {
+    80→    80→  asset: '#0ea5e9',
+    81→    81→  liability: '#f43f5e',
+    82→    82→  equity: '#8b5cf6',
+    83→    83→  revenue: '#10b981',
+    84→    84→  expense: '#f59e0b',
+    85→    85→};
+    86→    86→
+    87→    87→interface AccountFormData {
+    88→    88→  code: string;
+    89→    89→  name: string;
+    90→    90→  name_en: string;
+    91→    91→  parent_id: string;
+    92→    92→  account_type: ChartOfAccount['account_type'] | '';
+    93→    93→}
+    94→    94→
+    95→    95→const emptyForm: AccountFormData = {
+    96→    96→  code: '',
+    97→    97→  name: '',
+    98→    98→  name_en: '',
+    99→    99→  parent_id: 'none',
+   100→   100→  account_type: '',
+   101→   101→};
+   102→   102→
+   103→   103→export default function ChartOfAccountsPage() {
+   104→   104→  const { isAdmin, hasPermission } = useAppStore();
+   105→   105→
+   106→   106→  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+   107→   107→  const [loading, setLoading] = useState(true);
+   108→   108→  const [search, setSearch] = useState('');
+   109→   109→  const [typeFilter, setTypeFilter] = useState<string>('all');
+   110→   110→  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+   111→   111→
+   112→   112→  // Create/Edit dialog
+   113→   113→  const [dialogOpen, setDialogOpen] = useState(false);
+   114→   114→  const [editingAccount, setEditingAccount] = useState<ChartOfAccount | null>(null);
+   115→   115→  const [saving, setSaving] = useState(false);
+   116→   116→  const [formData, setFormData] = useState<AccountFormData>({ ...emptyForm });
+   117→   117→
+   118→   118→  // Delete dialog
+   119→   119→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   120→   120→  const [deletingAccount, setDeletingAccount] = useState<ChartOfAccount | null>(null);
+   121→   121→
+   122→   122→  const canView = isAdmin || hasPermission('chart_of_accounts', 'view');
+   123→   123→  const canCreate = isAdmin || hasPermission('chart_of_accounts', 'create');
+   124→   124→  const canEdit = isAdmin || hasPermission('chart_of_accounts', 'edit');
+   125→   125→  const canDelete = isAdmin || hasPermission('chart_of_accounts', 'delete');
+   126→   126→
+   127→   127→  useEffect(() => {
+   128→   128→    if (canView) loadAccounts();
+   129→   129→  }, [canView]);
+   130→   130→
+   131→   131→  const loadAccounts = async () => {
+   132→   132→    setLoading(true);
+   133→   133→    try {
+   134→   134→      const { data, error } = await supabase
+   135→   135→        .from('chart_of_accounts')
+   136→   136→        .select('*')
+   137→   137→        .order('code');
+   138→   138→
+   139→   139→      if (error) throw error;
+   140→   140→      setAccounts((data as ChartOfAccount[]) || []);
+   141→   141→      // Auto-expand root nodes
+   142→   142→      if (data && data.length > 0) {
+   143→   143→        const rootIds = data.filter((a: ChartOfAccount) => !a.parent_id).map((a: ChartOfAccount) => a.id);
+   144→   144→        setExpandedNodes(new Set(rootIds));
+   145→   145→      }
+   146→   146→    } catch {
+   147→   147→      toast.error('حدث خطأ أثناء تحميل الحسابات');
+   148→   148→    } finally {
+   149→   149→      setLoading(false);
+   150→   150→    }
+   151→   151→  };
+   152→   152→
+   153→   153→  // Build tree from flat list
+   154→   154→  const buildTree = useCallback((flatAccounts: ChartOfAccount[]): ChartOfAccount[] => {
+   155→   155→    const map = new Map<string, ChartOfAccount>();
+   156→   156→    const roots: ChartOfAccount[] = [];
+   157→   157→
+   158→   158→    flatAccounts.forEach((account) => {
+   159→   159→      map.set(account.id, { ...account, children: [] });
+   160→   160→    });
+   161→   161→
+   162→   162→    map.forEach((account) => {
+   163→   163→      if (account.parent_id && map.has(account.parent_id)) {
+   164→   164→        const parent = map.get(account.parent_id)!;
+   165→   165→        if (!parent.children) parent.children = [];
+   166→   166→        parent.children.push(account);
+   167→   167→      } else {
+   168→   168→        roots.push(account);
+   169→   169→      }
+   170→   170→    });
+   171→   171→
+   172→   172→    return roots;
+   173→   173→  }, []);
+   174→   174→
+   175→   175→  // Filter and search
+   176→   176→  const filteredAccounts = useMemo(() => {
+   177→   177→    let result = accounts;
+   178→   178→
+   179→   179→    if (typeFilter !== 'all') {
+   180→   180→      result = result.filter((a) => a.account_type === typeFilter);
+   181→   181→    }
+   182→   182→
+   183→   183→    if (search.trim()) {
+   184→   184→      const q = search.trim().toLowerCase();
+   185→   185→      const matchingIds = new Set<string>();
+   186→   186→      result.forEach((a) => {
+   187→   187→        if (
+   188→   188→          a.name.toLowerCase().includes(q) ||
+   189→   189→          (a.name_en && a.name_en.toLowerCase().includes(q)) ||
+   190→   190→          a.code.toLowerCase().includes(q)
+   191→   191→        ) {
+   192→   192→          matchingIds.add(a.id);
+   193→   193→          // Add all ancestor ids
+   194→   194→          let parentId = a.parent_id;
+   195→   195→          while (parentId) {
+   196→   196→            matchingIds.add(parentId);
+   197→   197→            const parent = result.find((p) => p.id === parentId);
+   198→   198→            parentId = parent?.parent_id || null;
+   199→   199→          }
+   200→   200→        }
+   201→   201→      });
+   202→   202→      result = result.filter((a) => matchingIds.has(a.id));
+   203→   203→    }
+   204→   204→
+   205→   205→    return result;
+   206→   206→  }, [accounts, typeFilter, search]);
+   207→   207→
+   208→   208→  const treeData = useMemo(() => buildTree(filteredAccounts), [filteredAccounts, buildTree]);
+   209→   209→
+   210→   210→  // Stats
+   211→   211→  const stats = useMemo(() => {
+   212→   212→    const countByType: Record<string, number> = {};
+   213→   213→    const balanceByType: Record<string, number> = {};
+   214→   214→    ACCOUNT_TYPES.forEach((t) => {
+   215→   215→      countByType[t] = 0;
+   216→   216→      balanceByType[t] = 0;
+   217→   217→    });
+   218→   218→    accounts.forEach((a) => {
+   219→   219→      countByType[a.account_type] = (countByType[a.account_type] || 0) + 1;
+   220→   220→      balanceByType[a.account_type] = (balanceByType[a.account_type] || 0) + (a.balance || 0);
+   221→   221→    });
+   222→   222→    return { countByType, balanceByType };
+   223→   223→  }, [accounts]);
+   224→   224→
+   225→   225→  // Toggle expand/collapse
+   226→   226→  const toggleNode = (id: string) => {
+   227→   227→    setExpandedNodes((prev) => {
+   228→   228→      const next = new Set(prev);
+   229→   229→      if (next.has(id)) {
+   230→   230→        next.delete(id);
+   231→   231→      } else {
+   232→   232→        next.add(id);
+   233→   233→      }
+   234→   234→      return next;
+   235→   235→    });
+   236→   236→  };
+   237→   237→
+   238→   238→  const expandAll = () => {
+   239→   239→    const allIds = new Set(accounts.map((a) => a.id));
+   240→   240→    setExpandedNodes(allIds);
+   241→   241→  };
+   242→   242→
+   243→   243→  const collapseAll = () => {
+   244→   244→    setExpandedNodes(new Set());
+   245→   245→  };
+   246→   246→
+   247→   247→  // Get parent accounts for select dropdown
+   248→   248→  const parentAccountOptions = useMemo(() => {
+   249→   249→    return accounts
+   250→   250→      .filter((a) => !editingAccount || a.id !== editingAccount.id)
+   251→   251→      .sort((a, b) => a.code.localeCompare(b.code));
+   252→   252→  }, [accounts, editingAccount]);
+   253→   253→
+   254→   254→  // Dialog handlers
+   255→   255→  const openCreateDialog = () => {
+   256→   256→    setEditingAccount(null);
+   257→   257→    setFormData({ ...emptyForm });
+   258→   258→    setDialogOpen(true);
+   259→   259→  };
+   260→   260→
+   261→   261→  const openEditDialog = (account: ChartOfAccount) => {
+   262→   262→    setEditingAccount(account);
+   263→   263→    setFormData({
+   264→   264→      code: account.code,
+   265→   265→      name: account.name,
+   266→   266→      name_en: account.name_en || '',
+   267→   267→      parent_id: account.parent_id || 'none',
+   268→   268→      account_type: account.account_type,
+   269→   269→    });
+   270→   270→    setDialogOpen(true);
+   271→   271→  };
+   272→   272→
+   273→   273→  const handleSave = async () => {
+   274→   274→    if (!formData.code.trim()) {
+   275→   275→      toast.error('يرجى إدخال كود الحساب');
+   276→   276→      return;
+   277→   277→    }
+   278→   278→    if (!formData.name.trim()) {
+   279→   279→      toast.error('يرجى إدخال اسم الحساب');
+   280→   280→      return;
+   281→   281→    }
+   282→   282→    if (!formData.account_type) {
+   283→   283→      toast.error('يرجى اختيار نوع الحساب');
+   284→   284→      return;
+   285→   285→    }
+   286→   286→
+   287→   287→    // Check duplicate code
+   288→   288→    const duplicate = accounts.find(
+   289→   289→      (a) => a.code === formData.code.trim() && a.id !== editingAccount?.id
+   290→   290→    );
+   291→   291→    if (duplicate) {
+   292→   292→      toast.error('كود الحساب موجود بالفعل');
+   293→   293→      return;
+   294→   294→    }
+   295→   295→
+   296→   296→    setSaving(true);
+   297→   297→    try {
+   298→   298→      const payload = {
+   299→   299→        code: formData.code.trim(),
+   300→   300→        name: formData.name.trim(),
+   301→   301→        name_en: formData.name_en.trim() || null,
+   302→   302→        parent_id: formData.parent_id === 'none' ? null : formData.parent_id,
+   303→   303→        account_type: formData.account_type,
+   304→   304→        is_active: true,
+   305→   305→        updated_at: new Date().toISOString(),
+   306→   306→      };
+   307→   307→
+   308→   308→      if (editingAccount) {
+   309→   309→        // Update
+   310→   310→        const { error } = await supabase
+   311→   311→          .from('chart_of_accounts')
+   312→   312→          .update(payload)
+   313→   313→          .eq('id', editingAccount.id);
+   314→   314→
+   315→   315→        if (error) throw error;
+   316→   316→        toast.success('تم تعديل الحساب بنجاح');
+   317→   317→      } else {
+   318→   318→        // Create
+   319→   319→        const { error } = await supabase
+   320→   320→          .from('chart_of_accounts')
+   321→   321→          .insert({
+   322→   322→            ...payload,
+   323→   323→            is_system: false,
+   324→   324→            balance: 0,
+   325→   325→          });
+   326→   326→
+   327→   327→        if (error) throw error;
+   328→   328→        toast.success('تم إضافة الحساب بنجاح');
+   329→   329→      }
+   330→   330→
+   331→   331→      setDialogOpen(false);
+   332→   332→      loadAccounts();
+   333→   333→    } catch {
+   334→   334→      toast.error('حدث خطأ أثناء الحفظ');
+   335→   335→    } finally {
+   336→   336→      setSaving(false);
+   337→   337→    }
+   338→   338→  };
+   339→   339→
+   340→   340→  const handleDelete = async () => {
+   341→   341→    if (!deletingAccount) return;
+   342→   342→
+   343→   343→    // Check if account has children
+   344→   344→    const hasChildren = accounts.some((a) => a.parent_id === deletingAccount.id);
+   345→   345→    if (hasChildren) {
+   346→   346→      toast.error('لا يمكن حذف حساب لديه حسابات فرعية');
+   347→   347→      setDeleteDialogOpen(false);
+   348→   348→      setDeletingAccount(null);
+   349→   349→      return;
+   350→   350→    }
+   351→   351→
+   352→   352→    try {
+   353→   353→      const { error } = await supabase
+   354→   354→        .from('chart_of_accounts')
+   355→   355→        .delete()
+   356→   356→        .eq('id', deletingAccount.id);
+   357→   357→
+   358→   358→      if (error) throw error;
+   359→   359→
+   360→   360→      toast.success('تم حذف الحساب بنجاح');
+   361→   361→      setDeleteDialogOpen(false);
+   362→   362→      setDeletingAccount(null);
+   363→   363→      loadAccounts();
+   364→   364→    } catch {
+   365→   365→      toast.error('حدث خطأ أثناء حذف الحساب');
+   366→   366→    }
+   367→   367→  };
+   368→   368→
+   369→   369→  // Calculate child balance for a parent (recursive)
+   370→   370→  const getTotalBalance = useCallback(
+   371→   371→    (account: ChartOfAccount): number => {
+   372→   372→      let total = account.balance || 0;
+   373→   373→      if (account.children && account.children.length > 0) {
+   374→   374→        account.children.forEach((child) => {
+   375→   375→          total += getTotalBalance(child);
+   376→   376→        });
+   377→   377→      }
+   378→   378→      return total;
+   379→   379→    },
+   380→   380→    []
+   381→   381→  );
+   382→   382→
+   383→   383→  // Render tree node
+   384→   384→  const renderTreeNode = (account: ChartOfAccount, depth: number = 0): React.ReactNode => {
+   385→   385→    const hasChildren = account.children && account.children.length > 0;
+   386→   386→    const isExpanded = expandedNodes.has(account.id);
+   387→   387→    const isSystem = account.is_system;
+   388→   388→
+   389→   389→    return (
+   390→   390→      <div key={account.id}>
+   391→   391→        {/* Mobile Card Layout */}
+   392→   392→        <div
+   393→   393→          className="sm:hidden mb-2"
+   394→   394→          style={{ marginRight: depth > 0 ? `${depth * 0.75}rem` : undefined }}
+   395→   395→        >
+   396→   396→          <div
+   397→   397→            className="bg-card rounded-lg border shadow-sm overflow-hidden border-r-4"
+   398→   398→            style={{ borderRightColor: ACCOUNT_TYPE_BORDER_COLORS[account.account_type] || '#6b7280' }}
+   399→   399→          >
+   400→   400→            {/* First row: Expand chevron + Colored dot + Code + Name */}
+   401→   401→            <div className="flex items-center gap-2 p-3 pb-1.5" style={{ display: 'flex' }}>
+   402→   402→              {hasChildren ? (
+   403→   403→                <button
+   404→   404→                  onClick={() => toggleNode(account.id)}
+   405→   405→                  className="w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0 hover:bg-muted cursor-pointer"
+   406→   406→                  style={{ display: 'flex' }}
+   407→   407→                >
+   408→   408→                  {isExpanded ? (
+   409→   409→                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+   410→   410→                  ) : (
+   411→   411→                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+   412→   412→                  )}
+   413→   413→                </button>
+   414→   414→              ) : (
+   415→   415→                <span className="w-6 shrink-0" />
+   416→   416→              )}
+   417→   417→              <div
+   418→   418→                className="w-2.5 h-2.5 rounded-full shrink-0"
+   419→   419→                style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
+   420→   420→              />
+   421→   421→              <span
+   422→   422→                className="font-mono text-sm font-bold"
+   423→   423→                style={{ color: 'transparent', background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', backgroundClip: 'text', WebkitBackgroundClip: 'text' }}
+   424→   424→              >
+   425→   425→                {account.code}
+   426→   426→              </span>
+   427→   427→              <span className="font-medium text-sm flex-1 min-w-0 truncate">
+   428→   428→                {account.name}
+   429→   429→              </span>
+   430→   430→            </div>
+   431→   431→
+   432→   432→            {/* Second row: Account type badge + Balance */}
+   433→   433→            <div className="flex items-center gap-2 px-3 pb-2 pl-11" style={{ display: 'flex' }}>
+   434→   434→              <Badge
+   435→   435→                variant="secondary"
+   436→   436→                className="text-[10px] text-white border-0"
+   437→   437→                style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', display: 'inline-flex' }}
+   438→   438→              >
+   439→   439→                {getAccountTypeLabel(account.account_type)}
+   440→   440→              </Badge>
+   441→   441→              <span
+   442→   442→                className={cn(
+   443→   443→                  'text-sm font-semibold tabular-nums',
+   444→   444→                  account.balance > 0
+   445→   445→                    ? 'text-emerald-600 dark:text-emerald-400'
+   446→   446→                    : account.balance < 0
+   447→   447→                    ? 'text-red-600 dark:text-red-400'
+   448→   448→                    : 'text-muted-foreground'
+   449→   449→                )}
+   450→   450→              >
+   451→   451→                {formatCurrency(account.balance)}
+   452→   452→              </span>
+   453→   453→            </div>
+   454→   454→
+   455→   455→            {/* Third row: System badge + children count */}
+   456→   456→            {(isSystem || hasChildren) && (
+   457→   457→              <div className="flex items-center gap-2 px-3 pb-2 pl-11" style={{ display: 'flex' }}>
+   458→   458→                {isSystem && (
+   459→   459→                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground" style={{ display: 'inline-flex' }}>
+   460→   460→                    <Shield className="w-3 h-3" />
+   461→   461→                    نظام
+   462→   462→                  </span>
+   463→   463→                )}
+   464→   464→                {hasChildren && (
+   465→   465→                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground" style={{ display: 'inline-flex' }}>
+   466→   466→                    {isExpanded ? (
+   467→   467→                      <FolderOpen className="w-3 h-3 text-amber-500" />
+   468→   468→                    ) : (
+   469→   469→                      <FolderTree className="w-3 h-3 text-amber-500" />
+   470→   470→                    )}
+   471→   471→                    {account.children!.length} حساب
+   472→   472→                  </span>
+   473→   473→                )}
+   474→   474→              </div>
+   475→   475→            )}
+   476→   476→
+   477→   477→            {/* Fourth row: Action buttons - always visible on mobile */}
+   478→   478→            {(canEdit || (canDelete && !isSystem)) && (
+   479→   479→              <div className="flex items-center gap-1 px-3 pb-3 pl-11" style={{ display: 'flex' }}>
+   480→   480→                {canEdit && (
+   481→   481→                  <Button
+   482→   482→                    variant="ghost"
+   483→   483→                    size="sm"
+   484→   484→                    className="h-7 text-xs gap-1"
+   485→   485→                    onClick={() => openEditDialog(account)}
+   486→   486→                  >
+   487→   487→                    <Pencil className="w-3.5 h-3.5" />
+   488→   488→                    تعديل
+   489→   489→                  </Button>
+   490→   490→                )}
+   491→   491→                {canDelete && !isSystem && (
+   492→   492→                  <Button
+   493→   493→                    variant="ghost"
+   494→   494→                    size="sm"
+   495→   495→                    className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
+   496→   496→                    onClick={() => {
+   497→   497→                      setDeletingAccount(account);
+   498→   498→                      setDeleteDialogOpen(true);
+   499→   499→                    }}
+   500→   500→                  >
+   501→   501→                    <Trash2 className="w-3.5 h-3.5" />
+   502→   502→                    حذف
+   503→   503→                  </Button>
+   504→   504→                )}
+   505→   505→              </div>
+   506→   506→            )}
+   507→   507→          </div>
+   508→   508→        </div>
+   509→   509→
+   510→   510→        {/* Desktop Row Layout */}
+   511→   511→        <div
+   512→   512→          className={cn(
+   513→   513→            'hidden sm:flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group',
+   514→   514→          )}
+   515→   515→          style={{ marginRight: depth > 0 ? `${depth * 1.5}rem` : undefined }}
+   516→   516→        >
+   517→   517→          {/* Expand/Collapse button */}
+   518→   518→          <button
+   519→   519→            onClick={() => hasChildren && toggleNode(account.id)}
+   520→   520→            className={cn(
+   521→   521→              'w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0',
+   522→   522→              hasChildren
+   523→   523→                ? 'hover:bg-muted cursor-pointer'
+   524→   524→                : 'cursor-default'
+   525→   525→            )}
+   526→   526→          >
+   527→   527→            {hasChildren ? (
+   528→   528→              isExpanded ? (
+   529→   529→                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+   530→   530→              ) : (
+   531→   531→                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+   532→   532→              )
+   533→   533→            ) : (
+   534→   534→              <span className="w-4 h-4" />
+   535→   535→            )}
+   536→   536→          </button>
+   537→   537→
+   538→   538→          {/* Folder icon with colored type indicator */}
+   539→   539→          <div className="relative shrink-0">
+   540→   540→            {hasChildren ? (
+   541→   541→              isExpanded ? (
+   542→   542→                <FolderOpen className="w-4 h-4 text-amber-500" />
+   543→   543→              ) : (
+   544→   544→                <FolderTree className="w-4 h-4 text-amber-500" />
+   545→   545→              )
+   546→   546→            ) : (
+   547→   547→              <div
+   548→   548→                className="w-4 h-4 rounded-full flex items-center justify-center"
+   549→   549→                style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
+   550→   550→              >
+   551→   551→                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+   552→   552→              </div>
+   553→   553→            )}
+   554→   554→          </div>
+   555→   555→
+   556→   556→          {/* Account code */}
+   557→   557→          <span
+   558→   558→            className="font-mono text-sm font-bold min-w-[60px] px-1.5 py-0.5 rounded"
+   559→   559→            style={{ color: ACCOUNT_TYPE_GRADIENTS[account.account_type] ? 'inherit' : undefined }}
+   560→   560→          >
+   561→   561→            <span style={{ color: 'transparent', background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280', backgroundClip: 'text', WebkitBackgroundClip: 'text' }}>
+   562→   562→              {account.code}
+   563→   563→            </span>
+   564→   564→          </span>
+   565→   565→
+   566→   566→          {/* Account name */}
+   567→   567→          <span className="font-medium text-sm flex-1 min-w-0 truncate">
+   568→   568→            {account.name}
+   569→   569→          </span>
+   570→   570→
+   571→   571→          {/* English name (hidden on small screens) */}
+   572→   572→          {account.name_en && (
+   573→   573→            <span className="text-xs text-muted-foreground hidden md:block max-w-[120px] truncate">
+   574→   574→              {account.name_en}
+   575→   575→            </span>
+   576→   576→          )}
+   577→   577→
+   578→   578→          {/* Account type badge with gradient */}
+   579→   579→          <Badge
+   580→   580→            variant="secondary"
+   581→   581→            className={cn('text-[10px] hidden sm:inline-flex text-white border-0')}
+   582→   582→            style={{ background: ACCOUNT_TYPE_GRADIENTS[account.account_type] || '#6b7280' }}
+   583→   583→          >
+   584→   584→            {getAccountTypeLabel(account.account_type)}
+   585→   585→          </Badge>
+   586→   586→
+   587→   587→          {/* Balance */}
+   588→   588→          <span
+   589→   589→            className={cn(
+   590→   590→              'text-sm font-semibold min-w-[100px] text-left tabular-nums',
+   591→   591→              account.balance > 0
+   592→   592→                ? 'text-emerald-600 dark:text-emerald-400'
+   593→   593→                : account.balance < 0
+   594→   594→                ? 'text-red-600 dark:text-red-400'
+   595→   595→                : 'text-muted-foreground'
+   596→   596→            )}
+   597→   597→          >
+   598→   598→            {formatCurrency(account.balance)}
+   599→   599→          </span>
+   600→   600→
+   601→   601→          {/* System badge */}
+   602→   602→          {isSystem && (
+   603→   603→            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+   604→   604→              <Shield className="w-3 h-3" />
+   605→   605→              نظام
+   606→   606→            </span>
+   607→   607→          )}
+   608→   608→
+   609→   609→          {/* Actions */}
+   610→   610→          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   611→   611→            {canEdit && (
+   612→   612→              <Button
+   613→   613→                variant="ghost"
+   614→   614→                size="icon"
+   615→   615→                className="h-7 w-7"
+   616→   616→                onClick={() => openEditDialog(account)}
+   617→   617→                title="تعديل"
+   618→   618→              >
+   619→   619→                <Pencil className="w-3.5 h-3.5" />
+   620→   620→              </Button>
+   621→   621→            )}
+   622→   622→            {canDelete && !isSystem && (
+   623→   623→              <Button
+   624→   624→                variant="ghost"
+   625→   625→                size="icon"
+   626→   626→                className="h-7 w-7 text-destructive hover:text-destructive"
+   627→   627→                onClick={() => {
+   628→   628→                  setDeletingAccount(account);
+   629→   629→                  setDeleteDialogOpen(true);
+   630→   630→                }}
+   631→   631→                title="حذف"
+   632→   632→              >
+   633→   633→                <Trash2 className="w-3.5 h-3.5" />
+   634→   634→              </Button>
+   635→   635→            )}
+   636→   636→          </div>
+   637→   637→        </div>
+   638→   638→
+   639→   639→        {/* Children */}
+   640→   640→        {hasChildren && isExpanded && (
+   641→   641→          <div>
+   642→   642→            {account.children!.map((child) => renderTreeNode(child, depth + 1))}
+   643→   643→          </div>
+   644→   644→        )}
+   645→   645→      </div>
+   646→   646→    );
+   647→   647→  };
+   648→   648→
+   649→   649→  const clearFilters = () => {
+   650→   650→    setSearch('');
+   651→   651→    setTypeFilter('all');
+   652→   652→  };
+   653→   653→
+   654→   654→  const hasActiveFilters = search || typeFilter !== 'all';
+   655→   655→
+   656→   656→  if (!canView) {
+   657→   657→    return (
+   658→   658→      <div className="space-y-6">
+   659→   659→        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+   660→   660→          <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   661→   661→            <Network className="w-12 h-12 text-white" />
+   662→   662→          </div>
+   663→   663→          <h2 className="text-xl font-bold">غير مسموح</h2>
+   664→   664→          <p className="text-muted-foreground text-sm text-center max-w-xs">
+   665→   665→            ليس لديك صلاحية لعرض شجرة الحسابات
+   666→   666→          </p>
+   667→   667→        </div>
+   668→   668→      </div>
+   669→   669→    );
+   670→   670→  }
+   671→   671→
+   672→   672→  return (
+   673→   673→    <div className="space-y-6">
+   674→   674→      {/* Header */}
+   675→   675→      <motion.div
+   676→   676→        initial={{ opacity: 0, y: -10 }}
+   677→   677→        animate={{ opacity: 1, y: 0 }}
+   678→   678→        transition={{ duration: 0.3 }}
+   679→   679→      >
+   680→   680→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   681→   681→          <div className="flex items-center gap-3">
+   682→   682→            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+   683→   683→              <Network className="w-6 h-6 text-white" />
+   684→   684→            </div>
+   685→   685→            <div>
+   686→   686→              <h1 className="text-2xl font-bold">شجرة الحسابات</h1>
+   687→   687→              <p className="text-muted-foreground text-sm mt-0.5">
+   688→   688→                إجمالي الحسابات: {accounts.length}
+   689→   689→              </p>
+   690→   690→            </div>
+   691→   691→          </div>
+   692→   692→          <div className="flex items-center gap-2">
+   693→   693→            <Button variant="outline" size="sm" onClick={expandAll} className="gap-1.5">
+   694→   694→              <ChevronDown className="w-3.5 h-3.5" />
+   695→   695→              توسيع الكل
+   696→   696→            </Button>
+   697→   697→            <Button variant="outline" size="sm" onClick={collapseAll} className="gap-1.5">
+   698→   698→              <ChevronLeft className="w-3.5 h-3.5" />
+   699→   699→              طي الكل
+   700→   700→            </Button>
+   701→   701→            {canCreate && (
+   702→   702→              <Button onClick={openCreateDialog} className="gap-2 shadow-md" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+   703→   703→                <Plus className="w-4 h-4" />
+   704→   704→                إضافة حساب
+   705→   705→              </Button>
+   706→   706→            )}
+   707→   707→          </div>
+   708→   708→        </div>
+   709→   709→      </motion.div>
+   710→   710→
+   711→   711→      {/* Stats Cards */}
+   712→   712→      <motion.div
+   713→   713→        initial={{ opacity: 0, y: 10 }}
+   714→   714→        animate={{ opacity: 1, y: 0 }}
+   715→   715→        transition={{ duration: 0.3, delay: 0.05 }}
+   716→   716→      >
+   717→   717→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+   718→   718→          {ACCOUNT_TYPES.map((type) => (
+   719→   719→            <Card key={type} className="border-0 shadow-md hover:shadow-lg transition-shadow cursor-default group">
+   720→   720→              <CardContent className="p-4">
+   721→   721→                <div className="flex items-center gap-2 mb-2">
+   722→   722→                  <div
+   723→   723→                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white transition-transform group-hover:scale-110"
+   724→   724→                    style={{ background: ACCOUNT_TYPE_GRADIENTS[type] }}
+   725→   725→                  >
+   726→   726→                    {ACCOUNT_TYPE_ICONS[type]}
+   727→   727→                  </div>
+   728→   728→                  <span className="text-xs font-medium text-muted-foreground">
+   729→   729→                    {getAccountTypeLabel(type)}
+   730→   730→                  </span>
+   731→   731→                </div>
+   732→   732→                <div className="text-2xl font-bold">{stats.countByType[type]}</div>
+   733→   733→                <div className="text-xs text-muted-foreground mt-1">
+   734→   734→                  {formatCurrency(stats.balanceByType[type])}
+   735→   735→                </div>
+   736→   736→              </CardContent>
+   737→   737→            </Card>
+   738→   738→          ))}
+   739→   739→        </div>
+   740→   740→      </motion.div>
+   741→   741→
+   742→   742→      {/* Filters */}
+   743→   743→      <motion.div
+   744→   744→        initial={{ opacity: 0, y: 10 }}
+   745→   745→        animate={{ opacity: 1, y: 0 }}
+   746→   746→        transition={{ duration: 0.3, delay: 0.1 }}
+   747→   747→      >
+   748→   748→        <Card className="border-0 shadow-md overflow-hidden">
+   749→   749→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #0ea5e9, #0284c7, #0369a1)' }} />
+   750→   750→          <CardContent className="p-4">
+   751→   751→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   752→   752→              <div className="relative">
+   753→   753→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   754→   754→                <Input
+   755→   755→                  placeholder="بحث بالاسم أو الكود..."
+   756→   756→                  value={search}
+   757→   757→                  onChange={(e) => setSearch(e.target.value)}
+   758→   758→                  className="pr-10"
+   759→   759→                />
+   760→   760→              </div>
+   761→   761→              <div>
+   762→   762→                <Select value={typeFilter} onValueChange={setTypeFilter}>
+   763→   763→                  <SelectTrigger className="w-full">
+   764→   764→                    <SelectValue placeholder="نوع الحساب" />
+   765→   765→                  </SelectTrigger>
+   766→   766→                  <SelectContent>
+   767→   767→                    <SelectItem value="all">جميع الأنواع</SelectItem>
+   768→   768→                    {ACCOUNT_TYPES.map((type) => (
+   769→   769→                      <SelectItem key={type} value={type}>
+   770→   770→                        {getAccountTypeLabel(type)}
+   771→   771→                      </SelectItem>
+   772→   772→                    ))}
+   773→   773→                  </SelectContent>
+   774→   774→                </Select>
+   775→   775→              </div>
+   776→   776→              {hasActiveFilters && (
+   777→   777→                <div className="flex items-center">
+   778→   778→                  <Button
+   779→   779→                    variant="ghost"
+   780→   780→                    size="sm"
+   781→   781→                    onClick={clearFilters}
+   782→   782→                    className="gap-1 text-muted-foreground hover:text-foreground"
+   783→   783→                  >
+   784→   784→                    <X className="w-3.5 h-3.5" />
+   785→   785→                    مسح الفلاتر
+   786→   786→                  </Button>
+   787→   787→                </div>
+   788→   788→              )}
+   789→   789→            </div>
+   790→   790→          </CardContent>
+   791→   791→        </Card>
+   792→   792→      </motion.div>
+   793→   793→
+   794→   794→      {/* Accounts Tree */}
+   795→   795→      <motion.div
+   796→   796→        initial={{ opacity: 0, y: 20 }}
+   797→   797→        animate={{ opacity: 1, y: 0 }}
+   798→   798→        transition={{ duration: 0.3, delay: 0.15 }}
+   799→   799→      >
+   800→   800→        <Card className="border-0 shadow-md overflow-hidden">
+   801→   801→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #0ea5e9, #0284c7, #0369a1)' }} />
+   802→   802→          <CardHeader className="pb-3">
+   803→   803→            <CardTitle className="text-lg flex items-center gap-2">
+   804→   804→              <FolderTree className="w-5 h-5" style={{ color: '#0ea5e9' }} />
+   805→   805→              الحسابات
+   806→   806→            </CardTitle>
+   807→   807→          </CardHeader>
+   808→   808→          <CardContent>
+   809→   809→            {loading ? (
+   810→   810→              <div className="flex items-center justify-center py-12">
+   811→   811→                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   812→   812→              </div>
+   813→   813→            ) : filteredAccounts.length === 0 ? (
+   814→   814→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   815→   815→                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+   816→   816→                  <Network className="w-12 h-12 text-white/80" />
+   817→   817→                </div>
+   818→   818→                <h3 className="text-xl font-bold mb-2">لا توجد حسابات</h3>
+   819→   819→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   820→   820→                  لم يتم إنشاء أي حسابات بعد. ابدأ بإنشاء أول حساب.
+   821→   821→                </p>
+   822→   822→                {canCreate && (
+   823→   823→                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+   824→   824→                    <Plus className="w-5 h-5" />
+   825→   825→                    إنشاء حساب جديد
+   826→   826→                  </Button>
+   827→   827→                )}
+   828→   828→              </div>
+   829→   829→            ) : (
+   830→   830→              <ScrollArea className="max-h-[60vh]">
+   831→   831→                <div className="space-y-0.5">
+   832→   832→                  {treeData.map((account) => renderTreeNode(account))}
+   833→   833→                </div>
+   834→   834→              </ScrollArea>
+   835→   835→            )}
+   836→   836→          </CardContent>
+   837→   837→        </Card>
+   838→   838→      </motion.div>
+   839→   839→
+   840→   840→      {/* Create/Edit Dialog */}
+   841→   841→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   842→   842→        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-lg">
+   843→   843→          <DialogHeader>
+   844→   844→            <DialogTitle className="flex items-center gap-2">
+   845→   845→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+   846→   846→                <Network className="w-4 h-4 text-white" />
+   847→   847→              </div>
+   848→   848→              {editingAccount ? 'تعديل حساب' : 'إضافة حساب جديد'}
+   849→   849→            </DialogTitle>
+   850→   850→          </DialogHeader>
+   851→   851→
+   852→   852→          <div className="space-y-4 py-2">
+   853→   853→            {/* Account Code */}
+   854→   854→            <div className="space-y-2">
+   855→   855→              <Label>كود الحساب *</Label>
+   856→   856→              <Input
+   857→   857→                value={formData.code}
+   858→   858→                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+   859→   859→                placeholder="مثال: 1001"
+   860→   860→                disabled={editingAccount?.is_system}
+   861→   861→                className={editingAccount?.is_system ? 'bg-muted' : ''}
+   862→   862→              />
+   863→   863→            </div>
+   864→   864→
+   865→   865→            {/* Account Name */}
+   866→   866→            <div className="space-y-2">
+   867→   867→              <Label>اسم الحساب *</Label>
+   868→   868→              <Input
+   869→   869→                value={formData.name}
+   870→   870→                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+   871→   871→                placeholder="اسم الحساب بالعربية"
+   872→   872→              />
+   873→   873→            </div>
+   874→   874→
+   875→   875→            {/* English Name */}
+   876→   876→            <div className="space-y-2">
+   877→   877→              <Label>الاسم بالإنجليزية</Label>
+   878→   878→              <Input
+   879→   879→                value={formData.name_en}
+   880→   880→                onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+   881→   881→                placeholder="Account name in English (optional)"
+   882→   882→                dir="ltr"
+   883→   883→              />
+   884→   884→            </div>
+   885→   885→
+   886→   886→            {/* Parent Account */}
+   887→   887→            <div className="space-y-2">
+   888→   888→              <Label>الحساب الأب</Label>
+   889→   889→              <Select
+   890→   890→                value={formData.parent_id}
+   891→   891→                onValueChange={(value) =>
+   892→   892→                  setFormData({ ...formData, parent_id: value })
+   893→   893→                }
+   894→   894→              >
+   895→   895→                <SelectTrigger className="w-full">
+   896→   896→                  <SelectValue placeholder="اختر الحساب الأب" />
+   897→   897→                </SelectTrigger>
+   898→   898→                <SelectContent>
+   899→   899→                  <SelectItem value="none">— بدون (حساب رئيسي) —</SelectItem>
+   900→   900→                  {parentAccountOptions.map((account) => (
+   901→   901→                    <SelectItem key={account.id} value={account.id}>
+   902→   902→                      {account.code} - {account.name}
+   903→   903→                    </SelectItem>
+   904→   904→                  ))}
+   905→   905→                </SelectContent>
+   906→   906→              </Select>
+   907→   907→            </div>
+   908→   908→
+   909→   909→            {/* Account Type */}
+   910→   910→            <div className="space-y-2">
+   911→   911→              <Label>نوع الحساب *</Label>
+   912→   912→              <Select
+   913→   913→                value={formData.account_type}
+   914→   914→                onValueChange={(value) =>
+   915→   915→                  setFormData({
+   916→   916→                    ...formData,
+   917→   917→                    account_type: value as ChartOfAccount['account_type'],
+   918→   918→                  })
+   919→   919→                }
+   920→   920→              >
+   921→   921→                <SelectTrigger className="w-full">
+   922→   922→                  <SelectValue placeholder="اختر نوع الحساب" />
+   923→   923→                </SelectTrigger>
+   924→   924→                <SelectContent>
+   925→   925→                  {ACCOUNT_TYPES.map((type) => (
+   926→   926→                    <SelectItem key={type} value={type}>
+   927→   927→                      <div className="flex items-center gap-2">
+   928→   928→                        <div
+   929→   929→                          className="w-4 h-4 rounded flex items-center justify-center text-white"
+   930→   930→                          style={{ background: ACCOUNT_TYPE_GRADIENTS[type] }}
+   931→   931→                        >
+   932→   932→                          <span className="text-[8px]">{getAccountTypeLabel(type).charAt(0)}</span>
+   933→   933→                        </div>
+   934→   934→                        {getAccountTypeLabel(type)}
+   935→   935→                      </div>
+   936→   936→                    </SelectItem>
+   937→   937→                  ))}
+   938→   938→                </SelectContent>
+   939→   939→              </Select>
+   940→   940→            </div>
+   941→   941→
+   942→   942→            {/* System account notice */}
+   943→   943→            {editingAccount?.is_system && (
+   944→   944→              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+   945→   945→                <Shield className="w-4 h-4 text-amber-500 shrink-0" />
+   946→   946→                <span className="text-xs text-amber-700 dark:text-amber-400">
+   947→   947→                  حساب نظامي — لا يمكن تغيير الكود أو الحذف
+   948→   948→                </span>
+   949→   949→              </div>
+   950→   950→            )}
+   951→   951→          </div>
+   952→   952→
+   953→   953→          <DialogFooter>
+   954→   954→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+   955→   955→              إلغاء
+   956→   956→            </Button>
+   957→   957→            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+   958→   958→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+   959→   959→              {editingAccount ? 'تحديث الحساب' : 'إضافة الحساب'}
+   960→   960→            </Button>
+   961→   961→          </DialogFooter>
+   962→   962→        </DialogContent>
+   963→   963→      </Dialog>
+   964→   964→
+   965→   965→      {/* Delete Confirmation Dialog */}
+   966→   966→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+   967→   967→        <AlertDialogContent>
+   968→   968→          <AlertDialogHeader>
+   969→   969→            <AlertDialogTitle>حذف حساب</AlertDialogTitle>
+   970→   970→            <AlertDialogDescription>
+   971→   971→              هل أنت متأكد من حذف الحساب &quot;{deletingAccount?.name}&quot; ({deletingAccount?.code})؟
+   972→   972→              لا يمكن التراجع عن هذا الإجراء.
+   973→   973→            </AlertDialogDescription>
+   974→   974→          </AlertDialogHeader>
+   975→   975→          <AlertDialogFooter>
+   976→   976→            <AlertDialogCancel onClick={() => setDeletingAccount(null)}>
+   977→   977→              تراجع
+   978→   978→            </AlertDialogCancel>
+   979→   979→            <AlertDialogAction
+   980→   980→              onClick={handleDelete}
+   981→   981→              className="bg-destructive hover:bg-destructive/90"
+   982→   982→            >
+   983→   983→              حذف
+   984→   984→            </AlertDialogAction>
+   985→   985→          </AlertDialogFooter>
+   986→   986→        </AlertDialogContent>
+   987→   987→      </AlertDialog>
+   988→   988→    </div>
+   989→   989→  );
+   990→   990→}
+   991→   991→

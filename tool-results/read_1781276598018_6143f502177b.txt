@@ -1,0 +1,745 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { Invoice, Branch } from '@/lib/types';
+     7→import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils';
+     8→import { generateInvoiceDocument, generateThermalDocument } from '@/lib/invoice-template';
+     9→import { Card, CardContent } from '@/components/ui/card';
+    10→import { Button } from '@/components/ui/button';
+    11→import { Input } from '@/components/ui/input';
+    12→import { Label } from '@/components/ui/label';
+    13→import { Badge } from '@/components/ui/badge';
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from '@/components/ui/select';
+    21→import {
+    22→  Table,
+    23→  TableBody,
+    24→  TableCell,
+    25→  TableHead,
+    26→  TableHeader,
+    27→  TableRow,
+    28→} from '@/components/ui/table';
+    29→import {
+    30→  Search,
+    31→  Plus,
+    32→  Eye,
+    33→  Copy,
+    34→  XCircle,
+    35→  FileText,
+    36→  Printer,
+    37→  Receipt,
+    38→  Calendar,
+    39→  Building2,
+    40→  DollarSign,
+    41→  Hash,
+    42→} from 'lucide-react';
+    43→import DataTablePagination from '@/components/ui/data-table-pagination';
+    44→import { toast } from 'sonner';
+    45→import {
+    46→  AlertDialog,
+    47→  AlertDialogAction,
+    48→  AlertDialogCancel,
+    49→  AlertDialogContent,
+    50→  AlertDialogDescription,
+    51→  AlertDialogFooter,
+    52→  AlertDialogHeader,
+    53→  AlertDialogTitle,
+    54→} from '@/components/ui/alert-dialog';
+    55→import { Textarea } from '@/components/ui/textarea';
+    56→
+    57→const PAGE_SIZE = 10;
+    58→
+    59→/** Map invoice status to a right-border accent color for mobile cards */
+    60→function getStatusAccent(status: string) {
+    61→  const map: Record<string, string> = {
+    62→    active: 'border-r-emerald-500',
+    63→    cancelled: 'border-r-red-500',
+    64→    partially_returned: 'border-r-amber-500',
+    65→    fully_returned: 'border-r-gray-400',
+    66→  };
+    67→  return map[status] || 'border-r-gray-300';
+    68→}
+    69→
+    70→/** Map invoice status to gradient background for status badges */
+    71→function getStatusGradient(status: string) {
+    72→  const map: Record<string, string> = {
+    73→    active: 'bg-gradient-to-l from-emerald-500 to-emerald-600 text-white shadow-emerald-200 dark:shadow-emerald-900/30',
+    74→    cancelled: 'bg-gradient-to-l from-red-500 to-red-600 text-white shadow-red-200 dark:shadow-red-900/30',
+    75→    partially_returned: 'bg-gradient-to-l from-amber-500 to-amber-600 text-white shadow-amber-200 dark:shadow-amber-900/30',
+    76→    fully_returned: 'bg-gradient-to-l from-gray-400 to-gray-500 text-white shadow-gray-200 dark:shadow-gray-900/30',
+    77→  };
+    78→  return map[status] || 'bg-gray-100 text-gray-800';
+    79→}
+    80→
+    81→/** Map invoice status to gradient for icon circle */
+    82→function getStatusIconGradient(status: string) {
+    83→  const map: Record<string, string> = {
+    84→    active: 'from-emerald-400 to-emerald-600',
+    85→    cancelled: 'from-red-400 to-red-600',
+    86→    partially_returned: 'from-amber-400 to-amber-600',
+    87→    fully_returned: 'from-gray-300 to-gray-500',
+    88→  };
+    89→  return map[status] || 'from-gray-300 to-gray-400';
+    90→}
+    91→
+    92→export default function InvoicesPage() {
+    93→  const { navigateTo, user, isAdmin, hasPermission } = useAppStore();
+    94→  const [invoices, setInvoices] = useState<Invoice[]>([]);
+    95→  const [branches, setBranches] = useState<Branch[]>([]);
+    96→  const [loading, setLoading] = useState(true);
+    97→  const [search, setSearch] = useState('');
+    98→  const [dateFrom, setDateFrom] = useState('');
+    99→  const [dateTo, setDateTo] = useState('');
+   100→  const [branchFilter, setBranchFilter] = useState('all');
+   101→  const [statusFilter, setStatusFilter] = useState('all');
+   102→  const [page, setPage] = useState(1);
+   103→  const [totalCount, setTotalCount] = useState(0);
+   104→
+   105→  // Cancel dialog
+   106→  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+   107→  const [cancellingInvoice, setCancellingInvoice] = useState<Invoice | null>(null);
+   108→  const [cancelReason, setCancelReason] = useState('');
+   109→
+   110→  const loadBranches = async () => {
+   111→    let query = supabase.from('branches').select('*').order('name');
+   112→    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+   113→    const { data } = await query;
+   114→    if (data) setBranches(data as Branch[]);
+   115→  };
+   116→
+   117→  const loadInvoices = async () => {
+   118→    setLoading(true);
+   119→    try {
+   120→      let query = supabase
+   121→        .from('invoices')
+   122→        .select('*, branches(name), customers(name)', { count: 'exact' })
+   123→        .order('created_at', { ascending: false });
+   124→
+   125→      if (search) {
+   126→        query = query.or(`invoice_number.ilike.%${search}%,branches.name.ilike.%${search}%`);
+   127→      }
+   128→      if (dateFrom) {
+   129→        query = query.gte('invoice_date', dateFrom);
+   130→      }
+   131→      if (dateTo) {
+   132→        query = query.lte('invoice_date', dateTo);
+   133→      }
+   134→      if (branchFilter !== 'all') {
+   135→        query = query.eq('branch_id', branchFilter);
+   136→      }
+   137→      // Branch user: always filter by their branch
+   138→      if (!isAdmin && user?.branch_id) {
+   139→        query = query.eq('branch_id', user.branch_id);
+   140→      }
+   141→      if (statusFilter !== 'all') {
+   142→        query = query.eq('status', statusFilter);
+   143→      }
+   144→
+   145→      const from = (page - 1) * PAGE_SIZE;
+   146→      const to = from + PAGE_SIZE - 1;
+   147→      query = query.range(from, to);
+   148→
+   149→      const { data, count, error } = await query;
+   150→
+   151→      if (!error && data) {
+   152→        setInvoices(data as unknown as Invoice[]);
+   153→        setTotalCount(count || 0);
+   154→      }
+   155→    } catch (err) {
+   156→      console.error(err);
+   157→    } finally {
+   158→      setLoading(false);
+   159→    }
+   160→  };
+   161→
+   162→  useEffect(() => {
+   163→    loadBranches();
+   164→  }, []);
+   165→
+   166→  useEffect(() => {
+   167→    loadInvoices();
+   168→  }, [page, search, dateFrom, dateTo, branchFilter, statusFilter]);
+   169→
+   170→  const handleCancel = async () => {
+   171→    if (!cancellingInvoice) return;
+   172→    if (!cancelReason.trim()) {
+   173→      toast.error('يرجى إدخال سبب الإلغاء');
+   174→      return;
+   175→    }
+   176→
+   177→    try {
+   178→      const { error } = await supabase
+   179→        .from('invoices')
+   180→        .update({
+   181→          status: 'cancelled',
+   182→          cancel_reason: cancelReason,
+   183→          updated_at: new Date().toISOString(),
+   184→        })
+   185→        .eq('id', cancellingInvoice.id);
+   186→
+   187→      if (error) throw error;
+   188→
+   189→      await supabase.from('audit_log').insert({
+   190→        action: 'cancel_invoice',
+   191→        details: { invoice_number: cancellingInvoice.invoice_number, reason: cancelReason },
+   192→      });
+   193→
+   194→      toast.success('تم إلغاء الفاتورة');
+   195→      setCancelDialogOpen(false);
+   196→      setCancellingInvoice(null);
+   197→      setCancelReason('');
+   198→      loadInvoices();
+   199→    } catch (err) {
+   200→      toast.error('حدث خطأ أثناء إلغاء الفاتورة');
+   201→    }
+   202→  };
+   203→
+   204→  const handleDuplicate = async (invoice: Invoice) => {
+   205→    try {
+   206→      // Load original items
+   207→      const { data: origItems } = await supabase
+   208→        .from('invoice_items')
+   209→        .select('*')
+   210→        .eq('invoice_id', invoice.id);
+   211→
+   212→      // Generate new number
+   213→      const year = new Date().getFullYear();
+   214→      const { data: lastInv } = await supabase
+   215→        .from('invoices')
+   216→        .select('invoice_number')
+   217→        .like('invoice_number', `INV-${year}-%`)
+   218→        .order('invoice_number', { ascending: false })
+   219→        .limit(1);
+   220→
+   221→      let lastNum = 0;
+   222→      if (lastInv && lastInv.length > 0) {
+   223→        const parts = lastInv[0].invoice_number.split('-');
+   224→        lastNum = parseInt(parts[parts.length - 1]) || 0;
+   225→      }
+   226→      const newNumber = `INV-${year}-${(lastNum + 1).toString().padStart(4, '0')}`;
+   227→
+   228→      const { data: newInv, error } = await supabase
+   229→        .from('invoices')
+   230→        .insert({
+   231→          invoice_number: newNumber,
+   232→          branch_id: invoice.branch_id,
+   233→          invoice_date: new Date().toISOString().split('T')[0],
+   234→          subtotal: invoice.subtotal,
+   235→          tax_rate: invoice.tax_rate,
+   236→          tax_amount: invoice.tax_amount,
+   237→          total: invoice.total,
+   238→          notes: invoice.notes,
+   239→        })
+   240→        .select('id')
+   241→        .single();
+   242→
+   243→      if (error) throw error;
+   244→
+   245→      if (origItems && origItems.length > 0) {
+   246→        const newItems = origItems.map((item) => ({
+   247→          invoice_id: newInv.id,
+   248→          item_name: item.item_name,
+   249→          quantity: item.quantity,
+   250→          unit_count: item.unit_count || 1,
+   251→          unit_price: item.unit_price,
+   252→          total_price: item.total_price,
+   253→        }));
+   254→        await supabase.from('invoice_items').insert(newItems);
+   255→      }
+   256→
+   257→      toast.success('تم تكرار الفاتورة بنجاح');
+   258→      navigateTo('invoice-detail', { id: newInv.id });
+   259→    } catch (err) {
+   260→      toast.error('حدث خطأ أثناء تكرار الفاتورة');
+   261→    }
+   262→  };
+   263→
+   264→  const handleQuickPrint = async (invoice: Invoice, type: 'a4' | 'thermal') => {
+   265→    try {
+   266→      // Load invoice items
+   267→      const { data: items } = await supabase
+   268→        .from('invoice_items')
+   269→        .select('*')
+   270→        .eq('invoice_id', invoice.id);
+   271→
+   272→      // Load branch name
+   273→      const { data: branch } = await supabase
+   274→        .from('branches')
+   275→        .select('name')
+   276→        .eq('id', invoice.branch_id)
+   277→        .single();
+   278→
+   279→      const { settings } = useAppStore.getState();
+   280→
+   281→      // Load customer name if invoice has customer_id
+   282→      let quickCustomerName = '';
+   283→      if ((invoice as any).customer_id) {
+   284→        const { data: customer } = await supabase
+   285→          .from('customers')
+   286→          .select('name')
+   287→          .eq('id', (invoice as any).customer_id)
+   288→          .single();
+   289→        if (customer) quickCustomerName = customer.name;
+   290→      }
+   291→
+   292→      const docData = {
+   293→        invoice,
+   294→        items: items || [],
+   295→        branchName: branch?.name || '',
+   296→        customerName: quickCustomerName,
+   297→        settings,
+   298→        userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
+   299→      };
+   300→
+   301→      const htmlDoc = type === 'a4'
+   302→        ? generateInvoiceDocument(docData)
+   303→        : generateThermalDocument(docData);
+   304→
+   305→      const windowFeatures = type === 'a4'
+   306→        ? 'width=800,height=1000'
+   307→        : 'width=340,height=800';
+   308→
+   309→      const printWindow = window.open('', '_blank', windowFeatures);
+   310→      if (!printWindow) {
+   311→        toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+   312→        return;
+   313→      }
+   314→
+   315→      printWindow.document.write(htmlDoc);
+   316→      printWindow.document.close();
+   317→
+   318→      setTimeout(() => {
+   319→        printWindow.focus();
+   320→        printWindow.print();
+   321→      }, 1500);
+   322→    } catch (err) {
+   323→      console.error(err);
+   324→      toast.error('حدث خطأ أثناء الطباعة');
+   325→    }
+   326→  };
+   327→
+   328→  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+   329→
+   330→  return (
+   331→    <div className="space-y-4 sm:space-y-6">
+   332→      {/* ─── Header ─── */}
+   333→      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:flex-row sm:items-center sm:justify-between">
+   334→        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+   335→          {/* Icon in gradient circle */}
+   336→          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 shrink-0">
+   337→            <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+   338→          </div>
+   339→          <div>
+   340→            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">الفواتير</h1>
+   341→            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="mt-0.5">
+   342→              <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+   343→              <p className="text-muted-foreground text-xs sm:text-sm">
+   344→                إجمالي <span className="font-bold text-foreground">{totalCount}</span> فاتورة
+   345→              </p>
+   346→            </div>
+   347→          </div>
+   348→        </div>
+   349→        {hasPermission('invoices', 'create') && (
+   350→          <Button
+   351→            onClick={() => navigateTo('invoice-form')}
+   352→            className="gap-2 w-full sm:w-auto bg-gradient-to-l from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 border-0 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+   353→          >
+   354→            <Plus className="w-4 h-4" />
+   355→            فاتورة جديدة
+   356→          </Button>
+   357→        )}
+   358→      </div>
+   359→
+   360→      {/* ─── Filters ─── */}
+   361→      <Card className="border-0 shadow-md overflow-hidden relative">
+   362→        {/* Gradient top border accent */}
+   363→        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
+   364→        <CardContent className="p-3 sm:p-4 pt-4 sm:pt-5">
+   365→          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }} className="sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+   366→            <div className="relative col-span-2 lg:col-span-1">
+   367→              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   368→              <Input
+   369→                placeholder="بحث برقم الفاتورة..."
+   370→                value={search}
+   371→                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   372→                className="pr-10 h-9"
+   373→              />
+   374→            </div>
+   375→            <div>
+   376→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+   377→              <Input
+   378→                type="date"
+   379→                value={dateFrom}
+   380→                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+   381→                className="h-9 text-xs sm:text-sm"
+   382→              />
+   383→            </div>
+   384→            <div>
+   385→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+   386→              <Input
+   387→                type="date"
+   388→                value={dateTo}
+   389→                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+   390→                className="h-9 text-xs sm:text-sm"
+   391→              />
+   392→            </div>
+   393→            {isAdmin && (
+   394→              <div>
+   395→                <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">الفرع</Label>
+   396→                <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
+   397→                  <SelectTrigger className="h-9 text-xs sm:text-sm">
+   398→                    <SelectValue />
+   399→                  </SelectTrigger>
+   400→                  <SelectContent>
+   401→                    <SelectItem value="all">كل الفروع</SelectItem>
+   402→                    {branches.map((b) => (
+   403→                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   404→                    ))}
+   405→                  </SelectContent>
+   406→                </Select>
+   407→              </div>
+   408→            )}
+   409→            <div>
+   410→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1 block">الحالة</Label>
+   411→              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+   412→                <SelectTrigger className="h-9 text-xs sm:text-sm">
+   413→                  <SelectValue />
+   414→                </SelectTrigger>
+   415→                <SelectContent>
+   416→                  <SelectItem value="all">كل الحالات</SelectItem>
+   417→                  <SelectItem value="active">نشطة</SelectItem>
+   418→                  <SelectItem value="cancelled">ملغاة</SelectItem>
+   419→                  <SelectItem value="partially_returned">مرتجع جزئياً</SelectItem>
+   420→                  <SelectItem value="fully_returned">مرتجع كلياً</SelectItem>
+   421→                </SelectContent>
+   422→              </Select>
+   423→            </div>
+   424→          </div>
+   425→        </CardContent>
+   426→      </Card>
+   427→
+   428→      {/* ─── Invoices List ─── */}
+   429→      {loading ? (
+   430→        <Card className="border-0 shadow-md">
+   431→          <CardContent className="p-0">
+   432→            <div className="flex items-center justify-center py-12">
+   433→              <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
+   434→            </div>
+   435→          </CardContent>
+   436→        </Card>
+   437→      ) : invoices.length === 0 ? (
+   438→        <Card className="border-0 shadow-md overflow-hidden">
+   439→          <CardContent className="p-0">
+   440→            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} className="py-20 px-4">
+   441→              {/* Gradient icon circle */}
+   442→              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-5 shadow-xl shadow-emerald-200 dark:shadow-emerald-900/30">
+   443→                <FileText className="w-12 h-12 text-white" />
+   444→              </div>
+   445→              <h3 className="text-xl font-bold mb-2 tracking-tight">لا توجد فواتير</h3>
+   446→              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
+   447→                لم يتم إنشاء أي فواتير بعد. ابدأ بإنشاء أول فاتورة صرف لتتبع عمليات البيع والتسليم.
+   448→              </p>
+   449→              <Button
+   450→                onClick={() => navigateTo('invoice-form')}
+   451→                className="gap-2 shadow-lg bg-gradient-to-l from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white border-0 shadow-emerald-200 dark:shadow-emerald-900/30 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+   452→                size="lg"
+   453→              >
+   454→                <Plus className="w-5 h-5" />
+   455→                إنشاء فاتورة جديدة
+   456→              </Button>
+   457→            </div>
+   458→          </CardContent>
+   459→        </Card>
+   460→      ) : (
+   461→        <>
+   462→          {/* ─── Mobile Card Layout ─── */}
+   463→          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden">
+   464→            {invoices.map((invoice) => (
+   465→              <Card
+   466→                key={invoice.id}
+   467→                className={`border-0 shadow-md cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden border-r-4 ${getStatusAccent(invoice.status)}`}
+   468→                onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
+   469→              >
+   470→                <CardContent className="p-4">
+   471→                  {/* Top row: Invoice number + status */}
+   472→                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+   473→                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+   474→                      {/* Invoice number icon in gradient circle */}
+   475→                      <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${getStatusIconGradient(invoice.status)} flex items-center justify-center shadow-sm shrink-0`}>
+   476→                        <FileText className="w-4 h-4 text-white" />
+   477→                      </div>
+   478→                      <div>
+   479→                        <h3 className="font-bold text-sm tracking-tight">{invoice.invoice_number}</h3>
+   480→                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="mt-0.5">
+   481→                          <Building2 className="w-3 h-3 text-muted-foreground" />
+   482→                          <p className="text-[11px] text-muted-foreground">
+   483→                            {(invoice as { branches?: { name: string } }).branches?.name || ''}
+   484→                          </p>
+   485→                        </div>
+   486→                      </div>
+   487→                    </div>
+   488→                    {/* Gradient status badge */}
+   489→                    <Badge
+   490→                      className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${getStatusGradient(invoice.status)}`}
+   491→                    >
+   492→                      {getStatusLabel(invoice.status)}
+   493→                    </Badge>
+   494→                  </div>
+   495→
+   496→                  {/* Info row: Date + Total */}
+   497→                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-2 pt-2.5 border-t border-dashed">
+   498→                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+   499→                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+   500→                      <span className="text-xs text-muted-foreground">
+   501→                        {formatDate(invoice.invoice_date)}
+   502→                      </span>
+   503→                    </div>
+   504→                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+   505→                      <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+   506→                      <span className="font-bold text-sm">{formatCurrency(invoice.total)}</span>
+   507→                    </div>
+   508→                  </div>
+   509→
+   510→                  {/* Action buttons */}
+   511→                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="mt-3 pt-2.5 border-t">
+   512→                    <Button
+   513→                      variant="outline"
+   514→                      size="sm"
+   515→                      className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 transition-colors"
+   516→                      onClick={(e) => { e.stopPropagation(); navigateTo('invoice-detail', { id: invoice.id }); }}
+   517→                    >
+   518→                      <Eye className="w-3.5 h-3.5" />
+   519→                      عرض
+   520→                    </Button>
+   521→                    {hasPermission('invoices', 'print') && (
+   522→                      <Button
+   523→                        variant="outline"
+   524→                        size="sm"
+   525→                        className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:hover:bg-blue-950 dark:hover:text-blue-400 transition-colors"
+   526→                        onClick={(e) => { e.stopPropagation(); handleQuickPrint(invoice, 'a4'); }}
+   527→                      >
+   528→                        <Printer className="w-3.5 h-3.5" />
+   529→                        طباعة
+   530→                      </Button>
+   531→                    )}
+   532→                    {invoice.status === 'active' && hasPermission('invoices', 'delete') && (
+   533→                      <Button
+   534→                        variant="outline"
+   535→                        size="sm"
+   536→                        className="flex-1 h-8 text-[11px] gap-1.5 text-destructive hover:bg-red-50 hover:text-red-700 hover:border-red-200 dark:hover:bg-red-950 dark:hover:text-red-400 border-destructive/30 transition-colors"
+   537→                        onClick={(e) => {
+   538→                          e.stopPropagation();
+   539→                          setCancellingInvoice(invoice);
+   540→                          setCancelDialogOpen(true);
+   541→                        }}
+   542→                      >
+   543→                        <XCircle className="w-3.5 h-3.5" />
+   544→                        إلغاء
+   545→                      </Button>
+   546→                    )}
+   547→                  </div>
+   548→                </CardContent>
+   549→              </Card>
+   550→            ))}
+   551→          </div>
+   552→
+   553→          {/* ─── Desktop Table Layout ─── */}
+   554→          <Card className="border-0 shadow-md overflow-hidden hidden sm:block">
+   555→            {/* Gradient accent bar at top */}
+   556→            <div className="h-1 bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
+   557→            <CardContent className="p-0">
+   558→              <div className="overflow-x-auto">
+   559→                <Table>
+   560→                  <TableHeader>
+   561→                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+   562→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">رقم الفاتورة</TableHead>
+   563→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">الفرع</TableHead>
+   564→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">العميل</TableHead>
+   565→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">التاريخ</TableHead>
+   566→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الإجمالي</TableHead>
+   567→                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+   568→                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">الأصناف</TableHead>
+   569→                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
+   570→                    </TableRow>
+   571→                  </TableHeader>
+   572→                  <TableBody>
+   573→                    {invoices.map((invoice) => (
+   574→                      <TableRow
+   575→                        key={invoice.id}
+   576→                        className="cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors"
+   577→                        onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
+   578→                      >
+   579→                        <TableCell>
+   580→                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+   581→                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getStatusIconGradient(invoice.status)} flex items-center justify-center shadow-sm shrink-0`}>
+   582→                              <FileText className="w-3.5 h-3.5 text-white" />
+   583→                            </div>
+   584→                            <span className="font-semibold text-sm">{invoice.invoice_number}</span>
+   585→                          </div>
+   586→                        </TableCell>
+   587→                        <TableCell className="hidden sm:table-cell">
+   588→                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+   589→                            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+   590→                            <span className="text-sm">{(invoice as { branches?: { name: string } }).branches?.name || '—'}</span>
+   591→                          </div>
+   592→                        </TableCell>
+   593→                        <TableCell className="hidden md:table-cell text-sm">
+   594→                          {(invoice as any).customers?.name || '—'}
+   595→                        </TableCell>
+   596→                        <TableCell className="hidden md:table-cell">
+   597→                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+   598→                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+   599→                            <span className="text-sm">{formatDate(invoice.invoice_date)}</span>
+   600→                          </div>
+   601→                        </TableCell>
+   602→                        <TableCell>
+   603→                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+   604→                            <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+   605→                            <span className="font-bold text-sm">{formatCurrency(invoice.total)}</span>
+   606→                          </div>
+   607→                        </TableCell>
+   608→                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+   609→                          <Badge
+   610→                            className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${getStatusGradient(invoice.status)}`}
+   611→                          >
+   612→                            {getStatusLabel(invoice.status)}
+   613→                          </Badge>
+   614→                        </TableCell>
+   615→                        <TableCell className="text-center hidden lg:table-cell text-sm">
+   616→                          {invoice.items?.length || '—'}
+   617→                        </TableCell>
+   618→                        <TableCell onClick={(e) => e.stopPropagation()}>
+   619→                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.125rem' }}>
+   620→                            <Button
+   621→                              variant="ghost"
+   622→                              size="icon"
+   623→                              className="h-8 w-8 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 transition-colors"
+   624→                              onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
+   625→                              title="عرض"
+   626→                            >
+   627→                              <Eye className="w-4 h-4" />
+   628→                            </Button>
+   629→                            {hasPermission('invoices', 'print') && (
+   630→                              <>
+   631→                                <Button
+   632→                                  variant="ghost"
+   633→                                  size="icon"
+   634→                                  className="h-8 w-8 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-400 transition-colors"
+   635→                                  onClick={() => handleQuickPrint(invoice, 'a4')}
+   636→                                  title="طباعة A4"
+   637→                                >
+   638→                                  <Printer className="w-4 h-4" />
+   639→                                </Button>
+   640→                                <Button
+   641→                                  variant="ghost"
+   642→                                  size="icon"
+   643→                                  className="h-8 w-8 hover:bg-purple-50 hover:text-purple-700 dark:hover:bg-purple-950 dark:hover:text-purple-400 transition-colors"
+   644→                                  onClick={() => handleQuickPrint(invoice, 'thermal')}
+   645→                                  title="طباعة حرارية"
+   646→                                >
+   647→                                  <Receipt className="w-4 h-4" />
+   648→                                </Button>
+   649→                              </>
+   650→                            )}
+   651→                            {invoice.status === 'active' && (
+   652→                              <>
+   653→                                {hasPermission('invoices', 'create') && (
+   654→                                  <Button
+   655→                                    variant="ghost"
+   656→                                    size="icon"
+   657→                                    className="h-8 w-8 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950 dark:hover:text-amber-400 transition-colors"
+   658→                                    onClick={() => handleDuplicate(invoice)}
+   659→                                    title="تكرار"
+   660→                                  >
+   661→                                    <Copy className="w-4 h-4" />
+   662→                                  </Button>
+   663→                                )}
+   664→                                {hasPermission('invoices', 'delete') && (
+   665→                                  <Button
+   666→                                    variant="ghost"
+   667→                                    size="icon"
+   668→                                    className="h-8 w-8 text-destructive hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-400 transition-colors"
+   669→                                    onClick={() => {
+   670→                                      setCancellingInvoice(invoice);
+   671→                                      setCancelDialogOpen(true);
+   672→                                    }}
+   673→                                    title="إلغاء"
+   674→                                  >
+   675→                                    <XCircle className="w-4 h-4" />
+   676→                                  </Button>
+   677→                                )}
+   678→                              </>
+   679→                            )}
+   680→                          </div>
+   681→                        </TableCell>
+   682→                      </TableRow>
+   683→                    ))}
+   684→                  </TableBody>
+   685→                </Table>
+   686→              </div>
+   687→
+   688→              <DataTablePagination
+   689→                page={page}
+   690→                totalPages={totalPages}
+   691→                totalCount={totalCount}
+   692→                pageSize={PAGE_SIZE}
+   693→                onPageChange={setPage}
+   694→                label="فاتورة"
+   695→              />
+   696→            </CardContent>
+   697→          </Card>
+   698→
+   699→          {/* ─── Mobile Pagination ─── */}
+   700→          <div className="sm:hidden">
+   701→            <Card className="border-0 shadow-md overflow-hidden">
+   702→              <div className="h-0.5 bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
+   703→              <DataTablePagination
+   704→                page={page}
+   705→                totalPages={totalPages}
+   706→                totalCount={totalCount}
+   707→                pageSize={PAGE_SIZE}
+   708→                onPageChange={setPage}
+   709→                label="فاتورة"
+   710→              />
+   711→            </Card>
+   712→          </div>
+   713→        </>
+   714→      )}
+   715→
+   716→      {/* Cancel Dialog */}
+   717→      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+   718→        <AlertDialogContent>
+   719→          <AlertDialogHeader>
+   720→            <AlertDialogTitle>إلغاء الفاتورة</AlertDialogTitle>
+   721→            <AlertDialogDescription>
+   722→              هل أنت متأكد من إلغاء الفاتورة {cancellingInvoice?.invoice_number}؟ لا يمكن التراجع عن هذا الإجراء.
+   723→            </AlertDialogDescription>
+   724→          </AlertDialogHeader>
+   725→          <div className="py-2">
+   726→            <Label>سبب الإلغاء *</Label>
+   727→            <Textarea
+   728→              value={cancelReason}
+   729→              onChange={(e) => setCancelReason(e.target.value)}
+   730→              placeholder="أدخل سبب إلغاء الفاتورة..."
+   731→              className="mt-2"
+   732→            />
+   733→          </div>
+   734→          <AlertDialogFooter>
+   735→            <AlertDialogCancel onClick={() => { setCancelReason(''); setCancellingInvoice(null); }}>تراجع</AlertDialogCancel>
+   736→            <AlertDialogAction onClick={handleCancel} className="bg-destructive hover:bg-destructive/90">
+   737→              إلغاء الفاتورة
+   738→            </AlertDialogAction>
+   739→          </AlertDialogFooter>
+   740→        </AlertDialogContent>
+   741→      </AlertDialog>
+   742→    </div>
+   743→  );
+   744→}
+   745→

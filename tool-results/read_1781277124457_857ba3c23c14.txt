@@ -1,0 +1,1825 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState, useMemo, useCallback } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { InventoryTransfer, InventoryTransferItem, Branch, Product } from '@/lib/types';
+     7→     7→import { formatCurrency, formatDate, formatDateTime, generateTransferNumber, generateJournalEntryNumber, getCurrentYear } from '@/lib/utils';
+     8→     8→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     9→     9→import { Button } from '@/components/ui/button';
+    10→    10→import { Input } from '@/components/ui/input';
+    11→    11→import { Label } from '@/components/ui/label';
+    12→    12→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+    13→    13→import {
+    14→    14→  AlertDialog,
+    15→    15→  AlertDialogAction,
+    16→    16→  AlertDialogCancel,
+    17→    17→  AlertDialogContent,
+    18→    18→  AlertDialogDescription,
+    19→    19→  AlertDialogFooter,
+    20→    20→  AlertDialogHeader,
+    21→    21→  AlertDialogTitle,
+    22→    22→} from '@/components/ui/alert-dialog';
+    23→    23→import {
+    24→    24→  Table,
+    25→    25→  TableBody,
+    26→    26→  TableCell,
+    27→    27→  TableHead,
+    28→    28→  TableHeader,
+    29→    29→  TableRow,
+    30→    30→} from '@/components/ui/table';
+    31→    31→import { Badge } from '@/components/ui/badge';
+    32→    32→import {
+    33→    33→  Select,
+    34→    34→  SelectContent,
+    35→    35→  SelectItem,
+    36→    36→  SelectTrigger,
+    37→    37→  SelectValue,
+    38→    38→} from '@/components/ui/select';
+    39→    39→import { ScrollArea } from '@/components/ui/scroll-area';
+    40→    40→import { Separator } from '@/components/ui/separator';
+    41→    41→import { Textarea } from '@/components/ui/textarea';
+    42→    42→import {
+    43→    43→  ArrowRightLeft,
+    44→    44→  Plus,
+    45→    45→  Search,
+    46→    46→  Loader2,
+    47→    47→  Eye,
+    48→    48→  CheckCircle2,
+    49→    49→  XCircle,
+    50→    50→  Package,
+    51→    51→  Building2,
+    52→    52→  FileText,
+    53→    53→  ChevronLeft,
+    54→    54→  ChevronRight,
+    55→    55→  Trash2,
+    56→    56→  AlertTriangle,
+    57→    57→  TrendingUp,
+    58→    58→  HandCoins,
+    59→    59→} from 'lucide-react';
+    60→    60→import { motion } from 'framer-motion';
+    61→    61→import { toast } from 'sonner';
+    62→    62→
+    63→    63→// ─── Extended types ────────────────────────────────────────────────────────────
+    64→    64→interface BranchWithFactory extends Branch {
+    65→    65→  is_factory?: boolean;
+    66→    66→}
+    67→    67→
+    68→    68→interface TransferRow extends Omit<InventoryTransfer, 'from_branch' | 'to_branch' | 'items'> {
+    69→    69→  from_branch?: { name: string } | null;
+    70→    70→  to_branch?: { name: string } | null;
+    71→    71→  items?: InventoryTransferItemRow[];
+    72→    72→}
+    73→    73→
+    74→    74→interface InventoryTransferItemRow extends Omit<InventoryTransferItem, 'products'> {
+    75→    75→  products?: { name: string; unit_price: number; unit_count: number } | null;
+    76→    76→}
+    77→    77→
+    78→    78→interface TransferFormItem {
+    79→    79→  product_id: string;
+    80→    80→  quantity: number;
+    81→    81→  unit_price: number;
+    82→    82→  total_price: number;
+    83→    83→}
+    84→    84→
+    85→    85→interface BranchDebtRow {
+    86→    86→  branch_id: string;
+    87→    87→  branch_name: string;
+    88→    88→  total_transferred: number;
+    89→    89→  total_paid: number;
+    90→    90→  remaining_debt: number;
+    91→    91→}
+    92→    92→
+    93→    93→type StatusFilter = 'all' | 'pending' | 'confirmed' | 'cancelled';
+    94→    94→type ActiveView = 'list' | 'debts';
+    95→    95→
+    96→    96→const PAGE_SIZE = 10;
+    97→    97→
+    98→    98→// ─── Status helpers ────────────────────────────────────────────────────────────
+    99→    99→const statusLabel: Record<string, string> = {
+   100→   100→  pending: 'في الانتظار',
+   101→   101→  confirmed: 'مؤكد',
+   102→   102→  cancelled: 'ملغي',
+   103→   103→};
+   104→   104→
+   105→   105→const statusColor: Record<string, string> = {
+   106→   106→  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+   107→   107→  confirmed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+   108→   108→  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+   109→   109→};
+   110→   110→
+   111→   111→const statusIcon: Record<string, typeof CheckCircle2> = {
+   112→   112→  pending: AlertTriangle,
+   113→   113→  confirmed: CheckCircle2,
+   114→   114→  cancelled: XCircle,
+   115→   115→};
+   116→   116→
+   117→   117→// ─── Component ─────────────────────────────────────────────────────────────────
+   118→   118→export default function InventoryTransfersPage() {
+   119→   119→  const { user, isAdmin, hasPermission } = useAppStore();
+   120→   120→
+   121→   121→  // Data
+   122→   122→  const [transfers, setTransfers] = useState<TransferRow[]>([]);
+   123→   123→  const [factoryBranches, setFactoryBranches] = useState<BranchWithFactory[]>([]);
+   124→   124→  const [destinationBranches, setDestinationBranches] = useState<BranchWithFactory[]>([]);
+   125→   125→  const [products, setProducts] = useState<Product[]>([]);
+   126→   126→  const [branchDebts, setBranchDebts] = useState<BranchDebtRow[]>([]);
+   127→   127→
+   128→   128→  // UI state
+   129→   129→  const [loading, setLoading] = useState(true);
+   130→   130→  const [activeView, setActiveView] = useState<ActiveView>('list');
+   131→   131→  const [search, setSearch] = useState('');
+   132→   132→  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+   133→   133→  const [branchFilter, setBranchFilter] = useState('all');
+   134→   134→  const [dateFrom, setDateFrom] = useState('');
+   135→   135→  const [dateTo, setDateTo] = useState('');
+   136→   136→  const [page, setPage] = useState(1);
+   137→   137→  const [totalCount, setTotalCount] = useState(0);
+   138→   138→
+   139→   139→  // Create dialog
+   140→   140→  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+   141→   141→  const [creating, setCreating] = useState(false);
+   142→   142→  const [createForm, setCreateForm] = useState({
+   143→   143→    from_branch_id: '',
+   144→   144→    to_branch_id: '',
+   145→   145→    transfer_date: new Date().toISOString().split('T')[0],
+   146→   146→    notes: '',
+   147→   147→  });
+   148→   148→  const [formItems, setFormItems] = useState<TransferFormItem[]>([]);
+   149→   149→
+   150→   150→  // Detail dialog
+   151→   151→  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+   152→   152→  const [detailTransfer, setDetailTransfer] = useState<TransferRow | null>(null);
+   153→   153→  const [loadingDetail, setLoadingDetail] = useState(false);
+   154→   154→
+   155→   155→  // Confirm dialog
+   156→   156→  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+   157→   157→  const [confirmingTransfer, setConfirmingTransfer] = useState<TransferRow | null>(null);
+   158→   158→  const [confirming, setConfirming] = useState(false);
+   159→   159→
+   160→   160→  // Cancel dialog
+   161→   161→  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+   162→   162→  const [cancellingTransfer, setCancellingTransfer] = useState<TransferRow | null>(null);
+   163→   163→  const [cancelling, setCancelling] = useState(false);
+   164→   164→
+   165→   165→  // ─── Data loading ──────────────────────────────────────────────────────────
+   166→   166→  useEffect(() => {
+   167→   167→    loadBranches();
+   168→   168→    loadProducts();
+   169→   169→  }, []);
+   170→   170→
+   171→   171→  useEffect(() => {
+   172→   172→    if (activeView === 'list') {
+   173→   173→      loadTransfers();
+   174→   174→    } else {
+   175→   175→      loadBranchDebts();
+   176→   176→    }
+   177→   177→  }, [activeView, page, search, statusFilter, branchFilter, dateFrom, dateTo]);
+   178→   178→
+   179→   179→  const loadBranches = async () => {
+   180→   180→    try {
+   181→   181→      const { data, error } = await supabase
+   182→   182→        .from('branches')
+   183→   183→        .select('*')
+   184→   184→        .eq('is_active', true)
+   185→   185→        .order('name');
+   186→   186→
+   187→   187→      if (error) throw error;
+   188→   188→      if (data) {
+   189→   189→        const branches = data as BranchWithFactory[];
+   190→   190→        setFactoryBranches(branches); // All branches can be source
+   191→   191→        setDestinationBranches(branches); // All branches can be destination
+   192→   192→      }
+   193→   193→    } catch (err) {
+   194→   194→      console.error('Error loading branches:', err);
+   195→   195→    }
+   196→   196→  };
+   197→   197→
+   198→   198→  const loadProducts = async () => {
+   199→   199→    try {
+   200→   200→      const { data, error } = await supabase
+   201→   201→        .from('products')
+   202→   202→        .select('*')
+   203→   203→        .eq('is_active', true)
+   204→   204→        .order('name');
+   205→   205→
+   206→   206→      if (error) throw error;
+   207→   207→      if (data) setProducts(data as Product[]);
+   208→   208→    } catch (err) {
+   209→   209→      console.error('Error loading products:', err);
+   210→   210→    }
+   211→   211→  };
+   212→   212→
+   213→   213→  const loadTransfers = async () => {
+   214→   214→    setLoading(true);
+   215→   215→    try {
+   216→   216→      let query = supabase
+   217→   217→        .from('inventory_transfers')
+   218→   218→        .select('*, from_branch:branches!inventory_transfers_from_branch_id_fkey(name), to_branch:branches!inventory_transfers_to_branch_id_fkey(name), items:inventory_transfer_items(*, products(name, unit_price, unit_count))', { count: 'exact' })
+   219→   219→        .order('created_at', { ascending: false });
+   220→   220→
+   221→   221→      if (search) {
+   222→   222→        query = query.or(`transfer_number.ilike.%${search}%`);
+   223→   223→      }
+   224→   224→      if (statusFilter !== 'all') {
+   225→   225→        query = query.eq('status', statusFilter);
+   226→   226→      }
+   227→   227→      if (branchFilter !== 'all') {
+   228→   228→        query = query.or(`from_branch_id.eq.${branchFilter},to_branch_id.eq.${branchFilter}`);
+   229→   229→      }
+   230→   230→      if (dateFrom) {
+   231→   231→        query = query.gte('transfer_date', dateFrom);
+   232→   232→      }
+   233→   233→      if (dateTo) {
+   234→   234→        query = query.lte('transfer_date', dateTo);
+   235→   235→      }
+   236→   236→
+   237→   237→      const from = (page - 1) * PAGE_SIZE;
+   238→   238→      query = query.range(from, from + PAGE_SIZE - 1);
+   239→   239→
+   240→   240→      const { data, count, error } = await query;
+   241→   241→      if (!error && data) {
+   242→   242→        setTransfers(data as unknown as TransferRow[]);
+   243→   243→        setTotalCount(count || 0);
+   244→   244→      }
+   245→   245→    } catch (err) {
+   246→   246→      console.error('Error loading transfers:', err);
+   247→   247→    } finally {
+   248→   248→      setLoading(false);
+   249→   249→    }
+   250→   250→  };
+   251→   251→
+   252→   252→  const loadBranchDebts = async () => {
+   253→   253→    setLoading(true);
+   254→   254→    try {
+   255→   255→      const { data: transfersData, error: tError } = await supabase
+   256→   256→        .from('inventory_transfers')
+   257→   257→        .select('to_branch_id, total_amount')
+   258→   258→        .eq('status', 'confirmed');
+   259→   259→
+   260→   260→      if (tError) throw tError;
+   261→   261→
+   262→   262→      const { data: paymentsData, error: pError } = await supabase
+   263→   263→        .from('payments')
+   264→   264→        .select('branch_id, amount');
+   265→   265→
+   266→   266→      if (pError) throw pError;
+   267→   267→
+   268→   268→      const { data: branchesData } = await supabase
+   269→   269→        .from('branches')
+   270→   270→        .select('id, name')
+   271→   271→        .eq('is_active', true);
+   272→   272→
+   273→   273→      const branchMap = new Map((branchesData || []).map((b: { id: string; name: string }) => [b.id, b.name]));
+   274→   274→
+   275→   275→      const debtMap = new Map<string, { transferred: number; paid: number }>();
+   276→   276→
+   277→   277→      (transfersData || []).forEach((t: { to_branch_id: string; total_amount: number }) => {
+   278→   278→        const existing = debtMap.get(t.to_branch_id) || { transferred: 0, paid: 0 };
+   279→   279→        existing.transferred += Number(t.total_amount);
+   280→   280→        debtMap.set(t.to_branch_id, existing);
+   281→   281→      });
+   282→   282→
+   283→   283→      (paymentsData || []).forEach((p: { branch_id: string; amount: number }) => {
+   284→   284→        const existing = debtMap.get(p.branch_id) || { transferred: 0, paid: 0 };
+   285→   285→        existing.paid += Number(p.amount);
+   286→   286→        debtMap.set(p.branch_id, existing);
+   287→   287→      });
+   288→   288→
+   289→   289→      const debts: BranchDebtRow[] = [];
+   290→   290→      debtMap.forEach((value, key) => {
+   291→   291→        const branchName = branchMap.get(key) || 'فرع غير معروف';
+   292→   292→        debts.push({
+   293→   293→          branch_id: key,
+   294→   294→          branch_name: branchName,
+   295→   295→          total_transferred: value.transferred,
+   296→   296→          total_paid: value.paid,
+   297→   297→          remaining_debt: value.transferred - value.paid,
+   298→   298→        });
+   299→   299→      });
+   300→   300→
+   301→   301→      debts.sort((a, b) => b.remaining_debt - a.remaining_debt);
+   302→   302→      setBranchDebts(debts);
+   303→   303→    } catch (err) {
+   304→   304→      console.error('Error loading branch debts:', err);
+   305→   305→    } finally {
+   306→   306→      setLoading(false);
+   307→   307→    }
+   308→   308→  };
+   309→   309→
+   310→   310→  const hasActiveFilters = search || statusFilter !== 'all' || branchFilter !== 'all' || dateFrom || dateTo;
+   311→   311→
+   312→   312→  const clearFilters = () => {
+   313→   313→    setSearch('');
+   314→   314→    setStatusFilter('all');
+   315→   315→    setBranchFilter('all');
+   316→   316→    setDateFrom('');
+   317→   317→    setDateTo('');
+   318→   318→    setPage(1);
+   319→   319→  };
+   320→   320→
+   321→   321→  const stats = useMemo(() => {
+   322→   322→    const pending = transfers.filter((t) => t.status === 'pending').length;
+   323→   323→    const confirmed = transfers.filter((t) => t.status === 'confirmed').length;
+   324→   324→    const totalAmount = transfers.reduce((sum, t) => sum + Number(t.total_amount), 0);
+   325→   325→    return { pending, confirmed, totalAmount };
+   326→   326→  }, [transfers]);
+   327→   327→
+   328→   328→  const totalDebt = useMemo(() => {
+   329→   329→    return branchDebts.reduce((sum, d) => sum + d.remaining_debt, 0);
+   330→   330→  }, [branchDebts]);
+   331→   331→
+   332→   332→  const openCreateDialog = async () => {
+   333→   333→    const year = getCurrentYear();
+   334→   334→    setCreating(false);
+   335→   335→
+   336→   336→    const defaultFactory = '';
+   337→   337→
+   338→   338→    setCreateForm({
+   339→   339→      from_branch_id: defaultFactory,
+   340→   340→      to_branch_id: '',
+   341→   341→      transfer_date: new Date().toISOString().split('T')[0],
+   342→   342→      notes: '',
+   343→   343→    });
+   344→   344→    setFormItems([]);
+   345→   345→    setCreateDialogOpen(true);
+   346→   346→  };
+   347→   347→
+   348→   348→  const addFormItem = () => {
+   349→   349→    setFormItems([...formItems, { product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
+   350→   350→  };
+   351→   351→
+   352→   352→  const removeFormItem = (index: number) => {
+   353→   353→    setFormItems(formItems.filter((_, i) => i !== index));
+   354→   354→  };
+   355→   355→
+   356→   356→  const updateFormItem = (index: number, field: keyof TransferFormItem, value: string | number) => {
+   357→   357→    const updated = [...formItems];
+   358→   358→    const item = { ...updated[index] };
+   359→   359→
+   360→   360→    if (field === 'product_id') {
+   361→   361→      item.product_id = value as string;
+   362→   362→      const product = products.find((p) => p.id === value);
+   363→   363→      if (product) {
+   364→   364→        item.unit_price = product.unit_price;
+   365→   365→        item.total_price = item.quantity * item.unit_price;
+   366→   366→      }
+   367→   367→    } else if (field === 'quantity') {
+   368→   368→      item.quantity = Math.max(1, Number(value) || 1);
+   369→   369→      item.total_price = item.quantity * item.unit_price;
+   370→   370→    } else if (field === 'unit_price') {
+   371→   371→      item.unit_price = Math.max(0, Number(value) || 0);
+   372→   372→      item.total_price = item.quantity * item.unit_price;
+   373→   373→    }
+   374→   374→
+   375→   375→    updated[index] = item;
+   376→   376→    setFormItems(updated);
+   377→   377→  };
+   378→   378→
+   379→   379→  const formTotalAmount = useMemo(() => {
+   380→   380→    return formItems.reduce((sum, item) => sum + item.total_price, 0);
+   381→   381→  }, [formItems]);
+   382→   382→
+   383→   383→  const handleCreateTransfer = async () => {
+   384→   384→    if (!createForm.from_branch_id) {
+   385→   385→      toast.error('يرجى اختيار الفرع المصدر (المصنع)');
+   386→   386→      return;
+   387→   387→    }
+   388→   388→    if (!createForm.to_branch_id) {
+   389→   389→      toast.error('يرجى اختيار الفرع الوجهة');
+   390→   390→      return;
+   391→   391→    }
+   392→   392→    if (createForm.from_branch_id === createForm.to_branch_id) {
+   393→   393→      toast.error('لا يمكن التحويل بين نفس الفرع');
+   394→   394→      return;
+   395→   395→    }
+   396→   396→    if (formItems.length === 0) {
+   397→   397→      toast.error('يرجى إضافة منتج واحد على الأقل');
+   398→   398→      return;
+   399→   399→    }
+   400→   400→    for (let i = 0; i < formItems.length; i++) {
+   401→   401→      if (!formItems[i].product_id) {
+   402→   402→        toast.error(`يرجى اختيار المنتج في السطر ${i + 1}`);
+   403→   403→        return;
+   404→   404→      }
+   405→   405→      if (formItems[i].quantity <= 0) {
+   406→   406→        toast.error(`يرجى إدخال كمية صحيحة في السطر ${i + 1}`);
+   407→   407→        return;
+   408→   408→      }
+   409→   409→      if (formItems[i].unit_price <= 0) {
+   410→   410→        toast.error(`يرجى إدخال سعر الوحدة في السطر ${i + 1}`);
+   411→   411→        return;
+   412→   412→      }
+   413→   413→    }
+   414→   414→
+   415→   415→    setCreating(true);
+   416→   416→    try {
+   417→   417→      const year = getCurrentYear();
+   418→   418→      const { data: lastTransfer } = await supabase
+   419→   419→        .from('inventory_transfers')
+   420→   420→        .select('transfer_number')
+   421→   421→        .like('transfer_number', `TR-${year}-%`)
+   422→   422→        .order('transfer_number', { ascending: false })
+   423→   423→        .limit(1);
+   424→   424→
+   425→   425→      let lastNum = 0;
+   426→   426→      if (lastTransfer && lastTransfer.length > 0) {
+   427→   427→        const parts = lastTransfer[0].transfer_number.split('-');
+   428→   428→        lastNum = parseInt(parts[parts.length - 1]) || 0;
+   429→   429→      }
+   430→   430→
+   431→   431→      const transferNumber = generateTransferNumber(lastNum, year);
+   432→   432→
+   433→   433→      const { data: newTransfer, error: transferError } = await supabase
+   434→   434→        .from('inventory_transfers')
+   435→   435→        .insert({
+   436→   436→          transfer_number: transferNumber,
+   437→   437→          from_branch_id: createForm.from_branch_id,
+   438→   438→          to_branch_id: createForm.to_branch_id,
+   439→   439→          transfer_date: createForm.transfer_date,
+   440→   440→          total_amount: formTotalAmount,
+   441→   441→          status: 'pending',
+   442→   442→          notes: createForm.notes.trim() || null,
+   443→   443→          created_by: user?.id || null,
+   444→   444→        })
+   445→   445→        .select('id')
+   446→   446→        .single();
+   447→   447→
+   448→   448→      if (transferError) throw transferError;
+   449→   449→      if (!newTransfer) throw new Error('Failed to create transfer');
+   450→   450→
+   451→   451→      const itemsPayload = formItems.map((item) => ({
+   452→   452→        transfer_id: newTransfer.id,
+   453→   453→        product_id: item.product_id,
+   454→   454→        quantity: item.quantity,
+   455→   455→        unit_price: item.unit_price,
+   456→   456→        total_price: item.total_price,
+   457→   457→      }));
+   458→   458→
+   459→   459→      const { error: itemsError } = await supabase
+   460→   460→        .from('inventory_transfer_items')
+   461→   461→        .insert(itemsPayload);
+   462→   462→
+   463→   463→      if (itemsError) throw itemsError;
+   464→   464→
+   465→   465→      await supabase.from('audit_log').insert({
+   466→   466→        action: 'create_inventory_transfer',
+   467→   467→        details: {
+   468→   468→          transfer_number: transferNumber,
+   469→   469→          from_branch_id: createForm.from_branch_id,
+   470→   470→          to_branch_id: createForm.to_branch_id,
+   471→   471→          total_amount: formTotalAmount,
+   472→   472→          items_count: formItems.length,
+   473→   473→        },
+   474→   474→      });
+   475→   475→
+   476→   476→      toast.success('تم إنشاء التصبين بنجاح');
+   477→   477→      setCreateDialogOpen(false);
+   478→   478→      loadTransfers();
+   479→   479→    } catch (err) {
+   480→   480→      console.error('Error creating transfer:', err);
+   481→   481→      toast.error('حدث خطأ أثناء إنشاء التصبين');
+   482→   482→    } finally {
+   483→   483→      setCreating(false);
+   484→   484→    }
+   485→   485→  };
+   486→   486→
+   487→   487→  const openDetailDialog = async (transfer: TransferRow) => {
+   488→   488→    setDetailTransfer(transfer);
+   489→   489→    setDetailDialogOpen(true);
+   490→   490→
+   491→   491→    if (!transfer.items || transfer.items.length === 0) {
+   492→   492→      setLoadingDetail(true);
+   493→   493→      try {
+   494→   494→        const { data, error } = await supabase
+   495→   495→          .from('inventory_transfer_items')
+   496→   496→          .select('*, products(name, unit_price, unit_count)')
+   497→   497→          .eq('transfer_id', transfer.id)
+   498→   498→          .order('created_at', { ascending: true });
+   499→   499→
+   500→   500→        if (!error && data) {
+   501→   501→          setDetailTransfer({ ...transfer, items: data as InventoryTransferItemRow[] });
+   502→   502→        }
+   503→   503→      } catch (err) {
+   504→   504→        console.error('Error loading transfer items:', err);
+   505→   505→      } finally {
+   506→   506→        setLoadingDetail(false);
+   507→   507→      }
+   508→   508→    } else {
+   509→   509→      setLoadingDetail(false);
+   510→   510→    }
+   511→   511→  };
+   512→   512→
+   513→   513→  const openConfirmDialog = (transfer: TransferRow) => {
+   514→   514→    setConfirmingTransfer(transfer);
+   515→   515→    setConfirmDialogOpen(true);
+   516→   516→  };
+   517→   517→
+   518→   518→  const handleConfirmTransfer = async () => {
+   519→   519→    if (!confirmingTransfer) return;
+   520→   520→    setConfirming(true);
+   521→   521→
+   522→   522→    try {
+   523→   523→      const transfer = confirmingTransfer;
+   524→   524→
+   525→   525→      let items = transfer.items;
+   526→   526→      if (!items || items.length === 0) {
+   527→   527→        const { data, error } = await supabase
+   528→   528→          .from('inventory_transfer_items')
+   529→   529→          .select('*, products(name, unit_price, unit_count)')
+   530→   530→          .eq('transfer_id', transfer.id);
+   531→   531→
+   532→   532→        if (error) throw error;
+   533→   533→        items = (data as InventoryTransferItemRow[]) || [];
+   534→   534→      }
+   535→   535→
+   536→   536→      if (items.length === 0) {
+   537→   537→        toast.error('لا توجد عناصر في هذا التصبين');
+   538→   538→        setConfirming(false);
+   539→   539→        return;
+   540→   540→      }
+   541→   541→
+   542→   542→      for (const item of items) {
+   543→   543→        const { data: sourceInv } = await supabase
+   544→   544→          .from('inventory')
+   545→   545→          .select('id, quantity')
+   546→   546→          .eq('product_id', item.product_id)
+   547→   547→          .eq('branch_id', transfer.from_branch_id)
+   548→   548→          .single();
+   549→   549→
+   550→   550→        if (!sourceInv || sourceInv.quantity < item.quantity) {
+   551→   551→          const productName = item.products?.name || 'منتج غير معروف';
+   552→   552→          toast.error(`الكمية غير كافية في المصنع للمنتج: ${productName} (المتاح: ${sourceInv?.quantity || 0})`);
+   553→   553→          setConfirming(false);
+   554→   554→          return;
+   555→   555→        }
+   556→   556→      }
+   557→   557→
+   558→   558→      for (const item of items) {
+   559→   559→        const { data: sourceInv } = await supabase
+   560→   560→          .from('inventory')
+   561→   561→          .select('id, quantity')
+   562→   562→          .eq('product_id', item.product_id)
+   563→   563→          .eq('branch_id', transfer.from_branch_id)
+   564→   564→          .single();
+   565→   565→
+   566→   566→        if (sourceInv) {
+   567→   567→          const { error: srcErr } = await supabase
+   568→   568→            .from('inventory')
+   569→   569→            .update({
+   570→   570→              quantity: sourceInv.quantity - item.quantity,
+   571→   571→              last_updated: new Date().toISOString(),
+   572→   572→            })
+   573→   573→            .eq('id', sourceInv.id);
+   574→   574→
+   575→   575→          if (srcErr) throw srcErr;
+   576→   576→        }
+   577→   577→
+   578→   578→        const { data: destInv } = await supabase
+   579→   579→          .from('inventory')
+   580→   580→          .select('id, quantity')
+   581→   581→          .eq('product_id', item.product_id)
+   582→   582→          .eq('branch_id', transfer.to_branch_id)
+   583→   583→          .single();
+   584→   584→
+   585→   585→        if (destInv) {
+   586→   586→          const { error: destErr } = await supabase
+   587→   587→            .from('inventory')
+   588→   588→            .update({
+   589→   589→              quantity: destInv.quantity + item.quantity,
+   590→   590→              last_updated: new Date().toISOString(),
+   591→   591→            })
+   592→   592→            .eq('id', destInv.id);
+   593→   593→
+   594→   594→          if (destErr) throw destErr;
+   595→   595→        } else {
+   596→   596→          const { error: destInsErr } = await supabase
+   597→   597→            .from('inventory')
+   598→   598→            .insert({
+   599→   599→              product_id: item.product_id,
+   600→   600→              branch_id: transfer.to_branch_id,
+   601→   601→              quantity: item.quantity,
+   602→   602→              min_quantity: 0,
+   603→   603→              last_updated: new Date().toISOString(),
+   604→   604→            });
+   605→   605→
+   606→   606→          if (destInsErr) throw destInsErr;
+   607→   607→        }
+   608→   608→      }
+   609→   609→
+   610→   610→      for (const item of items) {
+   611→   611→        const { error: outTxErr } = await supabase
+   612→   612→          .from('inventory_transactions')
+   613→   613→          .insert({
+   614→   614→            product_id: item.product_id,
+   615→   615→            branch_id: transfer.from_branch_id,
+   616→   616→            transaction_type: 'tasbeen',
+   617→   617→            quantity: -item.quantity,
+   618→   618→            reference_type: 'tasbeen_out',
+   619→   619→            reference_id: transfer.id,
+   620→   620→            notes: `تصبين إلى فرع - تحويل رقم ${transfer.transfer_number}`,
+   621→   621→            created_by: user?.id || null,
+   622→   622→            transfer_id: transfer.id,
+   623→   623→          });
+   624→   624→
+   625→   625→        if (outTxErr) throw outTxErr;
+   626→   626→
+   627→   627→        const { error: inTxErr } = await supabase
+   628→   628→          .from('inventory_transactions')
+   629→   629→          .insert({
+   630→   630→            product_id: item.product_id,
+   631→   631→            branch_id: transfer.to_branch_id,
+   632→   632→            transaction_type: 'tasbeen',
+   633→   633→            quantity: item.quantity,
+   634→   634→            reference_type: 'tasbeen_in',
+   635→   635→            reference_id: transfer.id,
+   636→   636→            notes: `تصبين من المصنع - تحويل رقم ${transfer.transfer_number}`,
+   637→   637→            created_by: user?.id || null,
+   638→   638→            transfer_id: transfer.id,
+   639→   639→          });
+   640→   640→
+   641→   641→        if (inTxErr) throw inTxErr;
+   642→   642→      }
+   643→   643→
+   644→   644→      const year = getCurrentYear();
+   645→   645→      const { data: lastEntry } = await supabase
+   646→   646→        .from('journal_entries')
+   647→   647→        .select('entry_number')
+   648→   648→        .like('entry_number', `JE-${year}-%`)
+   649→   649→        .order('entry_number', { ascending: false })
+   650→   650→        .limit(1);
+   651→   651→
+   652→   652→      let lastNum = 0;
+   653→   653→      if (lastEntry && lastEntry.length > 0) {
+   654→   654→        const parts = lastEntry[0].entry_number.split('-');
+   655→   655→        lastNum = parseInt(parts[parts.length - 1]) || 0;
+   656→   656→      }
+   657→   657→
+   658→   658→      const entryNumber = generateJournalEntryNumber(lastNum, year);
+   659→   659→      const totalAmount = Number(transfer.total_amount);
+   660→   660→
+   661→   661→      const { data: branchAccount } = await supabase
+   662→   662→        .from('chart_of_accounts')
+   663→   663→        .select('id')
+   664→   664→        .eq('code', '2102')
+   665→   665→        .single();
+   666→   666→
+   667→   667→      const { data: factoryInventoryAccount } = await supabase
+   668→   668→        .from('chart_of_accounts')
+   669→   669→        .select('id')
+   670→   670→        .eq('code', '1104')
+   671→   671→        .single();
+   672→   672→
+   673→   673→      const { data: newEntry, error: jeError } = await supabase
+   674→   674→        .from('journal_entries')
+   675→   675→        .insert({
+   676→   676→          entry_number: entryNumber,
+   677→   677→          entry_date: transfer.transfer_date,
+   678→   678→          description: `قيد تصبين - تحويل رقم ${transfer.transfer_number}`,
+   679→   679→          total_debit: totalAmount,
+   680→   680→          total_credit: totalAmount,
+   681→   681→          is_posted: true,
+   682→   682→          notes: `قيد تلقائي من تصبين مخزون رقم ${transfer.transfer_number}`,
+   683→   683→          created_by: user?.id || null,
+   684→   684→          source_type: 'inventory_transfer',
+   685→   685→          source_id: transfer.id,
+   686→   686→        })
+   687→   687→        .select('id')
+   688→   688→        .single();
+   689→   689→
+   690→   690→      if (!jeError && newEntry) {
+   691→   691→        await supabase.from('journal_entry_lines').insert([
+   692→   692→          {
+   693→   693→            journal_entry_id: newEntry.id,
+   694→   694→            account_id: branchAccount?.id || null,
+   695→   695→            account_name: 'حسابات الفروع',
+   696→   696→            debit: totalAmount,
+   697→   697→            credit: 0,
+   698→   698→            description: `مدين - تصبين إلى فرع - تحويل رقم ${transfer.transfer_number}`,
+   699→   699→          },
+   700→   700→          {
+   701→   701→            journal_entry_id: newEntry.id,
+   702→   702→            account_id: factoryInventoryAccount?.id || null,
+   703→   703→            account_name: 'مخزون المصنع',
+   704→   704→            debit: 0,
+   705→   705→            credit: totalAmount,
+   706→   706→            description: `دائن - تصبين من المصنع - تحويل رقم ${transfer.transfer_number}`,
+   707→   707→          },
+   708→   708→        ]);
+   709→   709→
+   710→   710→        await supabase
+   711→   711→          .from('inventory_transfers')
+   712→   712→          .update({ journal_entry_id: newEntry.id })
+   713→   713→          .eq('id', transfer.id);
+   714→   714→      }
+   715→   715→
+   716→   716→      const { error: statusError } = await supabase
+   717→   717→        .from('inventory_transfers')
+   718→   718→        .update({
+   719→   719→          status: 'confirmed',
+   720→   720→          updated_at: new Date().toISOString(),
+   721→   721→        })
+   722→   722→        .eq('id', transfer.id);
+   723→   723→
+   724→   724→      if (statusError) throw statusError;
+   725→   725→
+   726→   726→      await supabase.from('audit_log').insert({
+   727→   727→        action: 'confirm_inventory_transfer',
+   728→   728→        details: {
+   729→   729→          transfer_number: transfer.transfer_number,
+   730→   730→          total_amount: totalAmount,
+   731→   731→          journal_entry: entryNumber,
+   732→   732→        },
+   733→   733→      });
+   734→   734→
+   735→   735→      toast.success('تم تأكيد التصبين وتحديث المخزون وإنشاء القيد المحاسبي بنجاح');
+   736→   736→      setConfirmDialogOpen(false);
+   737→   737→      setConfirmingTransfer(null);
+   738→   738→      loadTransfers();
+   739→   739→    } catch (err) {
+   740→   740→      console.error('Error confirming transfer:', err);
+   741→   741→      toast.error('حدث خطأ أثناء تأكيد التصبين');
+   742→   742→    } finally {
+   743→   743→      setConfirming(false);
+   744→   744→    }
+   745→   745→  };
+   746→   746→
+   747→   747→  const openCancelDialog = (transfer: TransferRow) => {
+   748→   748→    setCancellingTransfer(transfer);
+   749→   749→    setCancelDialogOpen(true);
+   750→   750→  };
+   751→   751→
+   752→   752→  const handleCancelTransfer = async () => {
+   753→   753→    if (!cancellingTransfer) return;
+   754→   754→    setCancelling(true);
+   755→   755→
+   756→   756→    try {
+   757→   757→      const { error } = await supabase
+   758→   758→        .from('inventory_transfers')
+   759→   759→        .update({
+   760→   760→          status: 'cancelled',
+   761→   761→          updated_at: new Date().toISOString(),
+   762→   762→        })
+   763→   763→        .eq('id', cancellingTransfer.id);
+   764→   764→
+   765→   765→      if (error) throw error;
+   766→   766→
+   767→   767→      await supabase.from('audit_log').insert({
+   768→   768→        action: 'cancel_inventory_transfer',
+   769→   769→        details: {
+   770→   770→          transfer_number: cancellingTransfer.transfer_number,
+   771→   771→        },
+   772→   772→      });
+   773→   773→
+   774→   774→      toast.success('تم إلغاء التصبين بنجاح');
+   775→   775→      setCancelDialogOpen(false);
+   776→   776→      setCancellingTransfer(null);
+   777→   777→      loadTransfers();
+   778→   778→    } catch (err) {
+   779→   779→      console.error('Error cancelling transfer:', err);
+   780→   780→      toast.error('حدث خطأ أثناء إلغاء التصبين');
+   781→   781→    } finally {
+   782→   782→      setCancelling(false);
+   783→   783→    }
+   784→   784→  };
+   785→   785→
+   786→   786→  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+   787→   787→
+   788→   788→  const getProductName = useCallback((productId: string) => {
+   789→   789→    return products.find((p) => p.id === productId)?.name || 'غير معروف';
+   790→   790→  }, [products]);
+   791→   791→
+   792→   792→  // ─── Render: Loading ──────────────────────────────────────────────────────
+   793→   793→  if (loading && transfers.length === 0 && branchDebts.length === 0) {
+   794→   794→    return (
+   795→   795→      <div className="flex items-center justify-center min-h-[60vh]">
+   796→   796→        <div className="flex flex-col items-center gap-4">
+   797→   797→          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+   798→   798→            <Loader2 className="w-6 h-6 animate-spin text-white" />
+   799→   799→          </div>
+   800→   800→          <p className="text-muted-foreground text-sm">جاري تحميل التحويلات...</p>
+   801→   801→        </div>
+   802→   802→      </div>
+   803→   803→    );
+   804→   804→  }
+   805→   805→
+   806→   806→  const listStatCards = [
+   807→   807→    {
+   808→   808→      title: 'في الانتظار',
+   809→   809→      value: stats.pending,
+   810→   810→      icon: AlertTriangle,
+   811→   811→      color: 'text-amber-600 dark:text-amber-400',
+   812→   812→      bg: 'bg-amber-50 dark:bg-amber-900/20',
+   813→   813→    },
+   814→   814→    {
+   815→   815→      title: 'مؤكدة',
+   816→   816→      value: stats.confirmed,
+   817→   817→      icon: CheckCircle2,
+   818→   818→      color: 'text-emerald-600 dark:text-emerald-400',
+   819→   819→      bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+   820→   820→    },
+   821→   821→    {
+   822→   822→      title: 'إجمالي المبلغ',
+   823→   823→      value: formatCurrency(stats.totalAmount),
+   824→   824→      icon: TrendingUp,
+   825→   825→      color: 'text-indigo-600 dark:text-indigo-400',
+   826→   826→      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+   827→   827→    },
+   828→   828→  ];
+   829→   829→
+   830→   830→  const debtsStatCards = [
+   831→   831→    {
+   832→   832→      title: 'إجمالي الديون على الفروع',
+   833→   833→      value: formatCurrency(totalDebt),
+   834→   834→      icon: HandCoins,
+   835→   835→      color: 'text-red-600 dark:text-red-400',
+   836→   836→      bg: 'bg-red-50 dark:bg-red-900/20',
+   837→   837→    },
+   838→   838→    {
+   839→   839→      title: 'عدد الفروع المدينة',
+   840→   840→      value: branchDebts.filter((d) => d.remaining_debt > 0).length,
+   841→   841→      icon: Building2,
+   842→   842→      color: 'text-amber-600 dark:text-amber-400',
+   843→   843→      bg: 'bg-amber-50 dark:bg-amber-900/20',
+   844→   844→    },
+   845→   845→    {
+   846→   846→      title: 'إجمالي التصبينات',
+   847→   847→      value: formatCurrency(branchDebts.reduce((s, d) => s + d.total_transferred, 0)),
+   848→   848→      icon: ArrowRightLeft,
+   849→   849→      color: 'text-indigo-600 dark:text-indigo-400',
+   850→   850→      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+   851→   851→    },
+   852→   852→  ];
+   853→   853→
+   854→   854→  const currentStatCards = activeView === 'list' ? listStatCards : debtsStatCards;
+   855→   855→
+   856→   856→  // ─── Render ───────────────────────────────────────────────────────────────
+   857→   857→  return (
+   858→   858→    <div className="space-y-6">
+   859→   859→      {/* Header */}
+   860→   860→      <motion.div
+   861→   861→        initial={{ opacity: 0, y: 20 }}
+   862→   862→        animate={{ opacity: 1, y: 0 }}
+   863→   863→        transition={{ duration: 0.3 }}
+   864→   864→        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+   865→   865→      >
+   866→   866→        <div className="flex items-center gap-3">
+   867→   867→          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+   868→   868→            <ArrowRightLeft className="w-6 h-6 text-white" />
+   869→   869→          </div>
+   870→   870→          <div>
+   871→   871→            <h1 className="text-2xl font-bold">التصبين والتحويلات</h1>
+   872→   872→            <p className="text-muted-foreground text-sm mt-0.5">
+   873→   873→              تحويل المخزون من المصنع إلى الفروع وإدارة مديونيات الفروع
+   874→   874→            </p>
+   875→   875→          </div>
+   876→   876→        </div>
+   877→   877→        <div className="flex items-center gap-2">
+   878→   878→          {hasPermission('inventory_transfers', 'view') && (
+   879→   879→            <Button
+   880→   880→              variant={activeView === 'debts' ? 'default' : 'outline'}
+   881→   881→              onClick={() => { setActiveView('debts'); setLoading(true); }}
+   882→   882→              className="gap-2 shadow-sm"
+   883→   883→            >
+   884→   884→              <HandCoins className="w-4 h-4" />
+   885→   885→              مديونيات الفروع
+   886→   886→            </Button>
+   887→   887→          )}
+   888→   888→          {hasPermission('inventory_transfers', 'create') && (
+   889→   889→            <Button
+   890→   890→              onClick={openCreateDialog}
+   891→   891→              className="gap-2 shadow-lg"
+   892→   892→              style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}
+   893→   893→            >
+   894→   894→              <Plus className="w-4 h-4" />
+   895→   895→              تصبين جديد
+   896→   896→            </Button>
+   897→   897→          )}
+   898→   898→        </div>
+   899→   899→      </motion.div>
+   900→   900→
+   901→   901→      {/* Stats Cards */}
+   902→   902→      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   903→   903→        {currentStatCards.map((card, index) => {
+   904→   904→          const Icon = card.icon;
+   905→   905→          return (
+   906→   906→            <motion.div
+   907→   907→              key={card.title}
+   908→   908→              initial={{ opacity: 0, y: 20 }}
+   909→   909→              animate={{ opacity: 1, y: 0 }}
+   910→   910→              transition={{ duration: 0.3, delay: index * 0.1 }}
+   911→   911→            >
+   912→   912→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+   913→   913→                <CardContent className="p-5">
+   914→   914→                  <div className="flex items-center justify-between">
+   915→   915→                    <div>
+   916→   916→                      <p className="text-sm text-muted-foreground">{card.title}</p>
+   917→   917→                      <p className="text-2xl font-bold mt-1">{card.value}</p>
+   918→   918→                    </div>
+   919→   919→                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${card.bg}`}>
+   920→   920→                      <Icon className={`w-6 h-6 ${card.color}`} />
+   921→   921→                    </div>
+   922→   922→                  </div>
+   923→   923→                </CardContent>
+   924→   924→              </Card>
+   925→   925→            </motion.div>
+   926→   926→          );
+   927→   927→        })}
+   928→   928→      </div>
+   929→   929→
+   930→   930→      {/* ─── LIST VIEW ──────────────────────────────────────────────────────── */}
+   931→   931→      {activeView === 'list' && (
+   932→   932→        <>
+   933→   933→          {/* Filters */}
+   934→   934→          <motion.div
+   935→   935→            initial={{ opacity: 0, y: 20 }}
+   936→   936→            animate={{ opacity: 1, y: 0 }}
+   937→   937→            transition={{ duration: 0.3, delay: 0.3 }}
+   938→   938→          >
+   939→   939→            <Card className="border-0 shadow-md overflow-hidden">
+   940→   940→              <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
+   941→   941→              <CardContent className="p-4">
+   942→   942→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+   943→   943→                  <div className="relative">
+   944→   944→                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   945→   945→                    <Input
+   946→   946→                      placeholder="بحث برقم التحويل..."
+   947→   947→                      value={search}
+   948→   948→                      onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   949→   949→                      className="pr-10"
+   950→   950→                    />
+   951→   951→                  </div>
+   952→   952→                  <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as StatusFilter); setPage(1); }}>
+   953→   953→                    <SelectTrigger>
+   954→   954→                      <SelectValue placeholder="الحالة" />
+   955→   955→                    </SelectTrigger>
+   956→   956→                    <SelectContent>
+   957→   957→                      <SelectItem value="all">كل الحالات</SelectItem>
+   958→   958→                      <SelectItem value="pending">في الانتظار</SelectItem>
+   959→   959→                      <SelectItem value="confirmed">مؤكد</SelectItem>
+   960→   960→                      <SelectItem value="cancelled">ملغي</SelectItem>
+   961→   961→                    </SelectContent>
+   962→   962→                  </Select>
+   963→   963→                  <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
+   964→   964→                    <SelectTrigger>
+   965→   965→                      <SelectValue placeholder="كل الفروع" />
+   966→   966→                    </SelectTrigger>
+   967→   967→                    <SelectContent>
+   968→   968→                      <SelectItem value="all">كل الفروع</SelectItem>
+   969→   969→                      {[...factoryBranches, ...destinationBranches].map((b) => (
+   970→   970→                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   971→   971→                      ))}
+   972→   972→                    </SelectContent>
+   973→   973→                  </Select>
+   974→   974→                  <Input
+   975→   975→                    type="date"
+   976→   976→                    value={dateFrom}
+   977→   977→                    onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+   978→   978→                    placeholder="من تاريخ"
+   979→   979→                  />
+   980→   980→                  <Input
+   981→   981→                    type="date"
+   982→   982→                    value={dateTo}
+   983→   983→                    onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+   984→   984→                    placeholder="إلى تاريخ"
+   985→   985→                  />
+   986→   986→                  {hasActiveFilters && (
+   987→   987→                    <div className="col-span-full flex justify-end">
+   988→   988→                      <Button variant="outline" onClick={clearFilters} className="gap-2">
+   989→   989→                        مسح الفلاتر
+   990→   990→                      </Button>
+   991→   991→                    </div>
+   992→   992→                  )}
+   993→   993→                </div>
+   994→   994→              </CardContent>
+   995→   995→            </Card>
+   996→   996→          </motion.div>
+   997→   997→
+   998→   998→          {/* Transfers Table */}
+   999→   999→          <motion.div
+  1000→  1000→            initial={{ opacity: 0, y: 20 }}
+  1001→  1001→            animate={{ opacity: 1, y: 0 }}
+  1002→  1002→            transition={{ duration: 0.3, delay: 0.4 }}
+  1003→  1003→          >
+  1004→  1004→            <Card className="border-0 shadow-md overflow-hidden">
+  1005→  1005→              <CardContent className="p-0">
+  1006→  1006→                {loading ? (
+  1007→  1007→                  <div className="flex flex-col items-center justify-center py-16">
+  1008→  1008→                    <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1009→  1009→                      <Loader2 className="w-6 h-6 animate-spin text-white" />
+  1010→  1010→                    </div>
+  1011→  1011→                    <p className="text-muted-foreground text-sm">جاري التحميل...</p>
+  1012→  1012→                  </div>
+  1013→  1013→                ) : transfers.length === 0 ? (
+  1014→  1014→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1015→  1015→                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+  1016→  1016→                      <ArrowRightLeft className="w-10 h-10 text-white" />
+  1017→  1017→                    </div>
+  1018→  1018→                    <h3 className="text-xl font-bold mb-2">لا توجد تحويلات</h3>
+  1019→  1019→                    <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+  1020→  1020→                      لم يتم إنشاء أي تصبين بعد. ابدأ بتحويل المخزون من المصنع إلى الفروع.
+  1021→  1021→                    </p>
+  1022→  1022→                    {hasPermission('inventory_transfers', 'create') && (
+  1023→  1023→                      <Button onClick={openCreateDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1024→  1024→                        <Plus className="w-5 h-5" />
+  1025→  1025→                        تصبين جديد
+  1026→  1026→                      </Button>
+  1027→  1027→                    )}
+  1028→  1028→                  </div>
+  1029→  1029→                ) : (
+  1030→  1030→                  <>
+  1031→  1031→                    {/* Mobile Card Layout */}
+  1032→  1032→                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden">
+  1033→  1033→                      {transfers.map((transfer, idx) => {
+  1034→  1034→                        const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
+  1035→  1035→                        const borderColor = transfer.status === 'pending' ? '#f59e0b' : transfer.status === 'confirmed' ? '#10b981' : '#ef4444';
+  1036→  1036→                        const statusAccent = transfer.status === 'pending'
+  1037→  1037→                          ? 'border-amber-400'
+  1038→  1038→                          : transfer.status === 'confirmed'
+  1039→  1039→                            ? 'border-emerald-400'
+  1040→  1040→                            : 'border-red-400';
+  1041→  1041→                        return (
+  1042→  1042→                          <motion.div
+  1043→  1043→                            key={transfer.id}
+  1044→  1044→                            initial={{ opacity: 0, y: 10 }}
+  1045→  1045→                            animate={{ opacity: 1, y: 0 }}
+  1046→  1046→                            transition={{ duration: 0.25, delay: idx * 0.04 }}
+  1047→  1047→                          >
+  1048→  1048→                            <Card className={`border-0 shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden border-r-4 ${statusAccent}`}>
+  1049→  1049→                              <CardContent className="p-4">
+  1050→  1050→                                {/* Top row: Transfer number + Status badge */}
+  1051→  1051→                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+  1052→  1052→                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+  1053→  1053→                                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm shrink-0" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+  1054→  1054→                                      <FileText className="w-4 h-4 text-white" />
+  1055→  1055→                                    </div>
+  1056→  1056→                                    <div>
+  1057→  1057→                                      <h3 className="font-bold text-sm tracking-tight">{transfer.transfer_number}</h3>
+  1058→  1058→                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="mt-0.5">
+  1059→  1059→                                        <Building2 className="w-3 h-3 text-muted-foreground" />
+  1060→  1060→                                        <p className="text-[11px] text-muted-foreground">
+  1061→  1061→                                          {transfer.from_branch?.name || '—'} ← {transfer.to_branch?.name || '—'}
+  1062→  1062→                                        </p>
+  1063→  1063→                                      </div>
+  1064→  1064→                                    </div>
+  1065→  1065→                                  </div>
+  1066→  1066→                                  <Badge
+  1067→  1067→                                    className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${statusColor[transfer.status]}`}
+  1068→  1068→                                  >
+  1069→  1069→                                    <StatusIcon className="w-3 h-3 ml-0.5" />
+  1070→  1070→                                    {statusLabel[transfer.status]}
+  1071→  1071→                                  </Badge>
+  1072→  1072→                                </div>
+  1073→  1073→
+  1074→  1074→                                {/* Info row: Date + Total */}
+  1075→  1075→                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-2 pt-2.5 border-t border-dashed">
+  1076→  1076→                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+  1077→  1077→                                    <span className="text-xs text-muted-foreground">
+  1078→  1078→                                      {formatDate(transfer.transfer_date)}
+  1079→  1079→                                    </span>
+  1080→  1080→                                  </div>
+  1081→  1081→                                  <span className="font-bold text-sm text-indigo-600 dark:text-indigo-400">
+  1082→  1082→                                    {formatCurrency(transfer.total_amount)}
+  1083→  1083→                                  </span>
+  1084→  1084→                                </div>
+  1085→  1085→
+  1086→  1086→                                {/* Action buttons */}
+  1087→  1087→                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="mt-3 pt-2.5 border-t">
+  1088→  1088→                                  <Button
+  1089→  1089→                                    variant="outline"
+  1090→  1090→                                    size="sm"
+  1091→  1091→                                    className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 dark:hover:bg-indigo-950 dark:hover:text-indigo-400 transition-colors"
+  1092→  1092→                                    onClick={() => openDetailDialog(transfer)}
+  1093→  1093→                                  >
+  1094→  1094→                                    <Eye className="w-3.5 h-3.5" />
+  1095→  1095→                                    عرض
+  1096→  1096→                                  </Button>
+  1097→  1097→                                  {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+  1098→  1098→                                    <>
+  1099→  1099→                                      <Button
+  1100→  1100→                                        variant="outline"
+  1101→  1101→                                        size="sm"
+  1102→  1102→                                        className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 transition-colors"
+  1103→  1103→                                        onClick={() => openConfirmDialog(transfer)}
+  1104→  1104→                                      >
+  1105→  1105→                                        <CheckCircle2 className="w-3.5 h-3.5" />
+  1106→  1106→                                        تأكيد
+  1107→  1107→                                      </Button>
+  1108→  1108→                                      <Button
+  1109→  1109→                                        variant="outline"
+  1110→  1110→                                        size="sm"
+  1111→  1111→                                        className="flex-1 h-8 text-[11px] gap-1.5 text-destructive hover:bg-red-50 hover:text-red-700 hover:border-red-200 dark:hover:bg-red-950 dark:hover:text-red-400 border-destructive/30 transition-colors"
+  1112→  1112→                                        onClick={() => openCancelDialog(transfer)}
+  1113→  1113→                                      >
+  1114→  1114→                                        <XCircle className="w-3.5 h-3.5" />
+  1115→  1115→                                        إلغاء
+  1116→  1116→                                      </Button>
+  1117→  1117→                                    </>
+  1118→  1118→                                  )}
+  1119→  1119→                                </div>
+  1120→  1120→                              </CardContent>
+  1121→  1121→                            </Card>
+  1122→  1122→                          </motion.div>
+  1123→  1123→                        );
+  1124→  1124→                      })}
+  1125→  1125→                    </div>
+  1126→  1126→
+  1127→  1127→                    {/* Desktop Table */}
+  1128→  1128→                    <div className="hidden sm:block">
+  1129→  1129→                      <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
+  1130→  1130→                      <div className="overflow-x-auto">
+  1131→  1131→                        <Table>
+  1132→  1132→                          <TableHeader>
+  1133→  1133→                            <TableRow className="bg-muted/30">
+  1134→  1134→                              <TableHead className="text-right">رقم التحويل</TableHead>
+  1135→  1135→                              <TableHead className="text-right hidden md:table-cell">المصنع (المصدر)</TableHead>
+  1136→  1136→                              <TableHead className="text-right hidden md:table-cell">الفرع (الوجهة)</TableHead>
+  1137→  1137→                              <TableHead className="text-right hidden sm:table-cell">التاريخ</TableHead>
+  1138→  1138→                              <TableHead className="text-right">المبلغ الإجمالي</TableHead>
+  1139→  1139→                              <TableHead className="text-center">الحالة</TableHead>
+  1140→  1140→                              <TableHead className="text-center">الإجراءات</TableHead>
+  1141→  1141→                            </TableRow>
+  1142→  1142→                          </TableHeader>
+  1143→  1143→                          <TableBody>
+  1144→  1144→                            {transfers.map((transfer) => {
+  1145→  1145→                              const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
+  1146→  1146→                              return (
+  1147→  1147→                                <TableRow key={transfer.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors">
+  1148→  1148→                                  <TableCell className="font-medium">
+  1149→  1149→                                    <div className="flex items-center gap-2">
+  1150→  1150→                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+  1151→  1151→                                        <FileText className="w-4 h-4 text-white" />
+  1152→  1152→                                      </div>
+  1153→  1153→                                      {transfer.transfer_number}
+  1154→  1154→                                    </div>
+  1155→  1155→                                  </TableCell>
+  1156→  1156→                                  <TableCell className="hidden md:table-cell text-muted-foreground">
+  1157→  1157→                                    {transfer.from_branch?.name || '—'}
+  1158→  1158→                                  </TableCell>
+  1159→  1159→                                  <TableCell className="hidden md:table-cell text-muted-foreground">
+  1160→  1160→                                    {transfer.to_branch?.name || '—'}
+  1161→  1161→                                  </TableCell>
+  1162→  1162→                                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+  1163→  1163→                                    {formatDate(transfer.transfer_date)}
+  1164→  1164→                                  </TableCell>
+  1165→  1165→                                  <TableCell className="font-semibold text-indigo-600 dark:text-indigo-400">
+  1166→  1166→                                    {formatCurrency(transfer.total_amount)}
+  1167→  1167→                                  </TableCell>
+  1168→  1168→                                  <TableCell className="text-center">
+  1169→  1169→                                    <Badge variant="secondary" className={`gap-1 ${statusColor[transfer.status]}`}>
+  1170→  1170→                                      <StatusIcon className="w-3 h-3" />
+  1171→  1171→                                      {statusLabel[transfer.status]}
+  1172→  1172→                                    </Badge>
+  1173→  1173→                                  </TableCell>
+  1174→  1174→                                  <TableCell>
+  1175→  1175→                                    <div className="flex items-center justify-center gap-1">
+  1176→  1176→                                      <Button
+  1177→  1177→                                        variant="ghost"
+  1178→  1178→                                        size="icon"
+  1179→  1179→                                        className="h-8 w-8 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+  1180→  1180→                                        onClick={() => openDetailDialog(transfer)}
+  1181→  1181→                                        title="عرض التفاصيل"
+  1182→  1182→                                      >
+  1183→  1183→                                        <Eye className="w-4 h-4 text-indigo-600" />
+  1184→  1184→                                      </Button>
+  1185→  1185→                                      {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+  1186→  1186→                                        <>
+  1187→  1187→                                          <Button
+  1188→  1188→                                            variant="ghost"
+  1189→  1189→                                            size="icon"
+  1190→  1190→                                            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+  1191→  1191→                                            onClick={() => openConfirmDialog(transfer)}
+  1192→  1192→                                            title="تأكيد التصبين"
+  1193→  1193→                                          >
+  1194→  1194→                                            <CheckCircle2 className="w-4 h-4" />
+  1195→  1195→                                          </Button>
+  1196→  1196→                                          <Button
+  1197→  1197→                                            variant="ghost"
+  1198→  1198→                                            size="icon"
+  1199→  1199→                                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+  1200→  1200→                                            onClick={() => openCancelDialog(transfer)}
+  1201→  1201→                                            title="إلغاء"
+  1202→  1202→                                          >
+  1203→  1203→                                            <XCircle className="w-4 h-4" />
+  1204→  1204→                                          </Button>
+  1205→  1205→                                        </>
+  1206→  1206→                                      )}
+  1207→  1207→                                    </div>
+  1208→  1208→                                  </TableCell>
+  1209→  1209→                                </TableRow>
+  1210→  1210→                              );
+  1211→  1211→                            })}
+  1212→  1212→                          </TableBody>
+  1213→  1213→                        </Table>
+  1214→  1214→                      </div>
+  1215→  1215→                    </div>
+  1216→  1216→
+  1217→  1217→                    {totalPages > 1 && (
+  1218→  1218→                      <div className="flex items-center justify-between px-4 py-3 border-t">
+  1219→  1219→                        <p className="text-sm text-muted-foreground">
+  1220→  1220→                          صفحة {page} من {totalPages} ({totalCount} تحويل)
+  1221→  1221→                        </p>
+  1222→  1222→                        <div className="flex items-center gap-1">
+  1223→  1223→                          <Button
+  1224→  1224→                            variant="outline"
+  1225→  1225→                            size="icon"
+  1226→  1226→                            className="h-8 w-8"
+  1227→  1227→                            onClick={() => setPage(Math.max(1, page - 1))}
+  1228→  1228→                            disabled={page <= 1}
+  1229→  1229→                          >
+  1230→  1230→                            <ChevronRight className="w-4 h-4" />
+  1231→  1231→                          </Button>
+  1232→  1232→                          <Button
+  1233→  1233→                            variant="outline"
+  1234→  1234→                            size="icon"
+  1235→  1235→                            className="h-8 w-8"
+  1236→  1236→                            onClick={() => setPage(Math.min(totalPages, page + 1))}
+  1237→  1237→                            disabled={page >= totalPages}
+  1238→  1238→                          >
+  1239→  1239→                            <ChevronLeft className="w-4 h-4" />
+  1240→  1240→                          </Button>
+  1241→  1241→                        </div>
+  1242→  1242→                      </div>
+  1243→  1243→                    )}
+  1244→  1244→                  </>
+  1245→  1245→                )}
+  1246→  1246→              </CardContent>
+  1247→  1247→            </Card>
+  1248→  1248→          </motion.div>
+  1249→  1249→        </>
+  1250→  1250→      )}
+  1251→  1251→
+  1252→  1252→      {/* ─── DEBTS VIEW ─────────────────────────────────────────────────────── */}
+  1253→  1253→      {activeView === 'debts' && (
+  1254→  1254→        <motion.div
+  1255→  1255→          initial={{ opacity: 0, y: 20 }}
+  1256→  1256→          animate={{ opacity: 1, y: 0 }}
+  1257→  1257→          transition={{ duration: 0.3, delay: 0.3 }}
+  1258→  1258→        >
+  1259→  1259→          <Card className="border-0 shadow-md overflow-hidden">
+  1260→  1260→            <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
+  1261→  1261→            <CardHeader className="pb-4">
+  1262→  1262→              <CardTitle className="flex items-center gap-2 text-lg">
+  1263→  1263→                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1264→  1264→                  <HandCoins className="w-3.5 h-3.5 text-white" />
+  1265→  1265→                </div>
+  1266→  1266→                مديونيات الفروع - ديون على الفروع للمصنع
+  1267→  1267→              </CardTitle>
+  1268→  1268→            </CardHeader>
+  1269→  1269→            <CardContent className="p-0">
+  1270→  1270→              {loading ? (
+  1271→  1271→                <div className="flex flex-col items-center justify-center py-16">
+  1272→  1272→                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1273→  1273→                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+  1274→  1274→                  </div>
+  1275→  1275→                  <p className="text-muted-foreground text-sm">جاري التحميل...</p>
+  1276→  1276→                </div>
+  1277→  1277→              ) : branchDebts.length === 0 ? (
+  1278→  1278→                <div className="flex flex-col items-center justify-center py-20 px-4">
+  1279→  1279→                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #6ee7b7, #10b981)' }}>
+  1280→  1280→                    <CheckCircle2 className="w-10 h-10 text-white" />
+  1281→  1281→                  </div>
+  1282→  1282→                  <h3 className="text-xl font-bold mb-2">لا توجد مديونيات</h3>
+  1283→  1283→                  <p className="text-muted-foreground text-sm text-center">
+  1284→  1284→                    جميع الفروع مسددة أو لا توجد تصبينات مؤكدة بعد
+  1285→  1285→                  </p>
+  1286→  1286→                </div>
+  1287→  1287→              ) : (
+  1288→  1288→                <>
+  1289→  1289→                  {/* Mobile Card Layout */}
+  1290→  1290→                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden p-4 pt-0">
+  1291→  1291→                    {branchDebts.map((debt, idx) => {
+  1292→  1292→                      const hasDebt = debt.remaining_debt > 0;
+  1293→  1293→                      const statusAccent = hasDebt ? 'border-red-400' : 'border-emerald-400';
+  1294→  1294→                      return (
+  1295→  1295→                        <motion.div
+  1296→  1296→                          key={debt.branch_id}
+  1297→  1297→                          initial={{ opacity: 0, y: 10 }}
+  1298→  1298→                          animate={{ opacity: 1, y: 0 }}
+  1299→  1299→                          transition={{ duration: 0.25, delay: idx * 0.04 }}
+  1300→  1300→                        >
+  1301→  1301→                          <Card className={`border-0 shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden border-r-4 ${statusAccent} ${hasDebt ? 'bg-red-50/30 dark:bg-red-900/5' : ''}`}>
+  1302→  1302→                            <CardContent className="p-4">
+  1303→  1303→                              {/* Top row: Branch name + Debt badge */}
+  1304→  1304→                              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+  1305→  1305→                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+  1306→  1306→                                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm shrink-0" style={{ background: hasDebt ? 'linear-gradient(135deg, #fca5a5, #ef4444)' : 'linear-gradient(135deg, #6ee7b7, #10b981)' }}>
+  1307→  1307→                                    <Building2 className="w-4 h-4 text-white" />
+  1308→  1308→                                  </div>
+  1309→  1309→                                  <div>
+  1310→  1310→                                    <h3 className="font-bold text-sm tracking-tight">{debt.branch_name}</h3>
+  1311→  1311→                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+  1312→  1312→                                      إجمالي التصبينات: {formatCurrency(debt.total_transferred)}
+  1313→  1313→                                    </p>
+  1314→  1314→                                  </div>
+  1315→  1315→                                </div>
+  1316→  1316→                                <Badge
+  1317→  1317→                                  className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${hasDebt ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'}`}
+  1318→  1318→                                >
+  1319→  1319→                                  <HandCoins className="w-3 h-3 ml-0.5" />
+  1320→  1320→                                  {hasDebt ? 'مدين' : 'مسدد'}
+  1321→  1321→                                </Badge>
+  1322→  1322→                              </div>
+  1323→  1323→
+  1324→  1324→                              {/* Info row: Paid + Remaining */}
+  1325→  1325→                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-2 pt-2.5 border-t border-dashed">
+  1326→  1326→                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+  1327→  1327→                                  <span className="text-xs text-muted-foreground">المدفوع:</span>
+  1328→  1328→                                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(debt.total_paid)}</span>
+  1329→  1329→                                </div>
+  1330→  1330→                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+  1331→  1331→                                  <span className="text-xs text-muted-foreground">الرصيد:</span>
+  1332→  1332→                                  <span className={`font-bold text-sm ${hasDebt ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+  1333→  1333→                                    {formatCurrency(debt.remaining_debt)}
+  1334→  1334→                                  </span>
+  1335→  1335→                                </div>
+  1336→  1336→                              </div>
+  1337→  1337→                            </CardContent>
+  1338→  1338→                          </Card>
+  1339→  1339→                        </motion.div>
+  1340→  1340→                      );
+  1341→  1341→                    })}
+  1342→  1342→                  </div>
+  1343→  1343→
+  1344→  1344→                  {/* Desktop Table */}
+  1345→  1345→                  <div className="hidden sm:block">
+  1346→  1346→                    <div className="overflow-x-auto">
+  1347→  1347→                      <Table>
+  1348→  1348→                        <TableHeader>
+  1349→  1349→                          <TableRow className="bg-muted/30">
+  1350→  1350→                            <TableHead className="text-right">الفرع</TableHead>
+  1351→  1351→                            <TableHead className="text-right">إجمالي التصبينات</TableHead>
+  1352→  1352→                            <TableHead className="text-right">إجمالي المدفوعات</TableHead>
+  1353→  1353→                            <TableHead className="text-right">الرصيد المدين</TableHead>
+  1354→  1354→                          </TableRow>
+  1355→  1355→                        </TableHeader>
+  1356→  1356→                        <TableBody>
+  1357→  1357→                          {branchDebts.map((debt) => (
+  1358→  1358→                            <TableRow key={debt.branch_id} className={`hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors ${debt.remaining_debt > 0 ? 'bg-red-50/50 dark:bg-red-900/5' : ''}`}>
+  1359→  1359→                              <TableCell>
+  1360→  1360→                                <div className="flex items-center gap-2">
+  1361→  1361→                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+  1362→  1362→                                    <Building2 className="w-4 h-4 text-white" />
+  1363→  1363→                                  </div>
+  1364→  1364→                                  <span className="font-medium">{debt.branch_name}</span>
+  1365→  1365→                                </div>
+  1366→  1366→                              </TableCell>
+  1367→  1367→                              <TableCell className="text-muted-foreground">
+  1368→  1368→                                {formatCurrency(debt.total_transferred)}
+  1369→  1369→                              </TableCell>
+  1370→  1370→                              <TableCell className="text-emerald-600 dark:text-emerald-400">
+  1371→  1371→                                {formatCurrency(debt.total_paid)}
+  1372→  1372→                              </TableCell>
+  1373→  1373→                              <TableCell>
+  1374→  1374→                                <span className={`font-bold ${debt.remaining_debt > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+  1375→  1375→                                  {formatCurrency(debt.remaining_debt)}
+  1376→  1376→                                </span>
+  1377→  1377→                              </TableCell>
+  1378→  1378→                            </TableRow>
+  1379→  1379→                          ))}
+  1380→  1380→                        </TableBody>
+  1381→  1381→                      </Table>
+  1382→  1382→                    </div>
+  1383→  1383→                  </div>
+  1384→  1384→                </>
+  1385→  1385→              )}
+  1386→  1386→            </CardContent>
+  1387→  1387→          </Card>
+  1388→  1388→        </motion.div>
+  1389→  1389→      )}
+  1390→  1390→
+  1391→  1391→      {/* ─── CREATE TRANSFER DIALOG ─────────────────────────────────────────── */}
+  1392→  1392→      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+  1393→  1393→        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
+  1394→  1394→          <DialogHeader>
+  1395→  1395→            <DialogTitle className="flex items-center gap-2">
+  1396→  1396→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1397→  1397→                <ArrowRightLeft className="w-4 h-4 text-white" />
+  1398→  1398→              </div>
+  1399→  1399→              تصبين جديد - تحويل مخزون
+  1400→  1400→            </DialogTitle>
+  1401→  1401→          </DialogHeader>
+  1402→  1402→
+  1403→  1403→          <ScrollArea className="flex-1 -mx-6 px-6">
+  1404→  1404→            <div className="space-y-4 py-4">
+  1405→  1405→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1406→  1406→                <div className="space-y-2">
+  1407→  1407→                  <Label>الفرع المصدر *</Label>
+  1408→  1408→                  <Select
+  1409→  1409→                    value={createForm.from_branch_id}
+  1410→  1410→                    onValueChange={(v) => setCreateForm({ ...createForm, from_branch_id: v, to_branch_id: createForm.to_branch_id === v ? '' : createForm.to_branch_id })}
+  1411→  1411→                  >
+  1412→  1412→                    <SelectTrigger>
+  1413→  1413→                      <SelectValue placeholder="اختر الفرع المصدر" />
+  1414→  1414→                    </SelectTrigger>
+  1415→  1415→                    <SelectContent>
+  1416→  1416→                      {factoryBranches.map((b) => (
+  1417→  1417→                        <SelectItem key={b.id} value={b.id}>{b.name}{b.is_factory ? ' (مصنع)' : ''}</SelectItem>
+  1418→  1418→                      ))}
+  1419→  1419→                    </SelectContent>
+  1420→  1420→                  </Select>
+  1421→  1421→                </div>
+  1422→  1422→                <div className="space-y-2">
+  1423→  1423→                  <Label>الفرع الوجهة *</Label>
+  1424→  1424→                  <Select
+  1425→  1425→                    value={createForm.to_branch_id}
+  1426→  1426→                    onValueChange={(v) => setCreateForm({ ...createForm, to_branch_id: v })}
+  1427→  1427→                  >
+  1428→  1428→                    <SelectTrigger>
+  1429→  1429→                      <SelectValue placeholder="اختر الفرع الوجهة" />
+  1430→  1430→                    </SelectTrigger>
+  1431→  1431→                    <SelectContent>
+  1432→  1432→                      {destinationBranches.filter((b) => b.id !== createForm.from_branch_id).map((b) => (
+  1433→  1433→                        <SelectItem key={b.id} value={b.id}>{b.name}{b.is_factory ? ' (مصنع)' : ''}</SelectItem>
+  1434→  1434→                      ))}
+  1435→  1435→                    </SelectContent>
+  1436→  1436→                  </Select>
+  1437→  1437→                </div>
+  1438→  1438→              </div>
+  1439→  1439→
+  1440→  1440→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1441→  1441→                <div className="space-y-2">
+  1442→  1442→                  <Label>تاريخ التحويل *</Label>
+  1443→  1443→                  <Input
+  1444→  1444→                    type="date"
+  1445→  1445→                    value={createForm.transfer_date}
+  1446→  1446→                    onChange={(e) => setCreateForm({ ...createForm, transfer_date: e.target.value })}
+  1447→  1447→                  />
+  1448→  1448→                </div>
+  1449→  1449→                <div className="space-y-2">
+  1450→  1450→                  <Label>المبلغ الإجمالي</Label>
+  1451→  1451→                  <Input
+  1452→  1452→                    value={formatCurrency(formTotalAmount)}
+  1453→  1453→                    disabled
+  1454→  1454→                    className="bg-muted font-semibold"
+  1455→  1455→                  />
+  1456→  1456→                </div>
+  1457→  1457→              </div>
+  1458→  1458→
+  1459→  1459→              <Separator />
+  1460→  1460→              <div className="flex items-center justify-between">
+  1461→  1461→                <Label className="text-base font-semibold">المنتجات</Label>
+  1462→  1462→                <Button
+  1463→  1463→                  type="button"
+  1464→  1464→                  variant="outline"
+  1465→  1465→                  size="sm"
+  1466→  1466→                  onClick={addFormItem}
+  1467→  1467→                  className="gap-1"
+  1468→  1468→                >
+  1469→  1469→                  <Plus className="w-4 h-4" />
+  1470→  1470→                  إضافة منتج
+  1471→  1471→                </Button>
+  1472→  1472→              </div>
+  1473→  1473→
+  1474→  1474→              {formItems.length === 0 ? (
+  1475→  1475→                <div className="text-center py-8 border-2 border-dashed rounded-lg border-muted-foreground/20">
+  1476→  1476→                  <Package className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
+  1477→  1477→                  <p className="text-sm text-muted-foreground">لم يتم إضافة منتجات بعد</p>
+  1478→  1478→                  <Button
+  1479→  1479→                    type="button"
+  1480→  1480→                    variant="link"
+  1481→  1481→                    size="sm"
+  1482→  1482→                    onClick={addFormItem}
+  1483→  1483→                    className="mt-2"
+  1484→  1484→                  >
+  1485→  1485→                    إضافة منتج
+  1486→  1486→                  </Button>
+  1487→  1487→                </div>
+  1488→  1488→              ) : (
+  1489→  1489→                <div className="space-y-3 max-h-64 overflow-y-auto">
+  1490→  1490→                  {formItems.map((item, index) => (
+  1491→  1491→                    <div
+  1492→  1492→                      key={index}
+  1493→  1493→                      className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/30 rounded-lg border"
+  1494→  1494→                    >
+  1495→  1495→                      <div className="col-span-12 sm:col-span-4 space-y-1">
+  1496→  1496→                        <Label className="text-xs">المنتج *</Label>
+  1497→  1497→                        <Select
+  1498→  1498→                          value={item.product_id}
+  1499→  1499→                          onValueChange={(v) => updateFormItem(index, 'product_id', v)}
+  1500→  1500→                        >
+  1501→  1501→                          <SelectTrigger className="h-9">
+  1502→  1502→                            <SelectValue placeholder="اختر المنتج" />
+  1503→  1503→                          </SelectTrigger>
+  1504→  1504→                          <SelectContent>
+  1505→  1505→                            {products.map((p) => (
+  1506→  1506→                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+  1507→  1507→                            ))}
+  1508→  1508→                          </SelectContent>
+  1509→  1509→                        </Select>
+  1510→  1510→                      </div>
+  1511→  1511→                      <div className="col-span-4 sm:col-span-2 space-y-1">
+  1512→  1512→                        <Label className="text-xs">الكمية *</Label>
+  1513→  1513→                        <Input
+  1514→  1514→                          type="number"
+  1515→  1515→                          inputMode="numeric"
+  1516→  1516→                          min="1"
+  1517→  1517→                          value={item.quantity || ''}
+  1518→  1518→                          onChange={(e) => updateFormItem(index, 'quantity', e.target.value)}
+  1519→  1519→                          className="h-9 text-center"
+  1520→  1520→                        />
+  1521→  1521→                      </div>
+  1522→  1522→                      <div className="col-span-4 sm:col-span-3 space-y-1">
+  1523→  1523→                        <Label className="text-xs">سعر الوحدة *</Label>
+  1524→  1524→                        <Input
+  1525→  1525→                          type="number"
+  1526→  1526→                          inputMode="decimal"
+  1527→  1527→                          min="0"
+  1528→  1528→                          step="0.01"
+  1529→  1529→                          value={item.unit_price || ''}
+  1530→  1530→                          onChange={(e) => updateFormItem(index, 'unit_price', e.target.value)}
+  1531→  1531→                          className="h-9 text-left"
+  1532→  1532→                        />
+  1533→  1533→                      </div>
+  1534→  1534→                      <div className="col-span-3 sm:col-span-2 space-y-1">
+  1535→  1535→                        <Label className="text-xs">الإجمالي</Label>
+  1536→  1536→                        <Input
+  1537→  1537→                          value={formatCurrency(item.total_price)}
+  1538→  1538→                          disabled
+  1539→  1539→                          className="h-9 bg-muted text-left"
+  1540→  1540→                        />
+  1541→  1541→                      </div>
+  1542→  1542→                      <div className="col-span-1 flex justify-center">
+  1543→  1543→                        <Button
+  1544→  1544→                          type="button"
+  1545→  1545→                          variant="ghost"
+  1546→  1546→                          size="icon"
+  1547→  1547→                          className="h-9 w-9 text-destructive hover:text-destructive"
+  1548→  1548→                          onClick={() => removeFormItem(index)}
+  1549→  1549→                        >
+  1550→  1550→                          <Trash2 className="w-4 h-4" />
+  1551→  1551→                        </Button>
+  1552→  1552→                      </div>
+  1553→  1553→                    </div>
+  1554→  1554→                  ))}
+  1555→  1555→                </div>
+  1556→  1556→              )}
+  1557→  1557→
+  1558→  1558→              <div className="space-y-2">
+  1559→  1559→                <Label>ملاحظات</Label>
+  1560→  1560→                <Textarea
+  1561→  1561→                  value={createForm.notes}
+  1562→  1562→                  onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
+  1563→  1563→                  placeholder="ملاحظات إضافية..."
+  1564→  1564→                  rows={2}
+  1565→  1565→                />
+  1566→  1566→              </div>
+  1567→  1567→            </div>
+  1568→  1568→          </ScrollArea>
+  1569→  1569→
+  1570→  1570→          <DialogFooter className="pt-2 border-t">
+  1571→  1571→            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+  1572→  1572→              إلغاء
+  1573→  1573→            </Button>
+  1574→  1574→            <Button onClick={handleCreateTransfer} disabled={creating} style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1575→  1575→              {creating ? (
+  1576→  1576→                <>
+  1577→  1577→                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+  1578→  1578→                  جاري الإنشاء...
+  1579→  1579→                </>
+  1580→  1580→              ) : (
+  1581→  1581→                'إنشاء التصبين'
+  1582→  1582→              )}
+  1583→  1583→            </Button>
+  1584→  1584→          </DialogFooter>
+  1585→  1585→        </DialogContent>
+  1586→  1586→      </Dialog>
+  1587→  1587→
+  1588→  1588→      {/* ─── DETAIL DIALOG ──────────────────────────────────────────────────── */}
+  1589→  1589→      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+  1590→  1590→        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
+  1591→  1591→          <DialogHeader>
+  1592→  1592→            <DialogTitle className="flex items-center gap-2">
+  1593→  1593→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+  1594→  1594→                <Eye className="w-4 h-4 text-white" />
+  1595→  1595→              </div>
+  1596→  1596→              تفاصيل التحويل
+  1597→  1597→            </DialogTitle>
+  1598→  1598→          </DialogHeader>
+  1599→  1599→
+  1600→  1600→          {detailTransfer ? (
+  1601→  1601→            <ScrollArea className="flex-1 -mx-6 px-6">
+  1602→  1602→              <div className="space-y-4 py-4">
+  1603→  1603→                <div className="grid grid-cols-2 gap-4">
+  1604→  1604→                  <div className="space-y-1">
+  1605→  1605→                    <Label className="text-xs text-muted-foreground">رقم التحويل</Label>
+  1606→  1606→                    <p className="font-semibold">{detailTransfer.transfer_number}</p>
+  1607→  1607→                  </div>
+  1608→  1608→                  <div className="space-y-1">
+  1609→  1609→                    <Label className="text-xs text-muted-foreground">الحالة</Label>
+  1610→  1610→                    <div>
+  1611→  1611→                      <Badge variant="secondary" className={statusColor[detailTransfer.status]}>
+  1612→  1612→                        {statusLabel[detailTransfer.status]}
+  1613→  1613→                      </Badge>
+  1614→  1614→                    </div>
+  1615→  1615→                  </div>
+  1616→  1616→                  <div className="space-y-1">
+  1617→  1617→                    <Label className="text-xs text-muted-foreground">المصنع (المصدر)</Label>
+  1618→  1618→                    <p className="font-medium">{detailTransfer.from_branch?.name || '—'}</p>
+  1619→  1619→                  </div>
+  1620→  1620→                  <div className="space-y-1">
+  1621→  1621→                    <Label className="text-xs text-muted-foreground">الفرع (الوجهة)</Label>
+  1622→  1622→                    <p className="font-medium">{detailTransfer.to_branch?.name || '—'}</p>
+  1623→  1623→                  </div>
+  1624→  1624→                  <div className="space-y-1">
+  1625→  1625→                    <Label className="text-xs text-muted-foreground">تاريخ التحويل</Label>
+  1626→  1626→                    <p>{formatDate(detailTransfer.transfer_date)}</p>
+  1627→  1627→                  </div>
+  1628→  1628→                  <div className="space-y-1">
+  1629→  1629→                    <Label className="text-xs text-muted-foreground">المبلغ الإجمالي</Label>
+  1630→  1630→                    <p className="font-bold text-indigo-600 dark:text-indigo-400 text-lg">{formatCurrency(detailTransfer.total_amount)}</p>
+  1631→  1631→                  </div>
+  1632→  1632→                </div>
+  1633→  1633→
+  1634→  1634→                {detailTransfer.notes && (
+  1635→  1635→                  <div className="space-y-1">
+  1636→  1636→                    <Label className="text-xs text-muted-foreground">ملاحظات</Label>
+  1637→  1637→                    <p className="text-sm bg-muted/50 p-3 rounded-lg">{detailTransfer.notes}</p>
+  1638→  1638→                  </div>
+  1639→  1639→                )}
+  1640→  1640→
+  1641→  1641→                <Separator />
+  1642→  1642→
+  1643→  1643→                <div className="space-y-2">
+  1644→  1644→                  <Label className="text-base font-semibold">عناصر التحويل</Label>
+  1645→  1645→                  {loadingDetail ? (
+  1646→  1646→                    <div className="flex items-center justify-center py-8">
+  1647→  1647→                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1648→  1648→                    </div>
+  1649→  1649→                  ) : (
+  1650→  1650→                    <div className="overflow-x-auto border rounded-lg">
+  1651→  1651→                      <Table>
+  1652→  1652→                        <TableHeader>
+  1653→  1653→                          <TableRow>
+  1654→  1654→                            <TableHead className="text-right">المنتج</TableHead>
+  1655→  1655→                            <TableHead className="text-center">الكمية</TableHead>
+  1656→  1656→                            <TableHead className="text-left">سعر الوحدة</TableHead>
+  1657→  1657→                            <TableHead className="text-left">الإجمالي</TableHead>
+  1658→  1658→                          </TableRow>
+  1659→  1659→                        </TableHeader>
+  1660→  1660→                        <TableBody>
+  1661→  1661→                          {detailTransfer.items?.map((item) => (
+  1662→  1662→                            <TableRow key={item.id}>
+  1663→  1663→                              <TableCell className="font-medium">
+  1664→  1664→                                {item.products?.name || getProductName(item.product_id)}
+  1665→  1665→                              </TableCell>
+  1666→  1666→                              <TableCell className="text-center">{item.quantity}</TableCell>
+  1667→  1667→                              <TableCell className="text-left">{formatCurrency(item.unit_price)}</TableCell>
+  1668→  1668→                              <TableCell className="text-left font-semibold">{formatCurrency(item.total_price)}</TableCell>
+  1669→  1669→                            </TableRow>
+  1670→  1670→                          ))}
+  1671→  1671→                          {(!detailTransfer.items || detailTransfer.items.length === 0) && (
+  1672→  1672→                            <TableRow>
+  1673→  1673→                              <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+  1674→  1674→                                لا توجد عناصر
+  1675→  1675→                              </TableCell>
+  1676→  1676→                            </TableRow>
+  1677→  1677→                          )}
+  1678→  1678→                        </TableBody>
+  1679→  1679→                      </Table>
+  1680→  1680→                    </div>
+  1681→  1681→                  )}
+  1682→  1682→                </div>
+  1683→  1683→
+  1684→  1684→                {detailTransfer.journal_entry_id && (
+  1685→  1685→                  <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg flex items-center gap-2">
+  1686→  1686→                    <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+  1687→  1687→                    <span className="text-sm text-emerald-700 dark:text-emerald-300">
+  1688→  1688→                      تم إنشاء قيد محاسبي لهذا التصبين
+  1689→  1689→                    </span>
+  1690→  1690→                  </div>
+  1691→  1691→                )}
+  1692→  1692→
+  1693→  1693→                <div className="flex justify-between text-xs text-muted-foreground">
+  1694→  1694→                  <span>تاريخ الإنشاء: {formatDateTime(detailTransfer.created_at)}</span>
+  1695→  1695→                  <span>آخر تحديث: {formatDateTime(detailTransfer.updated_at)}</span>
+  1696→  1696→                </div>
+  1697→  1697→              </div>
+  1698→  1698→            </ScrollArea>
+  1699→  1699→          ) : (
+  1700→  1700→            <div className="py-12 text-center text-muted-foreground">لا توجد بيانات</div>
+  1701→  1701→          )}
+  1702→  1702→
+  1703→  1703→          <DialogFooter className="pt-2 border-t gap-2">
+  1704→  1704→            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+  1705→  1705→              إغلاق
+  1706→  1706→            </Button>
+  1707→  1707→            {detailTransfer?.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+  1708→  1708→              <>
+  1709→  1709→                <Button
+  1710→  1710→                  variant="destructive"
+  1711→  1711→                  onClick={() => {
+  1712→  1712→                    setDetailDialogOpen(false);
+  1713→  1713→                    if (detailTransfer) openCancelDialog(detailTransfer);
+  1714→  1714→                  }}
+  1715→  1715→                  className="gap-2"
+  1716→  1716→                >
+  1717→  1717→                  <XCircle className="w-4 h-4" />
+  1718→  1718→                  إلغاء التصبين
+  1719→  1719→                </Button>
+  1720→  1720→                <Button
+  1721→  1721→                  onClick={() => {
+  1722→  1722→                    setDetailDialogOpen(false);
+  1723→  1723→                    if (detailTransfer) openConfirmDialog(detailTransfer);
+  1724→  1724→                  }}
+  1725→  1725→                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+  1726→  1726→                >
+  1727→  1727→                  <CheckCircle2 className="w-4 h-4" />
+  1728→  1728→                  تأكيد التصبين
+  1729→  1729→                </Button>
+  1730→  1730→              </>
+  1731→  1731→            )}
+  1732→  1732→          </DialogFooter>
+  1733→  1733→        </DialogContent>
+  1734→  1734→      </Dialog>
+  1735→  1735→
+  1736→  1736→      {/* ─── CONFIRM DIALOG ─────────────────────────────────────────────────── */}
+  1737→  1737→      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+  1738→  1738→        <AlertDialogContent>
+  1739→  1739→          <AlertDialogHeader>
+  1740→  1740→            <AlertDialogTitle className="flex items-center gap-2">
+  1741→  1741→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+  1742→  1742→                <CheckCircle2 className="w-4 h-4 text-white" />
+  1743→  1743→              </div>
+  1744→  1744→              تأكيد التصبين
+  1745→  1745→            </AlertDialogTitle>
+  1746→  1746→            <AlertDialogDescription className="text-right">
+  1747→  1747→              هل أنت متأكد من تأكيد التصبين رقم &quot;{confirmingTransfer?.transfer_number}&quot;؟
+  1748→  1748→              <br />
+  1749→  1749→              سيتم تحديث المخزون وإنشاء قيد محاسبي تلقائياً. لا يمكن التراجع عن هذا الإجراء.
+  1750→  1750→            </AlertDialogDescription>
+  1751→  1751→          </AlertDialogHeader>
+  1752→  1752→          {confirmingTransfer && (
+  1753→  1753→            <div className="bg-muted/50 p-4 rounded-lg space-y-2 text-sm">
+  1754→  1754→              <div className="flex justify-between">
+  1755→  1755→                <span className="text-muted-foreground">المصنع:</span>
+  1756→  1756→                <span className="font-medium">{confirmingTransfer.from_branch?.name || '—'}</span>
+  1757→  1757→              </div>
+  1758→  1758→              <div className="flex justify-between">
+  1759→  1759→                <span className="text-muted-foreground">الفرع:</span>
+  1760→  1760→                <span className="font-medium">{confirmingTransfer.to_branch?.name || '—'}</span>
+  1761→  1761→              </div>
+  1762→  1762→              <div className="flex justify-between">
+  1763→  1763→                <span className="text-muted-foreground">المبلغ:</span>
+  1764→  1764→                <span className="font-bold text-indigo-600">{formatCurrency(confirmingTransfer.total_amount)}</span>
+  1765→  1765→              </div>
+  1766→  1766→            </div>
+  1767→  1767→          )}
+  1768→  1768→          <AlertDialogFooter>
+  1769→  1769→            <AlertDialogCancel disabled={confirming}>إلغاء</AlertDialogCancel>
+  1770→  1770→            <AlertDialogAction
+  1771→  1771→              onClick={handleConfirmTransfer}
+  1772→  1772→              disabled={confirming}
+  1773→  1773→              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+  1774→  1774→            >
+  1775→  1775→              {confirming ? (
+  1776→  1776→                <>
+  1777→  1777→                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+  1778→  1778→                  جاري التأكيد...
+  1779→  1779→                </>
+  1780→  1780→              ) : (
+  1781→  1781→                'تأكيد التصبين'
+  1782→  1782→              )}
+  1783→  1783→            </AlertDialogAction>
+  1784→  1784→          </AlertDialogFooter>
+  1785→  1785→        </AlertDialogContent>
+  1786→  1786→      </AlertDialog>
+  1787→  1787→
+  1788→  1788→      {/* ─── CANCEL DIALOG ──────────────────────────────────────────────────── */}
+  1789→  1789→      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+  1790→  1790→        <AlertDialogContent>
+  1791→  1791→          <AlertDialogHeader>
+  1792→  1792→            <AlertDialogTitle className="flex items-center gap-2">
+  1793→  1793→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+  1794→  1794→                <XCircle className="w-4 h-4 text-white" />
+  1795→  1795→              </div>
+  1796→  1796→              إلغاء التصبين
+  1797→  1797→            </AlertDialogTitle>
+  1798→  1798→            <AlertDialogDescription className="text-right">
+  1799→  1799→              هل أنت متأكد من إلغاء التصبين رقم &quot;{cancellingTransfer?.transfer_number}&quot;؟
+  1800→  1800→              لا يمكن التراجع عن هذا الإجراء.
+  1801→  1801→            </AlertDialogDescription>
+  1802→  1802→          </AlertDialogHeader>
+  1803→  1803→          <AlertDialogFooter>
+  1804→  1804→            <AlertDialogCancel disabled={cancelling}>تراجع</AlertDialogCancel>
+  1805→  1805→            <AlertDialogAction
+  1806→  1806→              onClick={handleCancelTransfer}
+  1807→  1807→              disabled={cancelling}
+  1808→  1808→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+  1809→  1809→            >
+  1810→  1810→              {cancelling ? (
+  1811→  1811→                <>
+  1812→  1812→                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+  1813→  1813→                  جاري الإلغاء...
+  1814→  1814→                </>
+  1815→  1815→              ) : (
+  1816→  1816→                'إلغاء التصبين'
+  1817→  1817→              )}
+  1818→  1818→            </AlertDialogAction>
+  1819→  1819→          </AlertDialogFooter>
+  1820→  1820→        </AlertDialogContent>
+  1821→  1821→      </AlertDialog>
+  1822→  1822→    </div>
+  1823→  1823→  );
+  1824→  1824→}
+  1825→  1825→

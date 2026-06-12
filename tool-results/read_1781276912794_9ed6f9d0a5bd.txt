@@ -1,0 +1,602 @@
+  1401→  1401→                        const totalDebit = ledgerLines.reduce((s, l) => s + l.debit, 0);
+  1402→  1402→                        const totalCredit = ledgerLines.reduce((s, l) => s + l.credit, 0);
+  1403→  1403→                        const finalBalance = ledgerLines[ledgerLines.length - 1]?.running_balance || 0;
+  1404→  1404→                        return (
+  1405→  1405→                          <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+  1406→  1406→                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  1407→  1407→                              <span>الإجمالي</span>
+  1408→  1408→                            </div>
+  1409→  1409→                            <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+  1410→  1410→                              <div>
+  1411→  1411→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1412→  1412→                                <p className="text-sm text-emerald-600">{formatCurrency(totalDebit)}</p>
+  1413→  1413→                              </div>
+  1414→  1414→                              <div>
+  1415→  1415→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1416→  1416→                                <p className="text-sm text-orange-600">{formatCurrency(totalCredit)}</p>
+  1417→  1417→                              </div>
+  1418→  1418→                              <div>
+  1419→  1419→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">الرصيد</p>
+  1420→  1420→                                <p className="text-sm">{formatCurrency(Math.abs(finalBalance))}</p>
+  1421→  1421→                              </div>
+  1422→  1422→                            </div>
+  1423→  1423→                          </div>
+  1424→  1424→                        );
+  1425→  1425→                      })()}
+  1426→  1426→                    </div>
+  1427→  1427→
+  1428→  1428→                    {/* Desktop Table */}
+  1429→  1429→                    <div className="hidden sm:block">
+  1430→  1430→                      <ScrollArea className="max-h-[500px]">
+  1431→  1431→                        <Table>
+  1432→  1432→                          <TableHeader>
+  1433→  1433→                            <TableRow className="bg-muted/30">
+  1434→  1434→                              <TableHead className="text-right font-bold">رقم القيد</TableHead>
+  1435→  1435→                              <TableHead className="text-right font-bold">التاريخ</TableHead>
+  1436→  1436→                              <TableHead className="text-right font-bold">البيان</TableHead>
+  1437→  1437→                              <TableHead className="text-right font-bold">مدين</TableHead>
+  1438→  1438→                              <TableHead className="text-right font-bold">دائن</TableHead>
+  1439→  1439→                              <TableHead className="text-right font-bold">الرصيد</TableHead>
+  1440→  1440→                            </TableRow>
+  1441→  1441→                          </TableHeader>
+  1442→  1442→                          <TableBody>
+  1443→  1443→                            {ledgerLines.map((line) => (
+  1444→  1444→                              <TableRow key={line.id}>
+  1445→  1445→                                <TableCell className="font-medium">
+  1446→  1446→                                  {line.entry_number}
+  1447→  1447→                                </TableCell>
+  1448→  1448→                                <TableCell>
+  1449→  1449→                                  {formatDate(line.entry_date)}
+  1450→  1450→                                </TableCell>
+  1451→  1451→                                <TableCell className="max-w-[200px] truncate">
+  1452→  1452→                                  {line.description || '—'}
+  1453→  1453→                                </TableCell>
+  1454→  1454→                                <TableCell className="font-semibold text-emerald-600">
+  1455→  1455→                                  {line.debit > 0 ? formatCurrency(line.debit) : '—'}
+  1456→  1456→                                </TableCell>
+  1457→  1457→                                <TableCell className="font-semibold text-orange-600">
+  1458→  1458→                                  {line.credit > 0 ? formatCurrency(line.credit) : '—'}
+  1459→  1459→                                </TableCell>
+  1460→  1460→                                <TableCell
+  1461→  1461→                                  className={`font-bold ${
+  1462→  1462→                                    line.running_balance >= 0
+  1463→  1463→                                      ? 'text-emerald-700 dark:text-emerald-400'
+  1464→  1464→                                      : 'text-red-600'
+  1465→  1465→                                  }`}
+  1466→  1466→                                >
+  1467→  1467→                                  {formatCurrency(Math.abs(line.running_balance))}
+  1468→  1468→                                  {line.running_balance < 0 && (
+  1469→  1469→                                    <span className="text-xs mr-1">(د)</span>
+  1470→  1470→                                  )}
+  1471→  1471→                                </TableCell>
+  1472→  1472→                              </TableRow>
+  1473→  1473→                            ))}
+  1474→  1474→                            {/* Totals Row */}
+  1475→  1475→                            <TableRow className="bg-muted/50 font-bold">
+  1476→  1476→                              <TableCell colSpan={3} className="text-left">
+  1477→  1477→                                الإجمالي
+  1478→  1478→                              </TableCell>
+  1479→  1479→                              <TableCell className="text-emerald-600">
+  1480→  1480→                                {formatCurrency(
+  1481→  1481→                                  ledgerLines.reduce((s, l) => s + l.debit, 0)
+  1482→  1482→                                )}
+  1483→  1483→                              </TableCell>
+  1484→  1484→                              <TableCell className="text-orange-600">
+  1485→  1485→                                {formatCurrency(
+  1486→  1486→                                  ledgerLines.reduce((s, l) => s + l.credit, 0)
+  1487→  1487→                                )}
+  1488→  1488→                              </TableCell>
+  1489→  1489→                              <TableCell>
+  1490→  1490→                                {formatCurrency(
+  1491→  1491→                                  Math.abs(
+  1492→  1492→                                    ledgerLines[ledgerLines.length - 1]?.running_balance || 0
+  1493→  1493→                                  )
+  1494→  1494→                                )}
+  1495→  1495→                              </TableCell>
+  1496→  1496→                            </TableRow>
+  1497→  1497→                          </TableBody>
+  1498→  1498→                        </Table>
+  1499→  1499→                      </ScrollArea>
+  1500→  1500→                    </div>
+  1501→  1501→                  </>
+  1502→  1502→                )}
+  1503→  1503→              </CardContent>
+  1504→  1504→            </Card>
+  1505→  1505→          </TabsContent>
+  1506→  1506→
+  1507→  1507→          {/* ==================== TRIAL BALANCE TAB ==================== */}
+  1508→  1508→          <TabsContent value="trial" className="space-y-4 mt-4">
+  1509→  1509→            {/* Filters */}
+  1510→  1510→            <Card className="border-0 shadow-md overflow-hidden">
+  1511→  1511→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1512→  1512→              <CardContent className="p-3 sm:p-4">
+  1513→  1513→                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  1514→  1514→                  <div>
+  1515→  1515→                    <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+  1516→  1516→                    <Input
+  1517→  1517→                      type="date"
+  1518→  1518→                      value={trialDateFrom}
+  1519→  1519→                      onChange={(e) => setTrialDateFrom(e.target.value)}
+  1520→  1520→                    />
+  1521→  1521→                  </div>
+  1522→  1522→                  <div>
+  1523→  1523→                    <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+  1524→  1524→                    <Input
+  1525→  1525→                      type="date"
+  1526→  1526→                      value={trialDateTo}
+  1527→  1527→                      onChange={(e) => setTrialDateTo(e.target.value)}
+  1528→  1528→                    />
+  1529→  1529→                  </div>
+  1530→  1530→                  <div className="flex items-end">
+  1531→  1531→                    <Button
+  1532→  1532→                      variant="ghost"
+  1533→  1533→                      size="sm"
+  1534→  1534→                      onClick={() => {
+  1535→  1535→                        setTrialDateFrom('');
+  1536→  1536→                        setTrialDateTo('');
+  1537→  1537→                      }}
+  1538→  1538→                      className="gap-1 text-muted-foreground hover:text-foreground"
+  1539→  1539→                    >
+  1540→  1540→                      <X className="w-3.5 h-3.5" />
+  1541→  1541→                      مسح الفلاتر
+  1542→  1542→                    </Button>
+  1543→  1543→                  </div>
+  1544→  1544→                </div>
+  1545→  1545→              </CardContent>
+  1546→  1546→            </Card>
+  1547→  1547→
+  1548→  1548→            {/* Summary Cards */}
+  1549→  1549→            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+  1550→  1550→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1551→  1551→                <CardContent className="p-4">
+  1552→  1552→                  <div className="flex items-center gap-2 mb-2">
+  1553→  1553→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1554→  1554→                      <Landmark className="w-4 h-4 text-white" />
+  1555→  1555→                    </div>
+  1556→  1556→                    <span className="text-xs text-muted-foreground">عدد الحسابات</span>
+  1557→  1557→                  </div>
+  1558→  1558→                  <p className="text-2xl font-bold">
+  1559→  1559→                    {trialBalanceData.length}
+  1560→  1560→                  </p>
+  1561→  1561→                </CardContent>
+  1562→  1562→              </Card>
+  1563→  1563→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1564→  1564→                <CardContent className="p-4">
+  1565→  1565→                  <div className="flex items-center gap-2 mb-2">
+  1566→  1566→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+  1567→  1567→                      <TrendingUp className="w-4 h-4 text-white" />
+  1568→  1568→                    </div>
+  1569→  1569→                    <span className="text-xs text-muted-foreground">إجمالي المدين</span>
+  1570→  1570→                  </div>
+  1571→  1571→                  <p className="text-2xl font-bold text-emerald-600">
+  1572→  1572→                    {formatCurrency(trialTotalDebit)}
+  1573→  1573→                  </p>
+  1574→  1574→                </CardContent>
+  1575→  1575→              </Card>
+  1576→  1576→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1577→  1577→                <CardContent className="p-4">
+  1578→  1578→                  <div className="flex items-center gap-2 mb-2">
+  1579→  1579→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+  1580→  1580→                      <CircleDollarSign className="w-4 h-4 text-white" />
+  1581→  1581→                    </div>
+  1582→  1582→                    <span className="text-xs text-muted-foreground">إجمالي الدائن</span>
+  1583→  1583→                  </div>
+  1584→  1584→                  <p className="text-2xl font-bold text-orange-600">
+  1585→  1585→                    {formatCurrency(trialTotalCredit)}
+  1586→  1586→                  </p>
+  1587→  1587→                </CardContent>
+  1588→  1588→              </Card>
+  1589→  1589→            </div>
+  1590→  1590→
+  1591→  1591→            {/* Balance Check */}
+  1592→  1592→            {trialBalanceData.length > 0 && (
+  1593→  1593→              <div
+  1594→  1594→                className={`flex items-center gap-2 p-3 rounded-lg border ${
+  1595→  1595→                  Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1596→  1596→                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+  1597→  1597→                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+  1598→  1598→                }`}
+  1599→  1599→              >
+  1600→  1600→                {Math.abs(trialTotalDebit - trialTotalCredit) < 0.01 ? (
+  1601→  1601→                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+  1602→  1602→                ) : (
+  1603→  1603→                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+  1604→  1604→                )}
+  1605→  1605→                <span
+  1606→  1606→                  className={`text-sm font-medium ${
+  1607→  1607→                    Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1608→  1608→                      ? 'text-emerald-700 dark:text-emerald-400'
+  1609→  1609→                      : 'text-red-700 dark:text-red-400'
+  1610→  1610→                  }`}
+  1611→  1611→                >
+  1612→  1612→                  {Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1613→  1613→                    ? 'ميزان المراجعة متوازن - إجمالي المدين يساوي إجمالي الدائن'
+  1614→  1614→                    : `ميزان المراجعة غير متوازن - الفرق: ${formatCurrency(Math.abs(trialTotalDebit - trialTotalCredit))}`}
+  1615→  1615→                </span>
+  1616→  1616→              </div>
+  1617→  1617→            )}
+  1618→  1618→
+  1619→  1619→            {/* Trial Balance Table */}
+  1620→  1620→            <Card className="border-0 shadow-md overflow-hidden">
+  1621→  1621→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1622→  1622→              <CardContent className="p-0">
+  1623→  1623→                {trialLoading ? (
+  1624→  1624→                  <div className="flex items-center justify-center py-12">
+  1625→  1625→                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1626→  1626→                  </div>
+  1627→  1627→                ) : trialBalanceData.length === 0 ? (
+  1628→  1628→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1629→  1629→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1630→  1630→                      <Scale className="w-12 h-12 text-white/80" />
+  1631→  1631→                    </div>
+  1632→  1632→                    <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
+  1633→  1633→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1634→  1634→                      لم يتم العثور على بيانات حسابات في الفترة المحددة
+  1635→  1635→                    </p>
+  1636→  1636→                  </div>
+  1637→  1637→                ) : (
+  1638→  1638→                  <>
+  1639→  1639→                    {/* Mobile Card Layout */}
+  1640→  1640→                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+  1641→  1641→                      {(() => {
+  1642→  1642→                        let currentType = '';
+  1643→  1643→                        const cards: React.ReactNode[] = [];
+  1644→  1644→                        trialBalanceData.forEach((account, index) => {
+  1645→  1645→                          // Add type group header
+  1646→  1646→                          if (account.account_type !== currentType) {
+  1647→  1647→                            currentType = account.account_type;
+  1648→  1648→                            cards.push(
+  1649→  1649→                              <div key={`type-${account.account_type}-${index}`} className="pt-2 first:pt-0">
+  1650→  1650→                                <Badge
+  1651→  1651→                                  variant="secondary"
+  1652→  1652→                                  className={`text-xs ${getAccountTypeColor(account.account_type)}`}
+  1653→  1653→                                >
+  1654→  1654→                                  {getAccountTypeLabel(account.account_type)}
+  1655→  1655→                                </Badge>
+  1656→  1656→                              </div>
+  1657→  1657→                            );
+  1658→  1658→                          }
+  1659→  1659→                          cards.push(
+  1660→  1660→                            <div
+  1661→  1661→                              key={account.account_name}
+  1662→  1662→                              className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+  1663→  1663→                              style={{ borderRightColor: getAccountTypeBorderColor(account.account_type), display: 'flex', flexDirection: 'column', gap: '8px' }}
+  1664→  1664→                            >
+  1665→  1665→                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+  1666→  1666→                                <span className="font-semibold text-sm">{account.account_name}</span>
+  1667→  1667→                                <Badge
+  1668→  1668→                                  variant="secondary"
+  1669→  1669→                                  className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+  1670→  1670→                                >
+  1671→  1671→                                  {getAccountTypeLabel(account.account_type)}
+  1672→  1672→                                </Badge>
+  1673→  1673→                              </div>
+  1674→  1674→                              <div style={{ display: 'flex', gap: '16px' }}>
+  1675→  1675→                                <div>
+  1676→  1676→                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1677→  1677→                                  <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+  1678→  1678→                                </div>
+  1679→  1679→                                <div>
+  1680→  1680→                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1681→  1681→                                  <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+  1682→  1682→                                </div>
+  1683→  1683→                              </div>
+  1684→  1684→                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+  1685→  1685→                                <span className="text-xs text-muted-foreground">صافي الرصيد</span>
+  1686→  1686→                                <span
+  1687→  1687→                                  className={`font-bold ${
+  1688→  1688→                                    account.net_balance >= 0
+  1689→  1689→                                      ? 'text-emerald-700 dark:text-emerald-400'
+  1690→  1690→                                      : 'text-red-600'
+  1691→  1691→                                  }`}
+  1692→  1692→                                >
+  1693→  1693→                                  {formatCurrency(Math.abs(account.net_balance))}
+  1694→  1694→                                  {account.net_balance < 0 && (
+  1695→  1695→                                    <span className="text-xs mr-1">(د)</span>
+  1696→  1696→                                  )}
+  1697→  1697→                                </span>
+  1698→  1698→                              </div>
+  1699→  1699→                            </div>
+  1700→  1700→                          );
+  1701→  1701→                        });
+  1702→  1702→                        return cards;
+  1703→  1703→                      })()}
+  1704→  1704→                      {/* Mobile Grand Total */}
+  1705→  1705→                      {trialBalanceData.length > 0 && (
+  1706→  1706→                        <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+  1707→  1707→                          <span className="text-sm">الإجمالي الكلي</span>
+  1708→  1708→                          <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+  1709→  1709→                            <div>
+  1710→  1710→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1711→  1711→                              <p className="text-sm text-emerald-600">{formatCurrency(trialTotalDebit)}</p>
+  1712→  1712→                            </div>
+  1713→  1713→                            <div>
+  1714→  1714→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1715→  1715→                              <p className="text-sm text-orange-600">{formatCurrency(trialTotalCredit)}</p>
+  1716→  1716→                            </div>
+  1717→  1717→                            <div>
+  1718→  1718→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">الفرق</p>
+  1719→  1719→                              <p className={`text-sm ${Math.abs(trialTotalDebit - trialTotalCredit) < 0.01 ? 'text-emerald-600' : 'text-red-600'}`}>
+  1720→  1720→                                {formatCurrency(Math.abs(trialTotalDebit - trialTotalCredit))}
+  1721→  1721→                              </p>
+  1722→  1722→                            </div>
+  1723→  1723→                          </div>
+  1724→  1724→                        </div>
+  1725→  1725→                      )}
+  1726→  1726→                    </div>
+  1727→  1727→
+  1728→  1728→                    {/* Desktop Table */}
+  1729→  1729→                    <div className="hidden sm:block">
+  1730→  1730→                      <ScrollArea className="max-h-[500px]">
+  1731→  1731→                        <Table>
+  1732→  1732→                          <TableHeader>
+  1733→  1733→                            <TableRow className="bg-muted/30">
+  1734→  1734→                              <TableHead className="text-right font-bold">اسم الحساب</TableHead>
+  1735→  1735→                              <TableHead className="text-right font-bold hidden sm:table-cell">نوع الحساب</TableHead>
+  1736→  1736→                              <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+  1737→  1737→                              <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+  1738→  1738→                              <TableHead className="text-right font-bold">صافي الرصيد</TableHead>
+  1739→  1739→                            </TableRow>
+  1740→  1740→                          </TableHeader>
+  1741→  1741→                          <TableBody>
+  1742→  1742→                            {(() => {
+  1743→  1743→                              let currentType = '';
+  1744→  1744→                              const rows: React.ReactNode[] = [];
+  1745→  1745→                              trialBalanceData.forEach((account, index) => {
+  1746→  1746→                                // Add type group header
+  1747→  1747→                                if (account.account_type !== currentType) {
+  1748→  1748→                                  currentType = account.account_type;
+  1749→  1749→                                  rows.push(
+  1750→  1750→                                    <TableRow key={`type-${account.account_type}-${index}`} className="bg-muted/30">
+  1751→  1751→                                      <TableCell
+  1752→  1752→                                        colSpan={5}
+  1753→  1753→                                        className="font-bold text-sm"
+  1754→  1754→                                      >
+  1755→  1755→                                        <Badge
+  1756→  1756→                                          variant="secondary"
+  1757→  1757→                                          className={`text-xs ${getAccountTypeColor(account.account_type)}`}
+  1758→  1758→                                        >
+  1759→  1759→                                          {getAccountTypeLabel(account.account_type)}
+  1760→  1760→                                        </Badge>
+  1761→  1761→                                      </TableCell>
+  1762→  1762→                                    </TableRow>
+  1763→  1763→                                  );
+  1764→  1764→                                }
+  1765→  1765→                                rows.push(
+  1766→  1766→                                  <TableRow key={account.account_name}>
+  1767→  1767→                                    <TableCell className="font-medium pr-6">
+  1768→  1768→                                      {account.account_name}
+  1769→  1769→                                    </TableCell>
+  1770→  1770→                                    <TableCell className="hidden sm:table-cell">
+  1771→  1771→                                      <Badge
+  1772→  1772→                                        variant="secondary"
+  1773→  1773→                                        className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+  1774→  1774→                                      >
+  1775→  1775→                                        {getAccountTypeLabel(account.account_type)}
+  1776→  1776→                                      </Badge>
+  1777→  1777→                                    </TableCell>
+  1778→  1778→                                    <TableCell className="text-emerald-600">
+  1779→  1779→                                      {formatCurrency(account.total_debit)}
+  1780→  1780→                                    </TableCell>
+  1781→  1781→                                    <TableCell className="text-orange-600">
+  1782→  1782→                                      {formatCurrency(account.total_credit)}
+  1783→  1783→                                    </TableCell>
+  1784→  1784→                                    <TableCell
+  1785→  1785→                                      className={`font-bold ${
+  1786→  1786→                                        account.net_balance >= 0
+  1787→  1787→                                          ? 'text-emerald-700 dark:text-emerald-400'
+  1788→  1788→                                          : 'text-red-600'
+  1789→  1789→                                      }`}
+  1790→  1790→                                    >
+  1791→  1791→                                      {formatCurrency(Math.abs(account.net_balance))}
+  1792→  1792→                                      {account.net_balance < 0 && (
+  1793→  1793→                                        <span className="text-xs mr-1">(د)</span>
+  1794→  1794→                                      )}
+  1795→  1795→                                    </TableCell>
+  1796→  1796→                                  </TableRow>
+  1797→  1797→                                );
+  1798→  1798→                              });
+  1799→  1799→                              return rows;
+  1800→  1800→                            })()}
+  1801→  1801→                            {/* Grand Total Row */}
+  1802→  1802→                            <TableRow className="font-bold border-t-2" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+  1803→  1803→                              <TableCell colSpan={2} className="text-lg">
+  1804→  1804→                                الإجمالي الكلي
+  1805→  1805→                              </TableCell>
+  1806→  1806→                              <TableCell className="text-emerald-600 text-lg">
+  1807→  1807→                                {formatCurrency(trialTotalDebit)}
+  1808→  1808→                              </TableCell>
+  1809→  1809→                              <TableCell className="text-orange-600 text-lg">
+  1810→  1810→                                {formatCurrency(trialTotalCredit)}
+  1811→  1811→                              </TableCell>
+  1812→  1812→                              <TableCell
+  1813→  1813→                                className={`text-lg ${
+  1814→  1814→                                  Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1815→  1815→                                    ? 'text-emerald-600'
+  1816→  1816→                                    : 'text-red-600'
+  1817→  1817→                                }`}
+  1818→  1818→                              >
+  1819→  1819→                                {formatCurrency(
+  1820→  1820→                                  Math.abs(trialTotalDebit - trialTotalCredit)
+  1821→  1821→                                )}
+  1822→  1822→                              </TableCell>
+  1823→  1823→                            </TableRow>
+  1824→  1824→                          </TableBody>
+  1825→  1825→                        </Table>
+  1826→  1826→                      </ScrollArea>
+  1827→  1827→                    </div>
+  1828→  1828→                  </>
+  1829→  1829→                )}
+  1830→  1830→              </CardContent>
+  1831→  1831→            </Card>
+  1832→  1832→          </TabsContent>
+  1833→  1833→
+  1834→  1834→          {/* ==================== INCOME STATEMENT TAB ==================== */}
+  1835→  1835→          <TabsContent value="income" className="space-y-4 mt-4">
+  1836→  1836→            {/* Filters */}
+  1837→  1837→            <Card className="border-0 shadow-md overflow-hidden">
+  1838→  1838→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1839→  1839→              <CardContent className="p-3 sm:p-4">
+  1840→  1840→                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  1841→  1841→                  <div>
+  1842→  1842→                    <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+  1843→  1843→                    <Input
+  1844→  1844→                      type="date"
+  1845→  1845→                      value={incomeDateFrom}
+  1846→  1846→                      onChange={(e) => setIncomeDateFrom(e.target.value)}
+  1847→  1847→                    />
+  1848→  1848→                  </div>
+  1849→  1849→                  <div>
+  1850→  1850→                    <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+  1851→  1851→                    <Input
+  1852→  1852→                      type="date"
+  1853→  1853→                      value={incomeDateTo}
+  1854→  1854→                      onChange={(e) => setIncomeDateTo(e.target.value)}
+  1855→  1855→                    />
+  1856→  1856→                  </div>
+  1857→  1857→                  <div className="flex items-end">
+  1858→  1858→                    <Button
+  1859→  1859→                      variant="ghost"
+  1860→  1860→                      size="sm"
+  1861→  1861→                      onClick={() => {
+  1862→  1862→                        setIncomeDateFrom('');
+  1863→  1863→                        setIncomeDateTo('');
+  1864→  1864→                      }}
+  1865→  1865→                      className="gap-1 text-muted-foreground hover:text-foreground"
+  1866→  1866→                    >
+  1867→  1867→                      <X className="w-3.5 h-3.5" />
+  1868→  1868→                      مسح الفلاتر
+  1869→  1869→                    </Button>
+  1870→  1870→                  </div>
+  1871→  1871→                </div>
+  1872→  1872→              </CardContent>
+  1873→  1873→            </Card>
+  1874→  1874→
+  1875→  1875→            {/* Summary Cards */}
+  1876→  1876→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  1877→  1877→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1878→  1878→                <CardContent className="p-4">
+  1879→  1879→                  <div className="flex items-center gap-2 mb-2">
+  1880→  1880→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+  1881→  1881→                      <TrendingUp className="w-4 h-4 text-white" />
+  1882→  1882→                    </div>
+  1883→  1883→                    <span className="text-xs text-muted-foreground">الإيرادات</span>
+  1884→  1884→                  </div>
+  1885→  1885→                  <p className="text-2xl font-bold text-emerald-600">
+  1886→  1886→                    {formatCurrency(totalRevenue)}
+  1887→  1887→                  </p>
+  1888→  1888→                  <p className="text-xs text-muted-foreground mt-1">
+  1889→  1889→                    {revenueAccounts.length} حساب
+  1890→  1890→                  </p>
+  1891→  1891→                </CardContent>
+  1892→  1892→              </Card>
+  1893→  1893→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1894→  1894→                <CardContent className="p-4">
+  1895→  1895→                  <div className="flex items-center gap-2 mb-2">
+  1896→  1896→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+  1897→  1897→                      <TrendingUp className="w-4 h-4 text-white rotate-180" />
+  1898→  1898→                    </div>
+  1899→  1899→                    <span className="text-xs text-muted-foreground">المصروفات</span>
+  1900→  1900→                  </div>
+  1901→  1901→                  <p className="text-2xl font-bold text-red-600">
+  1902→  1902→                    {formatCurrency(totalExpenses)}
+  1903→  1903→                  </p>
+  1904→  1904→                  <p className="text-xs text-muted-foreground mt-1">
+  1905→  1905→                    {expenseAccounts.length} حساب
+  1906→  1906→                  </p>
+  1907→  1907→                </CardContent>
+  1908→  1908→              </Card>
+  1909→  1909→              <Card
+  1910→  1910→                className={`border-0 shadow-md hover:shadow-lg transition-shadow ${
+  1911→  1911→                  netProfit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
+  1912→  1912→                }`}
+  1913→  1913→              >
+  1914→  1914→                <CardContent className="p-4">
+  1915→  1915→                  <div className="flex items-center gap-2 mb-2">
+  1916→  1916→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: netProfit >= 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+  1917→  1917→                      <Scale className="w-4 h-4 text-white" />
+  1918→  1918→                    </div>
+  1919→  1919→                    <span className="text-xs text-muted-foreground">
+  1920→  1920→                      {netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+  1921→  1921→                    </span>
+  1922→  1922→                  </div>
+  1923→  1923→                  <p
+  1924→  1924→                    className={`text-2xl font-bold ${
+  1925→  1925→                      netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
+  1926→  1926→                    }`}
+  1927→  1927→                  >
+  1928→  1928→                    {formatCurrency(Math.abs(netProfit))}
+  1929→  1929→                  </p>
+  1930→  1930→                  <Badge
+  1931→  1931→                    variant="secondary"
+  1932→  1932→                    className={`mt-1 ${
+  1933→  1933→                      netProfit >= 0
+  1934→  1934→                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+  1935→  1935→                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+  1936→  1936→                    }`}
+  1937→  1937→                  >
+  1938→  1938→                    {netProfit >= 0 ? 'ربح' : 'خسارة'}
+  1939→  1939→                  </Badge>
+  1940→  1940→                </CardContent>
+  1941→  1941→              </Card>
+  1942→  1942→            </div>
+  1943→  1943→
+  1944→  1944→            {/* Income Statement Detail */}
+  1945→  1945→            <Card className="border-0 shadow-md overflow-hidden">
+  1946→  1946→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1947→  1947→              <CardContent className="p-0">
+  1948→  1948→                {incomeLoading ? (
+  1949→  1949→                  <div className="flex items-center justify-center py-12">
+  1950→  1950→                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1951→  1951→                  </div>
+  1952→  1952→                ) : incomeData.length === 0 ? (
+  1953→  1953→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1954→  1954→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1955→  1955→                      <TrendingUp className="w-12 h-12 text-white/80" />
+  1956→  1956→                    </div>
+  1957→  1957→                    <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
+  1958→  1958→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1959→  1959→                      لم يتم العثور على بيانات إيرادات أو مصروفات في الفترة المحددة
+  1960→  1960→                    </p>
+  1961→  1961→                  </div>
+  1962→  1962→                ) : (
+  1963→  1963→                  <>
+  1964→  1964→                    {/* Mobile Card Layout */}
+  1965→  1965→                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+  1966→  1966→                      {/* Revenue Section */}
+  1967→  1967→                      <div className="pt-1">
+  1968→  1968→                        <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+  1969→  1969→                          الإيرادات
+  1970→  1970→                        </Badge>
+  1971→  1971→                      </div>
+  1972→  1972→                      {revenueAccounts.map((account) => (
+  1973→  1973→                        <div
+  1974→  1974→                          key={account.account_name}
+  1975→  1975→                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+  1976→  1976→                          style={{ borderRightColor: getAccountTypeBorderColor('revenue'), display: 'flex', flexDirection: 'column', gap: '8px' }}
+  1977→  1977→                        >
+  1978→  1978→                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+  1979→  1979→                            <span className="font-semibold text-sm">{account.account_name}</span>
+  1980→  1980→                            <Badge
+  1981→  1981→                              variant="secondary"
+  1982→  1982→                              className={`text-[10px] ${getAccountTypeColor('revenue')}`}
+  1983→  1983→                            >
+  1984→  1984→                              إيرادات
+  1985→  1985→                            </Badge>
+  1986→  1986→                          </div>
+  1987→  1987→                          <div style={{ display: 'flex', gap: '16px' }}>
+  1988→  1988→                            <div>
+  1989→  1989→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1990→  1990→                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+  1991→  1991→                            </div>
+  1992→  1992→                            <div>
+  1993→  1993→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1994→  1994→                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+  1995→  1995→                            </div>
+  1996→  1996→                          </div>
+  1997→  1997→                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+  1998→  1998→                            <span className="text-xs text-muted-foreground">الرصيد</span>
+  1999→  1999→                            <span className="font-bold text-emerald-600">
+  2000→  2000→                              {formatCurrency(account.total_credit - account.total_debit)}
+
+[showing lines 1401-2000 of 2002; use offset=2001 with limit to continue reading]
