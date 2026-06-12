@@ -333,7 +333,7 @@ export default function InventoryTransfersPage() {
     const year = getCurrentYear();
     setCreating(false);
 
-    const defaultFactory = factoryBranches.length > 0 ? factoryBranches[0].id : '';
+    const defaultFactory = '';
 
     setCreateForm({
       from_branch_id: defaultFactory,
@@ -1028,6 +1028,102 @@ export default function InventoryTransfersPage() {
                   </div>
                 ) : (
                   <>
+                    {/* Mobile Card Layout */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden">
+                      {transfers.map((transfer, idx) => {
+                        const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
+                        const borderColor = transfer.status === 'pending' ? '#f59e0b' : transfer.status === 'confirmed' ? '#10b981' : '#ef4444';
+                        const statusAccent = transfer.status === 'pending'
+                          ? 'border-amber-400'
+                          : transfer.status === 'confirmed'
+                            ? 'border-emerald-400'
+                            : 'border-red-400';
+                        return (
+                          <motion.div
+                            key={transfer.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.25, delay: idx * 0.04 }}
+                          >
+                            <Card className={`border-0 shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden border-r-4 ${statusAccent}`}>
+                              <CardContent className="p-4">
+                                {/* Top row: Transfer number + Status badge */}
+                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm shrink-0" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+                                      <FileText className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-bold text-sm tracking-tight">{transfer.transfer_number}</h3>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="mt-0.5">
+                                        <Building2 className="w-3 h-3 text-muted-foreground" />
+                                        <p className="text-[11px] text-muted-foreground">
+                                          {transfer.from_branch?.name || '—'} ← {transfer.to_branch?.name || '—'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Badge
+                                    className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${statusColor[transfer.status]}`}
+                                  >
+                                    <StatusIcon className="w-3 h-3 ml-0.5" />
+                                    {statusLabel[transfer.status]}
+                                  </Badge>
+                                </div>
+
+                                {/* Info row: Date + Total */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-2 pt-2.5 border-t border-dashed">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDate(transfer.transfer_date)}
+                                    </span>
+                                  </div>
+                                  <span className="font-bold text-sm text-indigo-600 dark:text-indigo-400">
+                                    {formatCurrency(transfer.total_amount)}
+                                  </span>
+                                </div>
+
+                                {/* Action buttons */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="mt-3 pt-2.5 border-t">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 dark:hover:bg-indigo-950 dark:hover:text-indigo-400 transition-colors"
+                                    onClick={() => openDetailDialog(transfer)}
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    عرض
+                                  </Button>
+                                  {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="flex-1 h-8 text-[11px] gap-1.5 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 transition-colors"
+                                        onClick={() => openConfirmDialog(transfer)}
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        تأكيد
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="flex-1 h-8 text-[11px] gap-1.5 text-destructive hover:bg-red-50 hover:text-red-700 hover:border-red-200 dark:hover:bg-red-950 dark:hover:text-red-400 border-destructive/30 transition-colors"
+                                        onClick={() => openCancelDialog(transfer)}
+                                      >
+                                        <XCircle className="w-3.5 h-3.5" />
+                                        إلغاء
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+
                     {/* Desktop Table */}
                     <div className="hidden sm:block">
                       <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #818cf8, #6366f1, #4f46e5)' }} />
@@ -1118,62 +1214,6 @@ export default function InventoryTransfersPage() {
                       </div>
                     </div>
 
-                    {/* Mobile Card Layout */}
-                    <div className="sm:hidden divide-y">
-                      {transfers.map((transfer) => {
-                        const StatusIcon = statusIcon[transfer.status] || AlertTriangle;
-                        const borderColor = transfer.status === 'pending' ? '#f59e0b' : transfer.status === 'confirmed' ? '#10b981' : '#ef4444';
-                        return (
-                          <motion.div
-                            key={transfer.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="p-3 border-r-4 hover:bg-muted/30 transition-all"
-                            style={{ borderRightColor: borderColor }}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
-                                  <ArrowRightLeft className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                  <p className="font-medium text-sm">{transfer.transfer_number}</p>
-                                  <p className="text-xs text-muted-foreground">{formatDate(transfer.transfer_date)}</p>
-                                </div>
-                              </div>
-                              <Badge variant="secondary" className={`gap-1 text-[10px] ${statusColor[transfer.status]}`}>
-                                <StatusIcon className="w-3 h-3" />
-                                {statusLabel[transfer.status]}
-                              </Badge>
-                            </div>
-                            <div className="mt-2 space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" />{transfer.from_branch?.name || '—'} ← {transfer.to_branch?.name || '—'}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(transfer.total_amount)}</span>
-                                <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-indigo-50 dark:hover:bg-indigo-900/20" onClick={() => openDetailDialog(transfer)}>
-                                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                                  </Button>
-                                  {transfer.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
-                                    <>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => openConfirmDialog(transfer)}>
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                      </Button>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => openCancelDialog(transfer)}>
-                                        <XCircle className="w-3.5 h-3.5" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between px-4 py-3 border-t">
                         <p className="text-sm text-muted-foreground">
@@ -1245,43 +1285,103 @@ export default function InventoryTransfersPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/30">
-                        <TableHead className="text-right">الفرع</TableHead>
-                        <TableHead className="text-right">إجمالي التصبينات</TableHead>
-                        <TableHead className="text-right">إجمالي المدفوعات</TableHead>
-                        <TableHead className="text-right">الرصيد المدين</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {branchDebts.map((debt) => (
-                        <TableRow key={debt.branch_id} className={`hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors ${debt.remaining_debt > 0 ? 'bg-red-50/50 dark:bg-red-900/5' : ''}`}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
-                                <Building2 className="w-4 h-4 text-white" />
+                <>
+                  {/* Mobile Card Layout */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:hidden p-4 pt-0">
+                    {branchDebts.map((debt, idx) => {
+                      const hasDebt = debt.remaining_debt > 0;
+                      const statusAccent = hasDebt ? 'border-red-400' : 'border-emerald-400';
+                      return (
+                        <motion.div
+                          key={debt.branch_id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.25, delay: idx * 0.04 }}
+                        >
+                          <Card className={`border-0 shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden border-r-4 ${statusAccent} ${hasDebt ? 'bg-red-50/30 dark:bg-red-900/5' : ''}`}>
+                            <CardContent className="p-4">
+                              {/* Top row: Branch name + Debt badge */}
+                              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }} className="mb-3">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm shrink-0" style={{ background: hasDebt ? 'linear-gradient(135deg, #fca5a5, #ef4444)' : 'linear-gradient(135deg, #6ee7b7, #10b981)' }}>
+                                    <Building2 className="w-4 h-4 text-white" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-bold text-sm tracking-tight">{debt.branch_name}</h3>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                      إجمالي التصبينات: {formatCurrency(debt.total_transferred)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge
+                                  className={`text-[10px] font-medium shadow-sm border-0 px-2.5 py-0.5 ${hasDebt ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'}`}
+                                >
+                                  <HandCoins className="w-3 h-3 ml-0.5" />
+                                  {hasDebt ? 'مدين' : 'مسدد'}
+                                </Badge>
                               </div>
-                              <span className="font-medium">{debt.branch_name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatCurrency(debt.total_transferred)}
-                          </TableCell>
-                          <TableCell className="text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(debt.total_paid)}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`font-bold ${debt.remaining_debt > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                              {formatCurrency(debt.remaining_debt)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+
+                              {/* Info row: Paid + Remaining */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mt-2 pt-2.5 border-t border-dashed">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                                  <span className="text-xs text-muted-foreground">المدفوع:</span>
+                                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(debt.total_paid)}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                                  <span className="text-xs text-muted-foreground">الرصيد:</span>
+                                  <span className={`font-bold text-sm ${hasDebt ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                    {formatCurrency(debt.remaining_debt)}
+                                  </span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30">
+                            <TableHead className="text-right">الفرع</TableHead>
+                            <TableHead className="text-right">إجمالي التصبينات</TableHead>
+                            <TableHead className="text-right">إجمالي المدفوعات</TableHead>
+                            <TableHead className="text-right">الرصيد المدين</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {branchDebts.map((debt) => (
+                            <TableRow key={debt.branch_id} className={`hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors ${debt.remaining_debt > 0 ? 'bg-red-50/50 dark:bg-red-900/5' : ''}`}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #a5b4fc, #6366f1)' }}>
+                                    <Building2 className="w-4 h-4 text-white" />
+                                  </div>
+                                  <span className="font-medium">{debt.branch_name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {formatCurrency(debt.total_transferred)}
+                              </TableCell>
+                              <TableCell className="text-emerald-600 dark:text-emerald-400">
+                                {formatCurrency(debt.total_paid)}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`font-bold ${debt.remaining_debt > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {formatCurrency(debt.remaining_debt)}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -1304,17 +1404,17 @@ export default function InventoryTransfersPage() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>الفرع المصدر (المصنع) *</Label>
+                  <Label>الفرع المصدر *</Label>
                   <Select
                     value={createForm.from_branch_id}
                     onValueChange={(v) => setCreateForm({ ...createForm, from_branch_id: v })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="اختر المصنع" />
+                      <SelectValue placeholder="اختر الفرع المصدر" />
                     </SelectTrigger>
                     <SelectContent>
-                      {factoryBranches.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                      {[...factoryBranches, ...destinationBranches].map((b) => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}{b.is_factory ? ' (مصنع)' : ''}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

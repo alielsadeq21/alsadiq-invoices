@@ -240,6 +240,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       'inventory-transfers': 'inventory_transfers',
       'inventory-counts': 'inventory_counts',
       'accounting-reports': 'accounting_reports',
+      'sales': 'sales',
     };
 
     const permKey = pagePermissionMap[pageId];

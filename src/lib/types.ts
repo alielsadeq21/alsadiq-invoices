@@ -51,6 +51,7 @@ export interface Permissions {
   inventory_transfers?: PagePermissions;
   inventory_counts?: PagePermissions;
   accounting_reports?: PagePermissions;
+  sales?: PagePermissions;
 }
 
 export interface Role {
@@ -437,6 +438,7 @@ export const DEFAULT_ADMIN_PERMISSIONS: Permissions = {
   inventory_transfers: { view: true, create: true, edit: true },
   inventory_counts: { view: true, create: true, edit: true },
   accounting_reports: { view: true, export: true },
+  sales: { view: true, export: true },
 };
 
 export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
@@ -448,6 +450,7 @@ export const DEFAULT_BRANCH_MANAGER_PERMISSIONS: Permissions = {
   account_statement: { view: true, print: true, export: true },
   reports: { view: true, export: true },
   settings: { view: true },
+  sales: { view: true, export: true },
 };
 
 export const DEFAULT_WAREHOUSE_KEEPER_PERMISSIONS: Permissions = {
@@ -460,4 +463,5 @@ export const DEFAULT_ACCOUNTANT_PERMISSIONS: Permissions = {
   accounting: { view: true, create: true, edit: true, export: true },
   branch_accounts: { view: true, export: true },
   account_statement: { view: true, print: true, export: true },
+  sales: { view: true, export: true },
 };

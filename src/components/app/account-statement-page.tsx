@@ -505,14 +505,14 @@ export default function AccountStatementPage() {
           </div>
         </div>
         {generated && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="text-xs text-muted-foreground">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="bg-muted/60 rounded-full px-3 py-1.5">
-              <Building2 className="w-3.5 h-3.5" />
-              <span className="font-medium text-foreground">{branchName}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }} className="sm:flex-row sm:items-center text-xs text-muted-foreground">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="bg-muted/60 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+              <Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="font-medium text-foreground text-[11px] sm:text-xs">{branchName}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="bg-muted/60 rounded-full px-3 py-1.5">
-              <CalendarRange className="w-3.5 h-3.5" />
-              <span className="font-medium text-foreground">{formatDate(dateFrom)} — {formatDate(dateTo)}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="bg-muted/60 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+              <CalendarRange className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="font-medium text-foreground text-[11px] sm:text-xs">{formatDate(dateFrom)} — {formatDate(dateTo)}</span>
             </div>
           </div>
         )}
@@ -522,7 +522,7 @@ export default function AccountStatementPage() {
       <Card className="border-0 shadow-lg overflow-hidden relative">
         <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-teal-500 via-emerald-500 to-teal-600" />
         <CardContent className="p-3 sm:p-5 pt-4 sm:pt-6">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
             <div>
               <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
                 <Building2 className="w-3 h-3" />
@@ -580,7 +580,7 @@ export default function AccountStatementPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end col-span-2 lg:col-span-1">
+            <div className="flex items-end col-span-1 sm:col-span-2 lg:col-span-1">
               <Button
                 onClick={generateStatement}
                 disabled={loading}

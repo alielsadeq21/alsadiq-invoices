@@ -205,28 +205,28 @@ export default function ProductsPage() {
   const activeCount = useMemo(() => products.filter((p) => p.is_active).length, [products]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="sm:flex-row sm:items-center sm:justify-between">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))' }}>
-            <Package className="w-6 h-6 text-primary-foreground" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="sm:flex-row sm:items-center sm:justify-between">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))' }}>
+            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">إدارة المنتجات</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }} className="flex-wrap">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="text-sm text-muted-foreground">
-                <BarChart3 className="w-3.5 h-3.5" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">إدارة المنتجات</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }} className="flex-wrap">
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="text-[11px] sm:text-sm text-muted-foreground">
+                <BarChart3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 الإجمالي: {totalCount}
               </span>
-              <span className="text-border">|</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="text-sm text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
+              <span className="text-border text-[11px]">|</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="text-[11px] sm:text-sm text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 نشطة: {activeCount}
               </span>
-              <span className="text-border">|</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }} className="text-sm text-red-500 dark:text-red-400">
-                <XCircle className="w-3.5 h-3.5" />
+              <span className="text-border text-[11px]">|</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="text-[11px] sm:text-sm text-red-500 dark:text-red-400">
+                <XCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 معطلة: {totalCount - activeCount}
               </span>
             </div>
@@ -235,7 +235,7 @@ export default function ProductsPage() {
         {hasPermission('products', 'create') && (
           <Button
             onClick={openAddDialog}
-            className="gap-2 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] shrink-0"
+            className="gap-2 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] shrink-0 w-full sm:w-auto"
             style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
           >
             <Plus className="w-4 h-4" />
@@ -247,7 +247,7 @@ export default function ProductsPage() {
       {/* Search */}
       <Card className="border-0 shadow-md overflow-hidden">
         <div className="h-1" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.4), hsl(var(--primary)))' }} />
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input

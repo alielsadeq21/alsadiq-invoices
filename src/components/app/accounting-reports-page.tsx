@@ -666,6 +666,18 @@ export default function AccountingReportsPage() {
   const liabilitiesEquityProfit = totalLiabilities + totalEquity + balanceSheetNetProfit;
   const balanceSheetBalanced = Math.abs(totalAssets - liabilitiesEquityProfit) < 0.01;
 
+  // ==================== HELPER: Account type border color ====================
+  const getAccountTypeBorderColor = (type: string) => {
+    const colors: Record<string, string> = {
+      asset: '#3b82f6',
+      liability: '#ef4444',
+      equity: '#8b5cf6',
+      revenue: '#10b981',
+      expense: '#f59e0b',
+    };
+    return colors[type] || '#f59e0b';
+  };
+
   // ==================== EXPORT FUNCTIONS ====================
   const exportCSV = (headers: string[], rows: string[][], filename: string) => {
     const BOM = '\uFEFF';
@@ -902,7 +914,7 @@ export default function AccountingReportsPage() {
             {/* Filters */}
             <Card className="border-0 shadow-md overflow-hidden">
               <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="relative">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1173,7 +1185,7 @@ export default function AccountingReportsPage() {
             {/* Account Selector & Filters */}
             <Card className="border-0 shadow-md overflow-hidden">
               <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">اختر الحساب</Label>
@@ -1331,76 +1343,162 @@ export default function AccountingReportsPage() {
                     </p>
                   </div>
                 ) : (
-                  <ScrollArea className="max-h-[500px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30">
-                          <TableHead className="text-right font-bold">رقم القيد</TableHead>
-                          <TableHead className="text-right font-bold">التاريخ</TableHead>
-                          <TableHead className="text-right font-bold">البيان</TableHead>
-                          <TableHead className="text-right font-bold">مدين</TableHead>
-                          <TableHead className="text-right font-bold">دائن</TableHead>
-                          <TableHead className="text-right font-bold">الرصيد</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ledgerLines.map((line) => (
-                          <TableRow key={line.id}>
-                            <TableCell className="font-medium">
-                              {line.entry_number}
-                            </TableCell>
-                            <TableCell>
-                              {formatDate(line.entry_date)}
-                            </TableCell>
-                            <TableCell className="max-w-[200px] truncate">
-                              {line.description || '—'}
-                            </TableCell>
-                            <TableCell className="font-semibold text-emerald-600">
-                              {line.debit > 0 ? formatCurrency(line.debit) : '—'}
-                            </TableCell>
-                            <TableCell className="font-semibold text-orange-600">
-                              {line.credit > 0 ? formatCurrency(line.credit) : '—'}
-                            </TableCell>
-                            <TableCell
-                              className={`font-bold ${
-                                line.running_balance >= 0
-                                  ? 'text-emerald-700 dark:text-emerald-400'
-                                  : 'text-red-600'
-                              }`}
-                            >
-                              {formatCurrency(Math.abs(line.running_balance))}
-                              {line.running_balance < 0 && (
-                                <span className="text-xs mr-1">(د)</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {/* Totals Row */}
-                        <TableRow className="bg-muted/50 font-bold">
-                          <TableCell colSpan={3} className="text-left">
-                            الإجمالي
-                          </TableCell>
-                          <TableCell className="text-emerald-600">
-                            {formatCurrency(
-                              ledgerLines.reduce((s, l) => s + l.debit, 0)
-                            )}
-                          </TableCell>
-                          <TableCell className="text-orange-600">
-                            {formatCurrency(
-                              ledgerLines.reduce((s, l) => s + l.credit, 0)
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(
-                              Math.abs(
-                                ledgerLines[ledgerLines.length - 1]?.running_balance || 0
-                              )
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                  <>
+                    {/* Mobile Card Layout */}
+                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+                      {(() => {
+                        const account = accounts.find((a) => a.id === selectedAccountId);
+                        const borderColor = getAccountTypeBorderColor(account?.account_type || 'expense');
+                        return ledgerLines.map((line) => (
+                          <div
+                            key={line.id}
+                            className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                            style={{ borderRightColor: borderColor, display: 'flex', flexDirection: 'column', gap: '8px' }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className="w-7 h-7 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                                  <Hash className="w-3.5 h-3.5 text-white" />
+                                </div>
+                                <span className="font-semibold text-sm">{line.entry_number}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-xs text-muted-foreground">
+                                <Calendar className="w-3.5 h-3.5" />
+                                {formatDate(line.entry_date)}
+                              </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{line.description || '—'}</p>
+                            <div style={{ display: 'flex', gap: '16px' }}>
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                                <p className="text-sm font-bold text-emerald-600">{line.debit > 0 ? formatCurrency(line.debit) : '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                                <p className="text-sm font-bold text-orange-600">{line.credit > 0 ? formatCurrency(line.credit) : '—'}</p>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                              <span className="text-xs text-muted-foreground">الرصيد</span>
+                              <span
+                                className={`font-bold ${
+                                  line.running_balance >= 0
+                                    ? 'text-emerald-700 dark:text-emerald-400'
+                                    : 'text-red-600'
+                                }`}
+                              >
+                                {formatCurrency(Math.abs(line.running_balance))}
+                                {line.running_balance < 0 && (
+                                  <span className="text-xs mr-1">(د)</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                      {/* Mobile Total */}
+                      {ledgerLines.length > 0 && (() => {
+                        const totalDebit = ledgerLines.reduce((s, l) => s + l.debit, 0);
+                        const totalCredit = ledgerLines.reduce((s, l) => s + l.credit, 0);
+                        const finalBalance = ledgerLines[ledgerLines.length - 1]?.running_balance || 0;
+                        return (
+                          <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>الإجمالي</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                                <p className="text-sm text-emerald-600">{formatCurrency(totalDebit)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                                <p className="text-sm text-orange-600">{formatCurrency(totalCredit)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">الرصيد</p>
+                                <p className="text-sm">{formatCurrency(Math.abs(finalBalance))}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block">
+                      <ScrollArea className="max-h-[500px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-right font-bold">رقم القيد</TableHead>
+                              <TableHead className="text-right font-bold">التاريخ</TableHead>
+                              <TableHead className="text-right font-bold">البيان</TableHead>
+                              <TableHead className="text-right font-bold">مدين</TableHead>
+                              <TableHead className="text-right font-bold">دائن</TableHead>
+                              <TableHead className="text-right font-bold">الرصيد</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ledgerLines.map((line) => (
+                              <TableRow key={line.id}>
+                                <TableCell className="font-medium">
+                                  {line.entry_number}
+                                </TableCell>
+                                <TableCell>
+                                  {formatDate(line.entry_date)}
+                                </TableCell>
+                                <TableCell className="max-w-[200px] truncate">
+                                  {line.description || '—'}
+                                </TableCell>
+                                <TableCell className="font-semibold text-emerald-600">
+                                  {line.debit > 0 ? formatCurrency(line.debit) : '—'}
+                                </TableCell>
+                                <TableCell className="font-semibold text-orange-600">
+                                  {line.credit > 0 ? formatCurrency(line.credit) : '—'}
+                                </TableCell>
+                                <TableCell
+                                  className={`font-bold ${
+                                    line.running_balance >= 0
+                                      ? 'text-emerald-700 dark:text-emerald-400'
+                                      : 'text-red-600'
+                                  }`}
+                                >
+                                  {formatCurrency(Math.abs(line.running_balance))}
+                                  {line.running_balance < 0 && (
+                                    <span className="text-xs mr-1">(د)</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {/* Totals Row */}
+                            <TableRow className="bg-muted/50 font-bold">
+                              <TableCell colSpan={3} className="text-left">
+                                الإجمالي
+                              </TableCell>
+                              <TableCell className="text-emerald-600">
+                                {formatCurrency(
+                                  ledgerLines.reduce((s, l) => s + l.debit, 0)
+                                )}
+                              </TableCell>
+                              <TableCell className="text-orange-600">
+                                {formatCurrency(
+                                  ledgerLines.reduce((s, l) => s + l.credit, 0)
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(
+                                  Math.abs(
+                                    ledgerLines[ledgerLines.length - 1]?.running_balance || 0
+                                  )
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1411,7 +1509,7 @@ export default function AccountingReportsPage() {
             {/* Filters */}
             <Card className="border-0 shadow-md overflow-hidden">
               <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
@@ -1537,61 +1635,55 @@ export default function AccountingReportsPage() {
                     </p>
                   </div>
                 ) : (
-                  <ScrollArea className="max-h-[500px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30">
-                          <TableHead className="text-right font-bold">اسم الحساب</TableHead>
-                          <TableHead className="text-right font-bold hidden sm:table-cell">نوع الحساب</TableHead>
-                          <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
-                          <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
-                          <TableHead className="text-right font-bold">صافي الرصيد</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(() => {
-                          let currentType = '';
-                          const rows: React.ReactNode[] = [];
-                          trialBalanceData.forEach((account, index) => {
-                            // Add type group header
-                            if (account.account_type !== currentType) {
-                              currentType = account.account_type;
-                              rows.push(
-                                <TableRow key={`type-${account.account_type}-${index}`} className="bg-muted/30">
-                                  <TableCell
-                                    colSpan={5}
-                                    className="font-bold text-sm"
-                                  >
-                                    <Badge
-                                      variant="secondary"
-                                      className={`text-xs ${getAccountTypeColor(account.account_type)}`}
-                                    >
-                                      {getAccountTypeLabel(account.account_type)}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            }
-                            rows.push(
-                              <TableRow key={account.account_name}>
-                                <TableCell className="font-medium pr-6">
-                                  {account.account_name}
-                                </TableCell>
-                                <TableCell className="hidden sm:table-cell">
-                                  <Badge
-                                    variant="secondary"
-                                    className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
-                                  >
-                                    {getAccountTypeLabel(account.account_type)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-emerald-600">
-                                  {formatCurrency(account.total_debit)}
-                                </TableCell>
-                                <TableCell className="text-orange-600">
-                                  {formatCurrency(account.total_credit)}
-                                </TableCell>
-                                <TableCell
+                  <>
+                    {/* Mobile Card Layout */}
+                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+                      {(() => {
+                        let currentType = '';
+                        const cards: React.ReactNode[] = [];
+                        trialBalanceData.forEach((account, index) => {
+                          // Add type group header
+                          if (account.account_type !== currentType) {
+                            currentType = account.account_type;
+                            cards.push(
+                              <div key={`type-${account.account_type}-${index}`} className="pt-2 first:pt-0">
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-xs ${getAccountTypeColor(account.account_type)}`}
+                                >
+                                  {getAccountTypeLabel(account.account_type)}
+                                </Badge>
+                              </div>
+                            );
+                          }
+                          cards.push(
+                            <div
+                              key={account.account_name}
+                              className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                              style={{ borderRightColor: getAccountTypeBorderColor(account.account_type), display: 'flex', flexDirection: 'column', gap: '8px' }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span className="font-semibold text-sm">{account.account_name}</span>
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+                                >
+                                  {getAccountTypeLabel(account.account_type)}
+                                </Badge>
+                              </div>
+                              <div style={{ display: 'flex', gap: '16px' }}>
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                                  <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                                  <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                                <span className="text-xs text-muted-foreground">صافي الرصيد</span>
+                                <span
                                   className={`font-bold ${
                                     account.net_balance >= 0
                                       ? 'text-emerald-700 dark:text-emerald-400'
@@ -1602,38 +1694,138 @@ export default function AccountingReportsPage() {
                                   {account.net_balance < 0 && (
                                     <span className="text-xs mr-1">(د)</span>
                                   )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          });
-                          return rows;
-                        })()}
-                        {/* Grand Total Row */}
-                        <TableRow className="font-bold border-t-2" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
-                          <TableCell colSpan={2} className="text-lg">
-                            الإجمالي الكلي
-                          </TableCell>
-                          <TableCell className="text-emerald-600 text-lg">
-                            {formatCurrency(trialTotalDebit)}
-                          </TableCell>
-                          <TableCell className="text-orange-600 text-lg">
-                            {formatCurrency(trialTotalCredit)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-lg ${
-                              Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
-                                ? 'text-emerald-600'
-                                : 'text-red-600'
-                            }`}
-                          >
-                            {formatCurrency(
-                              Math.abs(trialTotalDebit - trialTotalCredit)
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        });
+                        return cards;
+                      })()}
+                      {/* Mobile Grand Total */}
+                      {trialBalanceData.length > 0 && (
+                        <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+                          <span className="text-sm">الإجمالي الكلي</span>
+                          <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                              <p className="text-sm text-emerald-600">{formatCurrency(trialTotalDebit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                              <p className="text-sm text-orange-600">{formatCurrency(trialTotalCredit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">الفرق</p>
+                              <p className={`text-sm ${Math.abs(trialTotalDebit - trialTotalCredit) < 0.01 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {formatCurrency(Math.abs(trialTotalDebit - trialTotalCredit))}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block">
+                      <ScrollArea className="max-h-[500px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-right font-bold">اسم الحساب</TableHead>
+                              <TableHead className="text-right font-bold hidden sm:table-cell">نوع الحساب</TableHead>
+                              <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+                              <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+                              <TableHead className="text-right font-bold">صافي الرصيد</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              let currentType = '';
+                              const rows: React.ReactNode[] = [];
+                              trialBalanceData.forEach((account, index) => {
+                                // Add type group header
+                                if (account.account_type !== currentType) {
+                                  currentType = account.account_type;
+                                  rows.push(
+                                    <TableRow key={`type-${account.account_type}-${index}`} className="bg-muted/30">
+                                      <TableCell
+                                        colSpan={5}
+                                        className="font-bold text-sm"
+                                      >
+                                        <Badge
+                                          variant="secondary"
+                                          className={`text-xs ${getAccountTypeColor(account.account_type)}`}
+                                        >
+                                          {getAccountTypeLabel(account.account_type)}
+                                        </Badge>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                }
+                                rows.push(
+                                  <TableRow key={account.account_name}>
+                                    <TableCell className="font-medium pr-6">
+                                      {account.account_name}
+                                    </TableCell>
+                                    <TableCell className="hidden sm:table-cell">
+                                      <Badge
+                                        variant="secondary"
+                                        className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+                                      >
+                                        {getAccountTypeLabel(account.account_type)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-emerald-600">
+                                      {formatCurrency(account.total_debit)}
+                                    </TableCell>
+                                    <TableCell className="text-orange-600">
+                                      {formatCurrency(account.total_credit)}
+                                    </TableCell>
+                                    <TableCell
+                                      className={`font-bold ${
+                                        account.net_balance >= 0
+                                          ? 'text-emerald-700 dark:text-emerald-400'
+                                          : 'text-red-600'
+                                      }`}
+                                    >
+                                      {formatCurrency(Math.abs(account.net_balance))}
+                                      {account.net_balance < 0 && (
+                                        <span className="text-xs mr-1">(د)</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              });
+                              return rows;
+                            })()}
+                            {/* Grand Total Row */}
+                            <TableRow className="font-bold border-t-2" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+                              <TableCell colSpan={2} className="text-lg">
+                                الإجمالي الكلي
+                              </TableCell>
+                              <TableCell className="text-emerald-600 text-lg">
+                                {formatCurrency(trialTotalDebit)}
+                              </TableCell>
+                              <TableCell className="text-orange-600 text-lg">
+                                {formatCurrency(trialTotalCredit)}
+                              </TableCell>
+                              <TableCell
+                                className={`text-lg ${
+                                  Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+                                    ? 'text-emerald-600'
+                                    : 'text-red-600'
+                                }`}
+                              >
+                                {formatCurrency(
+                                  Math.abs(trialTotalDebit - trialTotalCredit)
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1644,7 +1836,7 @@ export default function AccountingReportsPage() {
             {/* Filters */}
             <Card className="border-0 shadow-md overflow-hidden">
               <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
@@ -1768,113 +1960,234 @@ export default function AccountingReportsPage() {
                     </p>
                   </div>
                 ) : (
-                  <ScrollArea className="max-h-[500px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30">
-                          <TableHead className="text-right font-bold">اسم الحساب</TableHead>
-                          <TableHead className="text-right font-bold hidden sm:table-cell">النوع</TableHead>
-                          <TableHead className="text-right font-bold">مدين</TableHead>
-                          <TableHead className="text-right font-bold">دائن</TableHead>
-                          <TableHead className="text-right font-bold">الرصيد</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {/* Revenue Section Header */}
-                        <TableRow className="bg-emerald-50 dark:bg-emerald-900/20">
-                          <TableCell colSpan={5} className="font-bold text-emerald-700 dark:text-emerald-400">
-                            الإيرادات
-                          </TableCell>
-                        </TableRow>
-                        {revenueAccounts.map((account) => (
-                          <TableRow key={account.account_name}>
-                            <TableCell className="font-medium pr-6">
-                              {account.account_name}
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <Badge
-                                variant="secondary"
-                                className={`text-[10px] ${getAccountTypeColor('revenue')}`}
-                              >
-                                إيرادات
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatCurrency(account.total_debit)}</TableCell>
-                            <TableCell>{formatCurrency(account.total_credit)}</TableCell>
-                            <TableCell className="font-semibold text-emerald-600">
-                              {formatCurrency(account.total_credit - account.total_debit)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {/* Revenue Total */}
-                        <TableRow className="bg-emerald-50/50 dark:bg-emerald-900/10 font-semibold">
-                          <TableCell colSpan={4} className="text-left text-emerald-700 dark:text-emerald-400">
-                            إجمالي الإيرادات
-                          </TableCell>
-                          <TableCell className="text-emerald-700 dark:text-emerald-400">
-                            {formatCurrency(totalRevenue)}
-                          </TableCell>
-                        </TableRow>
-
-                        {/* Expense Section Header */}
-                        <TableRow className="bg-red-50 dark:bg-red-900/20">
-                          <TableCell colSpan={5} className="font-bold text-red-700 dark:text-red-400">
-                            المصروفات
-                          </TableCell>
-                        </TableRow>
-                        {expenseAccounts.map((account) => (
-                          <TableRow key={account.account_name}>
-                            <TableCell className="font-medium pr-6">
-                              {account.account_name}
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <Badge
-                                variant="secondary"
-                                className={`text-[10px] ${getAccountTypeColor('expense')}`}
-                              >
-                                مصروفات
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatCurrency(account.total_debit)}</TableCell>
-                            <TableCell>{formatCurrency(account.total_credit)}</TableCell>
-                            <TableCell className="font-semibold text-red-600">
-                              {formatCurrency(account.total_debit - account.total_credit)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {/* Expense Total */}
-                        <TableRow className="bg-red-50/50 dark:bg-red-900/10 font-semibold">
-                          <TableCell colSpan={4} className="text-left text-red-700 dark:text-red-400">
-                            إجمالي المصروفات
-                          </TableCell>
-                          <TableCell className="text-red-700 dark:text-red-400">
-                            {formatCurrency(totalExpenses)}
-                          </TableCell>
-                        </TableRow>
-
-                        {/* Net Profit/Loss */}
-                        <TableRow
-                          className={`font-bold text-lg border-t-2 ${
-                            netProfit >= 0
-                              ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-400'
-                              : 'bg-red-100 dark:bg-red-900/30 border-red-400'
-                          }`}
+                  <>
+                    {/* Mobile Card Layout */}
+                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+                      {/* Revenue Section */}
+                      <div className="pt-1">
+                        <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          الإيرادات
+                        </Badge>
+                      </div>
+                      {revenueAccounts.map((account) => (
+                        <div
+                          key={account.account_name}
+                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                          style={{ borderRightColor: getAccountTypeBorderColor('revenue'), display: 'flex', flexDirection: 'column', gap: '8px' }}
                         >
-                          <TableCell
-                            colSpan={4}
-                            className={netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}
-                          >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="font-semibold text-sm">{account.account_name}</span>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] ${getAccountTypeColor('revenue')}`}
+                            >
+                              إيرادات
+                            </Badge>
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px' }}>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                            <span className="text-xs text-muted-foreground">الرصيد</span>
+                            <span className="font-bold text-emerald-600">
+                              {formatCurrency(account.total_credit - account.total_debit)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Revenue Total Mobile */}
+                      <div className="rounded-lg p-2 font-semibold text-sm" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span className="text-emerald-700 dark:text-emerald-400">إجمالي الإيرادات</span>
+                          <span className="text-emerald-700 dark:text-emerald-400">{formatCurrency(totalRevenue)}</span>
+                        </div>
+                      </div>
+
+                      {/* Expense Section */}
+                      <div className="pt-2">
+                        <Badge variant="secondary" className="text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                          المصروفات
+                        </Badge>
+                      </div>
+                      {expenseAccounts.map((account) => (
+                        <div
+                          key={account.account_name}
+                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                          style={{ borderRightColor: getAccountTypeBorderColor('expense'), display: 'flex', flexDirection: 'column', gap: '8px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="font-semibold text-sm">{account.account_name}</span>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] ${getAccountTypeColor('expense')}`}
+                            >
+                              مصروفات
+                            </Badge>
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px' }}>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                            <span className="text-xs text-muted-foreground">الرصيد</span>
+                            <span className="font-bold text-red-600">
+                              {formatCurrency(account.total_debit - account.total_credit)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Expense Total Mobile */}
+                      <div className="rounded-lg p-2 font-semibold text-sm" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span className="text-red-700 dark:text-red-400">إجمالي المصروفات</span>
+                          <span className="text-red-700 dark:text-red-400">{formatCurrency(totalExpenses)}</span>
+                        </div>
+                      </div>
+
+                      {/* Net Profit/Loss Mobile */}
+                      <div
+                        className={`rounded-xl p-3 font-bold text-sm border-t-2 ${
+                          netProfit >= 0
+                            ? 'border-emerald-400'
+                            : 'border-red-400'
+                        }`}
+                        style={{ background: netProfit >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span className={netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}>
                             {netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
-                          </TableCell>
-                          <TableCell
-                            className={netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}
-                          >
+                          </span>
+                          <span className={netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}>
                             {formatCurrency(Math.abs(netProfit))}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block">
+                      <ScrollArea className="max-h-[500px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-right font-bold">اسم الحساب</TableHead>
+                              <TableHead className="text-right font-bold hidden sm:table-cell">النوع</TableHead>
+                              <TableHead className="text-right font-bold">مدين</TableHead>
+                              <TableHead className="text-right font-bold">دائن</TableHead>
+                              <TableHead className="text-right font-bold">الرصيد</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {/* Revenue Section Header */}
+                            <TableRow className="bg-emerald-50 dark:bg-emerald-900/20">
+                              <TableCell colSpan={5} className="font-bold text-emerald-700 dark:text-emerald-400">
+                                الإيرادات
+                              </TableCell>
+                            </TableRow>
+                            {revenueAccounts.map((account) => (
+                              <TableRow key={account.account_name}>
+                                <TableCell className="font-medium pr-6">
+                                  {account.account_name}
+                                </TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-[10px] ${getAccountTypeColor('revenue')}`}
+                                  >
+                                    إيرادات
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{formatCurrency(account.total_debit)}</TableCell>
+                                <TableCell>{formatCurrency(account.total_credit)}</TableCell>
+                                <TableCell className="font-semibold text-emerald-600">
+                                  {formatCurrency(account.total_credit - account.total_debit)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {/* Revenue Total */}
+                            <TableRow className="bg-emerald-50/50 dark:bg-emerald-900/10 font-semibold">
+                              <TableCell colSpan={4} className="text-left text-emerald-700 dark:text-emerald-400">
+                                إجمالي الإيرادات
+                              </TableCell>
+                              <TableCell className="text-emerald-700 dark:text-emerald-400">
+                                {formatCurrency(totalRevenue)}
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Expense Section Header */}
+                            <TableRow className="bg-red-50 dark:bg-red-900/20">
+                              <TableCell colSpan={5} className="font-bold text-red-700 dark:text-red-400">
+                                المصروفات
+                              </TableCell>
+                            </TableRow>
+                            {expenseAccounts.map((account) => (
+                              <TableRow key={account.account_name}>
+                                <TableCell className="font-medium pr-6">
+                                  {account.account_name}
+                                </TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-[10px] ${getAccountTypeColor('expense')}`}
+                                  >
+                                    مصروفات
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{formatCurrency(account.total_debit)}</TableCell>
+                                <TableCell>{formatCurrency(account.total_credit)}</TableCell>
+                                <TableCell className="font-semibold text-red-600">
+                                  {formatCurrency(account.total_debit - account.total_credit)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {/* Expense Total */}
+                            <TableRow className="bg-red-50/50 dark:bg-red-900/10 font-semibold">
+                              <TableCell colSpan={4} className="text-left text-red-700 dark:text-red-400">
+                                إجمالي المصروفات
+                              </TableCell>
+                              <TableCell className="text-red-700 dark:text-red-400">
+                                {formatCurrency(totalExpenses)}
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Net Profit/Loss */}
+                            <TableRow
+                              className={`font-bold text-lg border-t-2 ${
+                                netProfit >= 0
+                                  ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-400'
+                                  : 'bg-red-100 dark:bg-red-900/30 border-red-400'
+                              }`}
+                            >
+                              <TableCell
+                                colSpan={4}
+                                className={netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}
+                              >
+                                {netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+                              </TableCell>
+                              <TableCell
+                                className={netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}
+                              >
+                                {formatCurrency(Math.abs(netProfit))}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1885,7 +2198,7 @@ export default function AccountingReportsPage() {
             {/* Filters */}
             <Card className="border-0 shadow-md overflow-hidden">
               <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">حتى تاريخ</Label>
@@ -1939,97 +2252,252 @@ export default function AccountingReportsPage() {
             )}
 
             {/* Balance Sheet Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Assets Side */}
-              <Card className="border-0 shadow-md overflow-hidden">
-                <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669)' }} />
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                      <Landmark className="w-3.5 h-3.5 text-white" />
+            {/* Mobile Card Layout */}
+            <div className="sm:hidden space-y-3">
+              {/* Assets Section */}
+              <div>
+                <div className="pt-1 pb-1">
+                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                    <div className="w-4 h-4 rounded flex items-center justify-center ml-1" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                      <Landmark className="w-2.5 h-2.5 text-white" />
                     </div>
                     الأصول
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {balanceSheetLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : assetAccounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      لا توجد حسابات أصول
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {assetAccounts.map((account) => {
-                        const balance = account.total_debit - account.total_credit;
-                        return (
-                          <div
-                            key={account.account_name}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                          >
-                            <span className="text-sm font-medium">{account.account_name}</span>
-                            <span className="font-semibold text-emerald-600">
-                              {formatCurrency(Math.abs(balance))}
-                            </span>
+                  </Badge>
+                </div>
+                {balanceSheetLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : assetAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">لا توجد حسابات أصول</p>
+                ) : (
+                  <div className="space-y-2">
+                    {assetAccounts.map((account) => {
+                      const balance = account.total_debit - account.total_credit;
+                      return (
+                        <div
+                          key={account.account_name}
+                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                          style={{ borderRightColor: getAccountTypeBorderColor('asset'), display: 'flex', flexDirection: 'column', gap: '8px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="font-semibold text-sm">{account.account_name}</span>
+                            <Badge variant="secondary" className={`text-[10px] ${getAccountTypeColor('asset')}`}>
+                              أصول
+                            </Badge>
                           </div>
-                        );
-                      })}
-                      <Separator />
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 font-bold">
+                          <div style={{ display: 'flex', gap: '16px' }}>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                            <span className="text-xs text-muted-foreground">الرصيد</span>
+                            <span className="font-semibold text-emerald-600">{formatCurrency(Math.abs(balance))}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="rounded-lg p-2 font-bold text-sm" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="text-emerald-700 dark:text-emerald-400">إجمالي الأصول</span>
-                        <span className="text-emerald-700 dark:text-emerald-400 text-lg">
-                          {formatCurrency(Math.abs(totalAssets))}
+                        <span className="text-emerald-700 dark:text-emerald-400">{formatCurrency(Math.abs(totalAssets))}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Liabilities Section */}
+              <div>
+                <div className="pt-1 pb-1">
+                  <Badge variant="secondary" className="text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                    <div className="w-4 h-4 rounded flex items-center justify-center ml-1" style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}>
+                      <CircleDollarSign className="w-2.5 h-2.5 text-white" />
+                    </div>
+                    الخصوم
+                  </Badge>
+                </div>
+                {balanceSheetLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : liabilityAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">لا توجد حسابات خصوم</p>
+                ) : (
+                  <div className="space-y-2">
+                    {liabilityAccounts.map((account) => {
+                      const balance = account.total_credit - account.total_debit;
+                      return (
+                        <div
+                          key={account.account_name}
+                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                          style={{ borderRightColor: getAccountTypeBorderColor('liability'), display: 'flex', flexDirection: 'column', gap: '8px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="font-semibold text-sm">{account.account_name}</span>
+                            <Badge variant="secondary" className={`text-[10px] ${getAccountTypeColor('liability')}`}>
+                              خصوم
+                            </Badge>
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px' }}>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                            <span className="text-xs text-muted-foreground">الرصيد</span>
+                            <span className="font-semibold text-red-600">{formatCurrency(Math.abs(balance))}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="rounded-lg p-2 font-bold text-sm" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span className="text-red-700 dark:text-red-400">إجمالي الخصوم</span>
+                        <span className="text-red-700 dark:text-red-400">{formatCurrency(Math.abs(totalLiabilities))}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Equity Section */}
+              <div>
+                <div className="pt-1 pb-1">
+                  <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                    <div className="w-4 h-4 rounded flex items-center justify-center ml-1" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                      <Landmark className="w-2.5 h-2.5 text-white" />
+                    </div>
+                    حقوق الملكية
+                  </Badge>
+                </div>
+                {balanceSheetLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {equityAccounts.map((account) => {
+                      const balance = account.total_credit - account.total_debit;
+                      return (
+                        <div
+                          key={account.account_name}
+                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                          style={{ borderRightColor: getAccountTypeBorderColor('equity'), display: 'flex', flexDirection: 'column', gap: '8px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="font-semibold text-sm">{account.account_name}</span>
+                            <Badge variant="secondary" className={`text-[10px] ${getAccountTypeColor('equity')}`}>
+                              حقوق ملكية
+                            </Badge>
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px' }}>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+                            <span className="text-xs text-muted-foreground">الرصيد</span>
+                            <span className="font-semibold text-purple-600">{formatCurrency(Math.abs(balance))}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* Net Profit Line */}
+                    {balanceSheetNetProfit !== 0 && (
+                      <div
+                        className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+                        style={{ borderRightColor: balanceSheetNetProfit >= 0 ? '#10b981' : '#ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <span className="text-sm font-medium">
+                          {balanceSheetNetProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+                        </span>
+                        <span className={`font-semibold ${balanceSheetNetProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {formatCurrency(Math.abs(balanceSheetNetProfit))}
                         </span>
                       </div>
+                    )}
+                    <div className="rounded-lg p-2 font-bold text-sm" style={{ background: 'rgba(139,92,246,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span className="text-purple-700 dark:text-purple-400">إجمالي حقوق الملكية + صافي الربح</span>
+                        <span className="text-purple-700 dark:text-purple-400">{formatCurrency(Math.abs(totalEquity + balanceSheetNetProfit))}</span>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
+                )}
+              </div>
 
-              {/* Liabilities + Equity Side */}
-              <div className="space-y-4">
+              {/* Grand Total Mobile */}
+              {balanceSheetData.length > 0 && (
+                <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>الخصوم + حقوق الملكية + صافي الربح</span>
+                    <span>{formatCurrency(Math.abs(liabilitiesEquityProfit))}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Card Layout */}
+            <div className="hidden sm:block">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Assets Side */}
                 <Card className="border-0 shadow-md overflow-hidden">
-                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #f43f5e, #e11d48)' }} />
+                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669)' }} />
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}>
-                        <CircleDollarSign className="w-3.5 h-3.5 text-white" />
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                        <Landmark className="w-3.5 h-3.5 text-white" />
                       </div>
-                      الخصوم
+                      الأصول
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {balanceSheetLoading ? (
-                      <div className="flex items-center justify-center py-4">
+                      <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
-                    ) : liabilityAccounts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-2">
-                        لا توجد حسابات خصوم
+                    ) : assetAccounts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        لا توجد حسابات أصول
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {liabilityAccounts.map((account) => {
-                          const balance = account.total_credit - account.total_debit;
+                        {assetAccounts.map((account) => {
+                          const balance = account.total_debit - account.total_credit;
                           return (
                             <div
                               key={account.account_name}
                               className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                             >
                               <span className="text-sm font-medium">{account.account_name}</span>
-                              <span className="font-semibold text-red-600">
+                              <span className="font-semibold text-emerald-600">
                                 {formatCurrency(Math.abs(balance))}
                               </span>
                             </div>
                           );
                         })}
                         <Separator />
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-900/20 font-bold">
-                          <span className="text-red-700 dark:text-red-400">إجمالي الخصوم</span>
-                          <span className="text-red-700 dark:text-red-400">
-                            {formatCurrency(Math.abs(totalLiabilities))}
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 font-bold">
+                          <span className="text-emerald-700 dark:text-emerald-400">إجمالي الأصول</span>
+                          <span className="text-emerald-700 dark:text-emerald-400 text-lg">
+                            {formatCurrency(Math.abs(totalAssets))}
                           </span>
                         </div>
                       </div>
@@ -2037,77 +2505,127 @@ export default function AccountingReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-md overflow-hidden">
-                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9)' }} />
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
-                        <Landmark className="w-3.5 h-3.5 text-white" />
-                      </div>
-                      حقوق الملكية
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {balanceSheetLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {equityAccounts.map((account) => {
-                          const balance = account.total_credit - account.total_debit;
-                          return (
-                            <div
-                              key={account.account_name}
-                              className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                            >
-                              <span className="text-sm font-medium">{account.account_name}</span>
-                              <span className="font-semibold text-purple-600">
-                                {formatCurrency(Math.abs(balance))}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {/* Net Profit Line */}
-                        {balanceSheetNetProfit !== 0 && (
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                            <span className="text-sm font-medium">
-                              {balanceSheetNetProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
-                            </span>
-                            <span
-                              className={`font-semibold ${
-                                balanceSheetNetProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
-                              }`}
-                            >
-                              {formatCurrency(Math.abs(balanceSheetNetProfit))}
+                {/* Liabilities + Equity Side */}
+                <div className="space-y-4">
+                  <Card className="border-0 shadow-md overflow-hidden">
+                    <div className="h-1" style={{ background: 'linear-gradient(90deg, #f43f5e, #e11d48)' }} />
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}>
+                          <CircleDollarSign className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        الخصوم
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {balanceSheetLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : liabilityAccounts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          لا توجد حسابات خصوم
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {liabilityAccounts.map((account) => {
+                            const balance = account.total_credit - account.total_debit;
+                            return (
+                              <div
+                                key={account.account_name}
+                                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                              >
+                                <span className="text-sm font-medium">{account.account_name}</span>
+                                <span className="font-semibold text-red-600">
+                                  {formatCurrency(Math.abs(balance))}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          <Separator />
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-900/20 font-bold">
+                            <span className="text-red-700 dark:text-red-400">إجمالي الخصوم</span>
+                            <span className="text-red-700 dark:text-red-400">
+                              {formatCurrency(Math.abs(totalLiabilities))}
                             </span>
                           </div>
-                        )}
-                        <Separator />
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 font-bold">
-                          <span className="text-purple-700 dark:text-purple-400">
-                            إجمالي حقوق الملكية + صافي الربح
-                          </span>
-                          <span className="text-purple-700 dark:text-purple-400">
-                            {formatCurrency(Math.abs(totalEquity + balanceSheetNetProfit))}
-                          </span>
                         </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                {/* Grand Total Liabilities + Equity */}
-                <Card className="border-0 shadow-md" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between font-bold text-lg">
-                      <span>الخصوم + حقوق الملكية + صافي الربح</span>
-                      <span>
-                        {formatCurrency(Math.abs(liabilitiesEquityProfit))}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <Card className="border-0 shadow-md overflow-hidden">
+                    <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9)' }} />
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                          <Landmark className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        حقوق الملكية
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {balanceSheetLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {equityAccounts.map((account) => {
+                            const balance = account.total_credit - account.total_debit;
+                            return (
+                              <div
+                                key={account.account_name}
+                                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                              >
+                                <span className="text-sm font-medium">{account.account_name}</span>
+                                <span className="font-semibold text-purple-600">
+                                  {formatCurrency(Math.abs(balance))}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {/* Net Profit Line */}
+                          {balanceSheetNetProfit !== 0 && (
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                              <span className="text-sm font-medium">
+                                {balanceSheetNetProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+                              </span>
+                              <span
+                                className={`font-semibold ${
+                                  balanceSheetNetProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                                }`}
+                              >
+                                {formatCurrency(Math.abs(balanceSheetNetProfit))}
+                              </span>
+                            </div>
+                          )}
+                          <Separator />
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 font-bold">
+                            <span className="text-purple-700 dark:text-purple-400">
+                              إجمالي حقوق الملكية + صافي الربح
+                            </span>
+                            <span className="text-purple-700 dark:text-purple-400">
+                              {formatCurrency(Math.abs(totalEquity + balanceSheetNetProfit))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Grand Total Liabilities + Equity */}
+                  <Card className="border-0 shadow-md" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between font-bold text-lg">
+                        <span>الخصوم + حقوق الملكية + صافي الربح</span>
+                        <span>
+                          {formatCurrency(Math.abs(liabilitiesEquityProfit))}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </div>
 

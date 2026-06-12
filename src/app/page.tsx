@@ -30,6 +30,7 @@ import ChartOfAccountsPage from '@/components/app/chart-of-accounts-page';
 import InventoryTransfersPage from '@/components/app/inventory-transfers-page';
 import InventoryCountsPage from '@/components/app/inventory-counts-page';
 import AccountingReportsPage from '@/components/app/accounting-reports-page';
+import SalesPage from '@/components/app/sales-page';
 
 export default function Home() {
   const { isLoggedIn, currentPage, checkAuth, canAccessPage, navigateTo, forceChangePassword } = useAppStore();
@@ -103,6 +104,8 @@ export default function Home() {
         return <InventoryCountsPage />;
       case 'accounting-reports':
         return <AccountingReportsPage />;
+      case 'sales':
+        return <SalesPage />;
       default:
         return <DashboardPage />;
     }
