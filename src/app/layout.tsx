@@ -13,8 +13,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "الصادق - نظام علي الصادق فقط",
-  description: "نظام علي الصادق فقط الاحترافي لمصنع الصادق للحلويات",
+  title: "الصادق - نظام علي الصادق",
+  description: "نظام علي الصادق الاحترافي لمصنع الصادق للحلويات",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "الصادق - نظام علي الصادق فقط",
-    description: "نظام علي الصادق فقط الاحترافي لمصنع الصادق للحلويات",
+    title: "الصادق - نظام علي الصادق",
+    description: "نظام علي الصادق الاحترافي لمصنع الصادق للحلويات",
   },
 };
 

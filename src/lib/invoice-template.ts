@@ -855,7 +855,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
     <!-- FOOTER -->
     <div class="inv-footer">
       <p class="footer-text">${invoiceFooter}</p>
-      <p class="footer-brand">${factoryName} - نظام علي الصادق فقط</p>
+      <p class="footer-brand">${factoryName} - نظام علي الصادق</p>
     </div>
   </div>
 </body>
@@ -1656,7 +1656,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     <!-- ===== FOOTER ===== -->
     <div class="r-footer">
       <p class="r-footer-msg">${invoiceFooter}</p>
-      <p class="r-footer-brand">${factoryName} - نظام علي الصادق فقط</p>
+      <p class="r-footer-brand">${factoryName} - نظام علي الصادق</p>
     </div>
 
     <!-- ===== BOTTOM BRAND BAR ===== -->
