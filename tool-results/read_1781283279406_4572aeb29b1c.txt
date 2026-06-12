@@ -1,0 +1,1033 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import { formatCurrency, generateInvoiceNumber } from '@/lib/utils';
+     7→import type { Product, Customer, PaymentMethod } from '@/lib/types';
+     8→import { Card, CardContent, CardHeader } from '@/components/ui/card';
+     9→import { Button } from '@/components/ui/button';
+    10→import { Input } from '@/components/ui/input';
+    11→import { Label } from '@/components/ui/label';
+    12→import { Badge } from '@/components/ui/badge';
+    13→import { Separator } from '@/components/ui/separator';
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from '@/components/ui/select';
+    21→import {
+    22→  Dialog,
+    23→  DialogContent,
+    24→  DialogHeader,
+    25→  DialogTitle,
+    26→  DialogFooter,
+    27→} from '@/components/ui/dialog';
+    28→import {
+    29→  ShoppingCart,
+    30→  Search,
+    31→  Plus,
+    32→  Minus,
+    33→  Trash2,
+    34→  CreditCard,
+    35→  Banknote,
+    36→  Printer,
+    37→  CheckCircle2,
+    38→  XCircle,
+    39→  Package,
+    40→  UserPlus,
+    41→  Loader2,
+    42→  Barcode,
+    43→  AlertTriangle,
+    44→  ArrowLeft,
+    45→  Hash,
+    46→  Phone,
+    47→  User,
+    48→} from 'lucide-react';
+    49→import { toast } from 'sonner';
+    50→import { motion, AnimatePresence } from 'framer-motion';
+    51→
+    52→// ─── Types ────────────────────────────────────────────────────────────────
+    53→interface CartItem {
+    54→  product_id: string;
+    55→  item_name: string;
+    56→  unit_price: number;
+    57→  unit_count: number;
+    58→  quantity: number;
+    59→  total_price: number;
+    60→  available_qty: number;
+    61→}
+    62→
+    63→interface ProductWithInventory extends Product {
+    64→  inventory_qty?: number;
+    65→}
+    66→
+    67→// ─── Component ────────────────────────────────────────────────────────────
+    68→export default function PosPage() {
+    69→  const { user, hasPermission } = useAppStore();
+    70→
+    71→  // ─── State ──────────────────────────────────────────────────────────────
+    72→  const [products, setProducts] = useState<ProductWithInventory[]>([]);
+    73→  const [customers, setCustomers] = useState<Customer[]>([]);
+    74→  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+    75→  const [cart, setCart] = useState<CartItem[]>([]);
+    76→  const [searchQuery, setSearchQuery] = useState('');
+    77→  const [barcodeInput, setBarcodeInput] = useState('');
+    78→  const [customerId, setCustomerId] = useState<string>('');
+    79→  const [receiverName, setReceiverName] = useState('');
+    80→  const [driverName, setDriverName] = useState('');
+    81→  const [driverPhone, setDriverPhone] = useState('');
+    82→  const [paymentMethodId, setPaymentMethodId] = useState<string>('');
+    83→  const [notes, setNotes] = useState('');
+    84→  const [loading, setLoading] = useState(true);
+    85→  const [saving, setSaving] = useState(false);
+    86→  const [showSuccess, setShowSuccess] = useState(false);
+    87→  const [lastInvoiceId, setLastInvoiceId] = useState<string>('');
+    88→  const [lastInvoiceNumber, setLastInvoiceNumber] = useState<string>('');
+    89→
+    90→  // New customer dialog
+    91→  const [newCustDialog, setNewCustDialog] = useState(false);
+    92→  const [newCustName, setNewCustName] = useState('');
+    93→  const [newCustPhone, setNewCustPhone] = useState('');
+    94→  const [savingCustomer, setSavingCustomer] = useState(false);
+    95→
+    96→  // Low stock warning
+    97→  const [lowStockWarnings, setLowStockWarnings] = useState<string[]>([]);
+    98→
+    99→  const barcodeRef = useRef<HTMLInputElement>(null);
+   100→  const searchRef = useRef<HTMLInputElement>(null);
+   101→
+   102→  // Branch ID from user
+   103→  const branchId = user?.branch_id || '';
+   104→
+   105→  // ─── Load data ──────────────────────────────────────────────────────────
+   106→  useEffect(() => {
+   107→    loadData();
+   108→  }, [branchId]);
+   109→
+   110→  const loadData = async () => {
+   111→    setLoading(true);
+   112→    try {
+   113→      // Load products with inventory for this branch
+   114→      const { data: productsData } = await supabase
+   115→        .from('products')
+   116→        .select('*')
+   117→        .eq('is_active', true)
+   118→        .order('name');
+   119→
+   120→      // Load inventory for this branch
+   121→      const { data: inventoryData } = await supabase
+   122→        .from('inventory')
+   123→        .select('product_id, quantity')
+   124→        .eq('branch_id', branchId);
+   125→
+   126→      const inventoryMap: Record<string, number> = {};
+   127→      (inventoryData || []).forEach((inv) => {
+   128→        inventoryMap[inv.product_id] = inv.quantity;
+   129→      });
+   130→
+   131→      const productsWithInv: ProductWithInventory[] = (productsData || []).map((p) => ({
+   132→        ...p,
+   133→        inventory_qty: inventoryMap[p.id] || 0,
+   134→      }));
+   135→
+   136→      setProducts(productsWithInv);
+   137→
+   138→      // Load customers
+   139→      const { data: custData } = await supabase
+   140→        .from('customers')
+   141→        .select('*')
+   142→        .eq('is_active', true)
+   143→        .order('name');
+   144→      setCustomers(custData || []);
+   145→
+   146→      // Load payment methods
+   147→      const { data: pmData } = await supabase
+   148→        .from('payment_methods')
+   149→        .select('*')
+   150→        .order('sort_order');
+   151→      setPaymentMethods(pmData || []);
+   152→
+   153→      // Set default payment method
+   154→      if (pmData && pmData.length > 0) {
+   155→        const defaultPm = pmData.find((p) => p.is_default) || pmData[0];
+   156→        setPaymentMethodId(defaultPm.id);
+   157→      }
+   158→    } catch (err) {
+   159→      console.error(err);
+   160→      toast.error('حدث خطأ أثناء تحميل البيانات');
+   161→    } finally {
+   162→      setLoading(false);
+   163→    }
+   164→  };
+   165→
+   166→  // ─── Filtered products ──────────────────────────────────────────────────
+   167→  const filteredProducts = useMemo(() => {
+   168→    if (!searchQuery.trim()) return products.slice(0, 50);
+   169→    const q = searchQuery.trim().toLowerCase();
+   170→    return products.filter(
+   171→      (p) =>
+   172→        p.name.toLowerCase().includes(q) ||
+   173→        p.id.toLowerCase().includes(q)
+   174→    );
+   175→  }, [products, searchQuery]);
+   176→
+   177→  // ─── Cart calculations ──────────────────────────────────────────────────
+   178→  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.total_price, 0), [cart]);
+   179→  const taxRate = 0;
+   180→  const taxAmount = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
+   181→  const total = useMemo(() => subtotal + taxAmount, [subtotal, taxAmount]);
+   182→  const cartItemCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+   183→
+   184→  // ─── Add to cart ────────────────────────────────────────────────────────
+   185→  const addToCart = useCallback((product: ProductWithInventory) => {
+   186→    setCart((prev) => {
+   187→      const existing = prev.find((item) => item.product_id === product.id);
+   188→      const availableQty = product.inventory_qty || 0;
+   189→
+   190→      if (existing) {
+   191→        // Check stock
+   192→        const newQty = existing.quantity + 1;
+   193→        const totalPieces = newQty * product.unit_count;
+   194→        if (totalPieces > availableQty && availableQty > 0) {
+   195→          toast.error(`الكمية المتاحة من ${product.name} هي ${availableQty} قطعة فقط`);
+   196→          return prev;
+   197→        }
+   198→        return prev.map((item) =>
+   199→          item.product_id === product.id
+   200→            ? {
+   201→                ...item,
+   202→                quantity: newQty,
+   203→                total_price: newQty * item.unit_price,
+   204→              }
+   205→            : item
+   206→        );
+   207→      }
+   208→
+   209→      // Check if out of stock
+   210→      if (availableQty <= 0) {
+   211→        toast.error(`${product.name} غير متوفر في المخزون`);
+   212→        return prev;
+   213→      }
+   214→
+   215→      return [
+   216→        ...prev,
+   217→        {
+   218→          product_id: product.id,
+   219→          item_name: product.name,
+   220→          unit_price: product.unit_price,
+   221→          unit_count: product.unit_count,
+   222→          quantity: 1,
+   223→          total_price: product.unit_price,
+   224→          available_qty: availableQty,
+   225→        },
+   226→      ];
+   227→    });
+   228→  }, []);
+   229→
+   230→  // ─── Barcode scan ───────────────────────────────────────────────────────
+   231→  const handleBarcodeSubmit = useCallback(() => {
+   232→    if (!barcodeInput.trim()) return;
+   233→    const product = products.find(
+   234→      (p) => p.id.toLowerCase() === barcodeInput.trim().toLowerCase()
+   235→    );
+   236→    if (product) {
+   237→      addToCart(product);
+   238→      setBarcodeInput('');
+   239→    } else {
+   240→      toast.error('منتج غير موجود');
+   241→    }
+   242→    barcodeRef.current?.focus();
+   243→  }, [barcodeInput, products, addToCart]);
+   244→
+   245→  // ─── Update quantity ────────────────────────────────────────────────────
+   246→  const updateQuantity = useCallback((productId: string, delta: number) => {
+   247→    setCart((prev) =>
+   248→      prev.map((item) => {
+   249→        if (item.product_id !== productId) return item;
+   250→        const newQty = item.quantity + delta;
+   251→        if (newQty <= 0) return item;
+   252→        // Check stock
+   253→        const totalPieces = newQty * item.unit_count;
+   254→        if (totalPieces > item.available_qty && item.available_qty > 0) {
+   255→          toast.error(`الكمية المتاحة هي ${item.available_qty} قطعة فقط`);
+   256→          return item;
+   257→        }
+   258→        return {
+   259→          ...item,
+   260→          quantity: newQty,
+   261→          total_price: newQty * item.unit_price,
+   262→        };
+   263→      })
+   264→    );
+   265→  }, []);
+   266→
+   267→  // ─── Set exact quantity ─────────────────────────────────────────────────
+   268→  const setItemQuantity = useCallback((productId: string, qty: number) => {
+   269→    setCart((prev) =>
+   270→      prev.map((item) => {
+   271→        if (item.product_id !== productId) return item;
+   272→        if (qty <= 0) return { ...item, quantity: 1, total_price: item.unit_price };
+   273→        const totalPieces = qty * item.unit_count;
+   274→        if (totalPieces > item.available_qty && item.available_qty > 0) {
+   275→          toast.error(`الكمية المتاحة هي ${item.available_qty} قطعة فقط`);
+   276→          return item;
+   277→        }
+   278→        return {
+   279→          ...item,
+   280→          quantity: qty,
+   281→          total_price: qty * item.unit_price,
+   282→        };
+   283→      })
+   284→    );
+   285→  }, []);
+   286→
+   287→  // ─── Remove from cart ───────────────────────────────────────────────────
+   288→  const removeFromCart = useCallback((productId: string) => {
+   289→    setCart((prev) => prev.filter((item) => item.product_id !== productId));
+   290→  }, []);
+   291→
+   292→  // ─── Clear cart ─────────────────────────────────────────────────────────
+   293→  const clearCart = useCallback(() => {
+   294→    setCart([]);
+   295→    setCustomerId('');
+   296→    setReceiverName('');
+   297→    setDriverName('');
+   298→    setDriverPhone('');
+   299→    setNotes('');
+   300→    setLowStockWarnings([]);
+   301→  }, []);
+   302→
+   303→  // ─── Add new customer ──────────────────────────────────────────────────
+   304→  const handleAddCustomer = async () => {
+   305→    if (!newCustName.trim()) {
+   306→      toast.error('يرجى إدخال اسم العميل');
+   307→      return;
+   308→    }
+   309→    setSavingCustomer(true);
+   310→    try {
+   311→      const { data, error } = await supabase
+   312→        .from('customers')
+   313→        .insert({
+   314→          name: newCustName.trim(),
+   315→          phone: newCustPhone.trim() || null,
+   316→          is_active: true,
+   317→        })
+   318→        .select('id, name, phone')
+   319→        .single();
+   320→
+   321→      if (error) throw error;
+   322→
+   323→      const newCustomer: Customer = {
+   324→        id: data.id,
+   325→        name: data.name,
+   326→        phone: data.phone || null,
+   327→        address: null,
+   328→        tax_number: null,
+   329→        is_active: true,
+   330→        notes: null,
+   331→        created_at: new Date().toISOString(),
+   332→        updated_at: new Date().toISOString(),
+   333→      };
+   334→      setCustomers((prev) => [...prev, newCustomer]);
+   335→      setCustomerId(data.id);
+   336→      setNewCustName('');
+   337→      setNewCustPhone('');
+   338→      setNewCustDialog(false);
+   339→      toast.success('تم إضافة العميل بنجاح');
+   340→    } catch (err) {
+   341→      console.error(err);
+   342→      toast.error('حدث خطأ أثناء إضافة العميل');
+   343→    } finally {
+   344→      setSavingCustomer(false);
+   345→    }
+   346→  };
+   347→
+   348→  // ─── Complete sale ──────────────────────────────────────────────────────
+   349→  const completeSale = async (andPrint = false) => {
+   350→    if (cart.length === 0) {
+   351→      toast.error('السلة فارغة');
+   352→      return;
+   353→    }
+   354→
+   355→    if (!hasPermission('pos', 'create')) {
+   356→      toast.error('ليس لديك صلاحية إجراء عملية بيع');
+   357→      return;
+   358→    }
+   359→
+   360→    // Check stock for all items
+   361→    const warnings: string[] = [];
+   362→    for (const item of cart) {
+   363→      const { data: invRecord } = await supabase
+   364→        .from('inventory')
+   365→        .select('quantity')
+   366→        .eq('product_id', item.product_id)
+   367→        .eq('branch_id', branchId)
+   368→        .single();
+   369→
+   370→      const availableQty = invRecord?.quantity || 0;
+   371→      const totalPieces = item.quantity * item.unit_count;
+   372→      if (totalPieces > availableQty) {
+   373→        warnings.push(`${item.item_name}: مطلوب ${totalPieces} قطعة، متاح ${availableQty}`);
+   374→      }
+   375→    }
+   376→
+   377→    if (warnings.length > 0) {
+   378→      setLowStockWarnings(warnings);
+   379→      toast.error('بعض المنتجات غير متوفرة بالكمية المطلوبة');
+   380→      return;
+   381→    }
+   382→
+   383→    setSaving(true);
+   384→    try {
+   385→      // Generate invoice number
+   386→      const year = new Date().getFullYear();
+   387→      const { data: lastInvoice } = await supabase
+   388→        .from('invoices')
+   389→        .select('invoice_number')
+   390→        .like('invoice_number', `INV-${year}-%`)
+   391→        .order('invoice_number', { ascending: false })
+   392→        .limit(1);
+   393→
+   394→      let lastNum = 0;
+   395→      if (lastInvoice && lastInvoice.length > 0) {
+   396→        const parts = lastInvoice[0].invoice_number.split('-');
+   397→        lastNum = parseInt(parts[parts.length - 1]) || 0;
+   398→      }
+   399→      const invoiceNumber = generateInvoiceNumber(lastNum, year);
+   400→
+   401→      // Get today's date and time
+   402→      const now = new Date();
+   403→      const invoiceDate = now.toISOString().split('T')[0];
+   404→      const invoiceTime = now.toTimeString().split(' ')[0];
+   405→
+   406→      // Create invoice
+   407→      const { data: invData, error: invError } = await supabase
+   408→        .from('invoices')
+   409→        .insert({
+   410→          invoice_number: invoiceNumber,
+   411→          branch_id: branchId,
+   412→          customer_id: customerId || null,
+   413→          invoice_date: invoiceDate,
+   414→          invoice_time: invoiceTime,
+   415→          receiver_name: receiverName || null,
+   416→          driver_name: driverName || null,
+   417→          driver_phone: driverPhone || null,
+   418→          subtotal,
+   419→          tax_rate: 0,
+   420→          tax_amount: taxAmount,
+   421→          total,
+   422→          notes: notes || null,
+   423→        })
+   424→        .select('id')
+   425→        .single();
+   426→
+   427→      if (invError) throw invError;
+   428→
+   429→      // Insert invoice items
+   430→      const itemsData = cart.map((item) => ({
+   431→        invoice_id: invData.id,
+   432→        item_name: item.item_name,
+   433→        product_id: item.product_id,
+   434→        quantity: item.quantity,
+   435→        unit_count: item.unit_count,
+   436→        unit_price: item.unit_price,
+   437→        total_price: item.total_price,
+   438→      }));
+   439→      const { error: itemsError } = await supabase.from('invoice_items').insert(itemsData);
+   440→      if (itemsError) throw itemsError;
+   441→
+   442→      // Update inventory and log transactions
+   443→      for (const item of cart) {
+   444→        const totalPieces = item.quantity * item.unit_count;
+   445→
+   446→        const { data: invRecord } = await supabase
+   447→          .from('inventory')
+   448→          .select('*')
+   449→          .eq('product_id', item.product_id)
+   450→          .eq('branch_id', branchId)
+   451→          .single();
+   452→
+   453→        if (invRecord) {
+   454→          const newQty = invRecord.quantity - totalPieces;
+   455→          await supabase
+   456→            .from('inventory')
+   457→            .update({
+   458→              quantity: Math.max(0, newQty),
+   459→              last_updated: new Date().toISOString(),
+   460→            })
+   461→            .eq('id', invRecord.id);
+   462→        }
+   463→
+   464→        // Log inventory transaction
+   465→        await supabase.from('inventory_transactions').insert({
+   466→          product_id: item.product_id,
+   467→          branch_id: branchId,
+   468→          transaction_type: 'sale',
+   469→          quantity: -totalPieces,
+   470→          reference_type: 'invoice',
+   471→          reference_id: invData.id,
+   472→          notes: `نقطة بيع - فاتورة: ${invoiceNumber}`,
+   473→          created_by: user?.id || null,
+   474→        });
+   475→      }
+   476→
+   477→      // Auto journal entry
+   478→      try {
+   479→        const { data: lastJe } = await supabase
+   480→          .from('journal_entries')
+   481→          .select('entry_number')
+   482→          .like('entry_number', `JE-${year}-%`)
+   483→          .order('entry_number', { ascending: false })
+   484→          .limit(1);
+   485→        let lastJeNum = 0;
+   486→        if (lastJe && lastJe.length > 0) {
+   487→          const parts = lastJe[0].entry_number.split('-');
+   488→          lastJeNum = parseInt(parts[parts.length - 1]) || 0;
+   489→        }
+   490→        const jeNum = `JE-${year}-${(lastJeNum + 1).toString().padStart(4, '0')}`;
+   491→
+   492→        const jeLines: { account_name: string; debit: number; credit: number; description: string }[] = [];
+   493→        const customerOrCash = customerId ? 'العملاء' : 'الصندوق (كاش)';
+   494→        jeLines.push({
+   495→          account_name: customerOrCash,
+   496→          debit: total,
+   497→          credit: 0,
+   498→          description: `نقطة بيع - فاتورة رقم ${invoiceNumber}`,
+   499→        });
+   500→        jeLines.push({
+   501→          account_name: 'مبيعات الفروع',
+   502→          debit: 0,
+   503→          credit: subtotal,
+   504→          description: `نقطة بيع - فاتورة رقم ${invoiceNumber}`,
+   505→        });
+   506→
+   507→        const { data: jeData } = await supabase
+   508→          .from('journal_entries')
+   509→          .insert({
+   510→            entry_number: jeNum,
+   511→            entry_date: invoiceDate,
+   512→            description: `قيد تلقائي - نقطة بيع فاتورة رقم ${invoiceNumber}`,
+   513→            total_debit: total,
+   514→            total_credit: subtotal + taxAmount,
+   515→            is_posted: true,
+   516→            source_type: 'invoice',
+   517→            source_id: invData.id,
+   518→            created_by: user?.id || null,
+   519→          })
+   520→          .select('id')
+   521→          .single();
+   522→
+   523→        if (jeData) {
+   524→          await supabase.from('journal_entry_lines').insert(
+   525→            jeLines.map((line) => ({
+   526→              ...line,
+   527→              journal_entry_id: jeData.id,
+   528→            }))
+   529→          );
+   530→        }
+   531→      } catch (jeErr) {
+   532→        console.error('Auto journal entry error:', jeErr);
+   533→      }
+   534→
+   535→      // Audit log
+   536→      await supabase.from('audit_log').insert({
+   537→        action: 'pos_sale',
+   538→        details: { invoice_number: invoiceNumber, total, branch_id: branchId },
+   539→      });
+   540→
+   541→      setLastInvoiceId(invData.id);
+   542→      setLastInvoiceNumber(invoiceNumber);
+   543→      setShowSuccess(true);
+   544→      toast.success('تم إتمام عملية البيع بنجاح');
+   545→
+   546→      if (andPrint && hasPermission('pos', 'print')) {
+   547→        // Navigate to invoice detail with print
+   548→        const { navigateTo } = useAppStore.getState();
+   549→        navigateTo('invoice-detail', { id: invData.id, print: 'true' });
+   550→      }
+   551→    } catch (err) {
+   552→      console.error(err);
+   553→      toast.error('حدث خطأ أثناء إتمام عملية البيع');
+   554→    } finally {
+   555→      setSaving(false);
+   556→    }
+   557→  };
+   558→
+   559→  // ─── Reset after success ────────────────────────────────────────────────
+   560→  const handleSuccessClose = () => {
+   561→    setShowSuccess(false);
+   562→    clearCart();
+   563→  };
+   564→
+   565→  // ─── Loading ────────────────────────────────────────────────────────────
+   566→  if (loading) {
+   567→    return (
+   568→      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+   569→        <div style={{ textAlign: 'center' }}>
+   570→          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+   571→          <p className="text-muted-foreground">جاري تحميل نقطة البيع...</p>
+   572→        </div>
+   573→      </div>
+   574→    );
+   575→  }
+   576→
+   577→  // ─── Render ─────────────────────────────────────────────────────────────
+   578→  return (
+   579→    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="p-2 sm:p-4">
+   580→      {/* Header */}
+   581→      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+   582→        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+   583→          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg">
+   584→            <ShoppingCart className="w-5 h-5 text-white" />
+   585→          </div>
+   586→          <div>
+   587→            <h1 className="text-lg sm:text-xl font-bold">نقطة البيع</h1>
+   588→            <p className="text-xs text-muted-foreground">
+   589→              فرع: {user?.branch_name || 'غير محدد'}
+   590→            </p>
+   591→          </div>
+   592→        </div>
+   593→        <Badge variant="outline" className="text-xs">
+   594→          {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+   595→        </Badge>
+   596→      </div>
+   597→
+   598→      {/* Main content - two columns on desktop, stacked on mobile */}
+   599→      <div style={{ display: 'flex', gap: '1rem', flexDirection: 'row' }} className="flex-col lg:flex-row">
+   600→        
+   601→        {/* ─── Left: Products ──────────────────────────────────────── */}
+   602→        <div style={{ flex: '1 1 60%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+   603→          
+   604→          {/* Search & Barcode */}
+   605→          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+   606→            <div style={{ flex: '1 1 200px', position: 'relative' }}>
+   607→              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   608→              <Input
+   609→                ref={searchRef}
+   610→                placeholder="بحث بالاسم أو الكود..."
+   611→                value={searchQuery}
+   612→                onChange={(e) => setSearchQuery(e.target.value)}
+   613→                className="pr-9 h-10"
+   614→              />
+   615→            </div>
+   616→            <div style={{ flex: '0 1 180px', position: 'relative' }}>
+   617→              <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   618→              <Input
+   619→                ref={barcodeRef}
+   620→                placeholder="باركود..."
+   621→                value={barcodeInput}
+   622→                onChange={(e) => setBarcodeInput(e.target.value)}
+   623→                onKeyDown={(e) => {
+   624→                  if (e.key === 'Enter') handleBarcodeSubmit();
+   625→                }}
+   626→                className="pr-9 h-10"
+   627→              />
+   628→            </div>
+   629→          </div>
+   630→
+   631→          {/* Products Grid */}
+   632→          <div
+   633→            style={{
+   634→              display: 'grid',
+   635→              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+   636→              gap: '0.5rem',
+   637→              maxHeight: 'calc(100dvh - 280px)',
+   638→              overflowY: 'auto',
+   639→              padding: '0.25rem',
+   640→            }}
+   641→          >
+   642→            {filteredProducts.map((product) => {
+   643→              const inCart = cart.find((c) => c.product_id === product.id);
+   644→              const isLow = (product.inventory_qty || 0) <= 0;
+   645→              return (
+   646→                <motion.button
+   647→                  key={product.id}
+   648→                  whileTap={{ scale: 0.97 }}
+   649→                  onClick={() => addToCart(product)}
+   650→                  className={`
+   651→                    relative rounded-xl border-2 p-3 text-right transition-all duration-200
+   652→                    ${inCart
+   653→                      ? 'border-green-500 bg-green-50 dark:bg-green-950/30 shadow-md'
+   654→                      : isLow
+   655→                        ? 'border-red-200 bg-red-50/50 dark:bg-red-950/20 opacity-60'
+   656→                        : 'border-border bg-card hover:border-green-300 hover:shadow-md'
+   657→                    }
+   658→                  `}
+   659→                  disabled={isLow}
+   660→                >
+   661→                  {inCart && (
+   662→                    <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold shadow-md">
+   663→                      {inCart.quantity}
+   664→                    </div>
+   665→                  )}
+   666→                  <Package className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+   667→                  <p className="text-xs font-semibold truncate mb-1">{product.name}</p>
+   668→                  <p className="text-xs text-green-600 dark:text-green-400 font-bold">
+   669→                    {formatCurrency(product.unit_price)}
+   670→                  </p>
+   671→                  <p className="text-[10px] text-muted-foreground mt-0.5">
+   672→                    المخزون: {product.inventory_qty || 0} قطعة
+   673→                  </p>
+   674→                </motion.button>
+   675→              );
+   676→            })}
+   677→          </div>
+   678→        </div>
+   679→
+   680→        {/* ─── Right: Cart & Payment ────────────────────────────────── */}
+   681→        <div style={{ flex: '0 0 380px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="w-full lg:w-auto lg:flex-none">
+   682→          
+   683→          {/* Cart */}
+   684→          <Card className="flex-1 flex flex-col overflow-hidden">
+   685→            <CardHeader className="pb-2 pt-3 px-3">
+   686→              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+   687→                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+   688→                  <ShoppingCart className="w-4 h-4 text-green-600" />
+   689→                  <span className="text-sm font-bold">سلة المشتريات</span>
+   690→                  {cartItemCount > 0 && (
+   691→                    <Badge className="bg-green-600 text-white text-[10px] h-5 min-w-5">{cartItemCount}</Badge>
+   692→                  )}
+   693→                </div>
+   694→                {cart.length > 0 && (
+   695→                  <Button
+   696→                    variant="ghost"
+   697→                    size="sm"
+   698→                    className="text-red-500 hover:text-red-600 hover:bg-red-50 h-7 text-xs"
+   699→                    onClick={clearCart}
+   700→                  >
+   701→                    <Trash2 className="w-3 h-3 ml-1" />
+   702→                    إفراغ
+   703→                  </Button>
+   704→                )}
+   705→              </div>
+   706→            </CardHeader>
+   707→            <Separator />
+   708→            <CardContent className="flex-1 overflow-y-auto p-2" style={{ maxHeight: '300px', minHeight: '120px' }}>
+   709→              {cart.length === 0 ? (
+   710→                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 0' }}>
+   711→                  <ShoppingCart className="w-10 h-10 text-muted-foreground/30 mb-2" />
+   712→                  <p className="text-xs text-muted-foreground">السلة فارغة</p>
+   713→                  <p className="text-[10px] text-muted-foreground/60">اضغط على المنتج لإضافته</p>
+   714→                </div>
+   715→              ) : (
+   716→                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+   717→                  <AnimatePresence>
+   718→                    {cart.map((item) => (
+   719→                      <motion.div
+   720→                        key={item.product_id}
+   721→                        initial={{ opacity: 0, x: 20 }}
+   722→                        animate={{ opacity: 1, x: 0 }}
+   723→                        exit={{ opacity: 0, x: -20 }}
+   724→                        className="rounded-lg border bg-card p-2"
+   725→                      >
+   726→                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+   727→                          <div style={{ flex: 1, minWidth: 0 }}>
+   728→                            <p className="text-xs font-semibold truncate">{item.item_name}</p>
+   729→                            <p className="text-[10px] text-muted-foreground">
+   730→                              {formatCurrency(item.unit_price)} × {item.quantity} = {formatCurrency(item.total_price)}
+   731→                            </p>
+   732→                          </div>
+   733→                          <Button
+   734→                            variant="ghost"
+   735→                            size="icon"
+   736→                            className="h-6 w-6 text-red-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+   737→                            onClick={() => removeFromCart(item.product_id)}
+   738→                          >
+   739→                            <XCircle className="w-3.5 h-3.5" />
+   740→                          </Button>
+   741→                        </div>
+   742→                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.375rem' }}>
+   743→                          <Button
+   744→                            variant="outline"
+   745→                            size="icon"
+   746→                            className="h-6 w-6"
+   747→                            onClick={() => updateQuantity(item.product_id, -1)}
+   748→                            disabled={item.quantity <= 1}
+   749→                          >
+   750→                            <Minus className="w-3 h-3" />
+   751→                          </Button>
+   752→                          <Input
+   753→                            type="number"
+   754→                            min={1}
+   755→                            value={item.quantity}
+   756→                            onChange={(e) => {
+   757→                              const val = parseInt(e.target.value);
+   758→                              if (!isNaN(val)) setItemQuantity(item.product_id, val);
+   759→                            }}
+   760→                            className="h-6 w-14 text-center text-xs p-0"
+   761→                          />
+   762→                          <Button
+   763→                            variant="outline"
+   764→                            size="icon"
+   765→                            className="h-6 w-6"
+   766→                            onClick={() => updateQuantity(item.product_id, 1)}
+   767→                          >
+   768→                            <Plus className="w-3 h-3" />
+   769→                          </Button>
+   770→                          <span className="text-[10px] text-muted-foreground mr-auto">
+   771→                            متاح: {item.available_qty} قطعة
+   772→                          </span>
+   773→                        </div>
+   774→                      </motion.div>
+   775→                    ))}
+   776→                  </AnimatePresence>
+   777→                </div>
+   778→              )}
+   779→            </CardContent>
+   780→
+   781→            {/* Totals */}
+   782→            {cart.length > 0 && (
+   783→              <>
+   784→                <Separator />
+   785→                <div className="p-3 space-y-1.5 bg-muted/30">
+   786→                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+   787→                    <span className="text-xs text-muted-foreground">المجموع الفرعي</span>
+   788→                    <span className="text-xs font-medium">{formatCurrency(subtotal)}</span>
+   789→                  </div>
+   790→                  {taxAmount > 0 && (
+   791→                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+   792→                      <span className="text-xs text-muted-foreground">الضريبة</span>
+   793→                      <span className="text-xs font-medium">{formatCurrency(taxAmount)}</span>
+   794→                    </div>
+   795→                  )}
+   796→                  <Separator />
+   797→                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+   798→                    <span className="text-sm font-bold">الإجمالي</span>
+   799→                    <span className="text-sm font-bold text-green-600">{formatCurrency(total)}</span>
+   800→                  </div>
+   801→                </div>
+   802→              </>
+   803→            )}
+   804→          </Card>
+   805→
+   806→          {/* Payment Details */}
+   807→          <Card>
+   808→            <CardContent className="p-3 space-y-2.5">
+   809→              <p className="text-xs font-bold text-muted-foreground mb-1">بيانات الدفع</p>
+   810→
+   811→              {/* Customer */}
+   812→              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+   813→                <div style={{ flex: 1, minWidth: 0 }}>
+   814→                  <Label className="text-[10px] mb-1">العميل</Label>
+   815→                  <Select value={customerId} onValueChange={setCustomerId}>
+   816→                    <SelectTrigger className="h-8 text-xs">
+   817→                      <SelectValue placeholder="اختر العميل" />
+   818→                    </SelectTrigger>
+   819→                    <SelectContent>
+   820→                      <SelectItem value="walk-in">عميل عادي (بدون حساب)</SelectItem>
+   821→                      {customers.map((c) => (
+   822→                        <SelectItem key={c.id} value={c.id}>{c.name}{c.phone ? ` - ${c.phone}` : ''}</SelectItem>
+   823→                      ))}
+   824→                    </SelectContent>
+   825→                  </Select>
+   826→                </div>
+   827→                <Button
+   828→                  variant="outline"
+   829→                  size="icon"
+   830→                  className="h-8 w-8 flex-shrink-0"
+   831→                  onClick={() => setNewCustDialog(true)}
+   832→                  title="إضافة عميل جديد"
+   833→                >
+   834→                  <UserPlus className="w-3.5 h-3.5" />
+   835→                </Button>
+   836→              </div>
+   837→
+   838→              {/* Payment method */}
+   839→              <div>
+   840→                <Label className="text-[10px] mb-1">طريقة الدفع</Label>
+   841→                <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
+   842→                  <SelectTrigger className="h-8 text-xs">
+   843→                    <SelectValue placeholder="طريقة الدفع" />
+   844→                  </SelectTrigger>
+   845→                  <SelectContent>
+   846→                    {paymentMethods.map((pm) => (
+   847→                      <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+   848→                    ))}
+   849→                  </SelectContent>
+   850→                </Select>
+   851→              </div>
+   852→
+   853→              {/* Receiver / Driver - compact */}
+   854→              <details className="group">
+   855→                <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
+   856→                  <span className="group-open:rotate-90 transition-transform">▶</span>
+   857→                  بيانات إضافية (اختياري)
+   858→                </summary>
+   859→                <div className="mt-2 space-y-2">
+   860→                  <Input
+   861→                    placeholder="اسم المستلم"
+   862→                    value={receiverName}
+   863→                    onChange={(e) => setReceiverName(e.target.value)}
+   864→                    className="h-8 text-xs"
+   865→                  />
+   866→                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+   867→                    <Input
+   868→                      placeholder="اسم السائق"
+   869→                      value={driverName}
+   870→                      onChange={(e) => setDriverName(e.target.value)}
+   871→                      className="h-8 text-xs"
+   872→                      style={{ flex: 1 }}
+   873→                    />
+   874→                    <Input
+   875→                      placeholder="تليفون السائق"
+   876→                      value={driverPhone}
+   877→                      onChange={(e) => setDriverPhone(e.target.value)}
+   878→                      className="h-8 text-xs"
+   879→                      style={{ flex: 1 }}
+   880→                    />
+   881→                  </div>
+   882→                  <Input
+   883→                    placeholder="ملاحظات"
+   884→                    value={notes}
+   885→                    onChange={(e) => setNotes(e.target.value)}
+   886→                    className="h-8 text-xs"
+   887→                  />
+   888→                </div>
+   889→              </details>
+   890→
+   891→              {/* Action Buttons */}
+   892→              <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
+   893→                <Button
+   894→                  className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-bold text-sm"
+   895→                  onClick={() => completeSale(false)}
+   896→                  disabled={saving || cart.length === 0}
+   897→                >
+   898→                  {saving ? (
+   899→                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+   900→                  ) : (
+   901→                    <CheckCircle2 className="w-4 h-4 ml-2" />
+   902→                  )}
+   903→                  {saving ? 'جاري الحفظ...' : 'إتمام البيع'}
+   904→                </Button>
+   905→                {hasPermission('pos', 'print') && (
+   906→                  <Button
+   907→                    variant="outline"
+   908→                    className="h-11 px-4 border-green-600 text-green-600 hover:bg-green-50"
+   909→                    onClick={() => completeSale(true)}
+   910→                    disabled={saving || cart.length === 0}
+   911→                    title="بيع وطباعة"
+   912→                  >
+   913→                    <Printer className="w-4 h-4" />
+   914→                  </Button>
+   915→                )}
+   916→              </div>
+   917→
+   918→              {/* Low stock warnings */}
+   919→              {lowStockWarnings.length > 0 && (
+   920→                <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 p-2">
+   921→                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+   922→                    <AlertTriangle className="w-4 h-4 text-red-500" />
+   923→                    <span className="text-xs font-bold text-red-600">تحذير المخزون</span>
+   924→                  </div>
+   925→                  {lowStockWarnings.map((w, i) => (
+   926→                    <p key={i} className="text-[10px] text-red-500">{w}</p>
+   927→                  ))}
+   928→                  <Button
+   929→                    variant="ghost"
+   930→                    size="sm"
+   931→                    className="text-red-500 text-[10px] h-6 mt-1"
+   932→                    onClick={() => setLowStockWarnings([])}
+   933→                  >
+   934→                    إغلاق
+   935→                  </Button>
+   936→                </div>
+   937→              )}
+   938→            </CardContent>
+   939→          </Card>
+   940→        </div>
+   941→      </div>
+   942→
+   943→      {/* ─── Success Dialog ─────────────────────────────────────────────── */}
+   944→      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+   945→        <DialogContent className="max-w-sm text-center">
+   946→          <DialogHeader>
+   947→            <div className="mx-auto mb-3">
+   948→              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
+   949→                <CheckCircle2 className="w-8 h-8 text-green-600" />
+   950→              </div>
+   951→            </div>
+   952→            <DialogTitle className="text-green-600 text-lg">تم البيع بنجاح!</DialogTitle>
+   953→          </DialogHeader>
+   954→          <div className="space-y-2">
+   955→            <p className="text-sm text-muted-foreground">
+   956→              رقم الفاتورة: <span className="font-bold text-foreground">{lastInvoiceNumber}</span>
+   957→            </p>
+   958→            <p className="text-sm text-muted-foreground">
+   959→              الإجمالي: <span className="font-bold text-green-600">{formatCurrency(total)}</span>
+   960→            </p>
+   961→          </div>
+   962→          <DialogFooter className="flex gap-2 sm:justify-center mt-2">
+   963→            <Button
+   964→              variant="outline"
+   965→              onClick={handleSuccessClose}
+   966→              className="flex-1"
+   967→            >
+   968→              بيع جديد
+   969→            </Button>
+   970→            {hasPermission('pos', 'print') && (
+   971→              <Button
+   972→                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+   973→                onClick={() => {
+   974→                  setShowSuccess(false);
+   975→                  const { navigateTo } = useAppStore.getState();
+   976→                  navigateTo('invoice-detail', { id: lastInvoiceId, print: 'true' });
+   977→                }}
+   978→              >
+   979→                <Printer className="w-4 h-4 ml-1" />
+   980→                طباعة
+   981→              </Button>
+   982→            )}
+   983→          </DialogFooter>
+   984→        </DialogContent>
+   985→      </Dialog>
+   986→
+   987→      {/* ─── New Customer Dialog ─────────────────────────────────────────── */}
+   988→      <Dialog open={newCustDialog} onOpenChange={setNewCustDialog}>
+   989→        <DialogContent className="max-w-sm">
+   990→          <DialogHeader>
+   991→            <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+   992→              <UserPlus className="w-5 h-5 text-green-600" />
+   993→              إضافة عميل جديد
+   994→            </DialogTitle>
+   995→          </DialogHeader>
+   996→          <div className="space-y-3">
+   997→            <div>
+   998→              <Label className="text-xs">اسم العميل *</Label>
+   999→              <Input
+  1000→                placeholder="اسم العميل"
+  1001→                value={newCustName}
+  1002→                onChange={(e) => setNewCustName(e.target.value)}
+  1003→                className="h-9"
+  1004→              />
+  1005→            </div>
+  1006→            <div>
+  1007→              <Label className="text-xs">رقم الهاتف</Label>
+  1008→              <Input
+  1009→                placeholder="رقم الهاتف"
+  1010→                value={newCustPhone}
+  1011→                onChange={(e) => setNewCustPhone(e.target.value)}
+  1012→                className="h-9"
+  1013→              />
+  1014→            </div>
+  1015→          </div>
+  1016→          <DialogFooter>
+  1017→            <Button variant="outline" onClick={() => setNewCustDialog(false)}>
+  1018→              إلغاء
+  1019→            </Button>
+  1020→            <Button
+  1021→              className="bg-green-600 hover:bg-green-700 text-white"
+  1022→              onClick={handleAddCustomer}
+  1023→              disabled={savingCustomer}
+  1024→            >
+  1025→              {savingCustomer ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إضافة'}
+  1026→            </Button>
+  1027→          </DialogFooter>
+  1028→        </DialogContent>
+  1029→      </Dialog>
+  1030→    </div>
+  1031→  );
+  1032→}
+  1033→

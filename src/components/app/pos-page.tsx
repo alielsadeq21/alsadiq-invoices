@@ -95,6 +95,7 @@ export default function PosPage() {
 
   // Low stock warning
   const [lowStockWarnings, setLowStockWarnings] = useState<string[]>([]);
+  const [showMobileCart, setShowMobileCart] = useState(false);
 
   const barcodeRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -559,6 +560,7 @@ export default function PosPage() {
   // ─── Reset after success ────────────────────────────────────────────────
   const handleSuccessClose = () => {
     setShowSuccess(false);
+    setShowMobileCart(false);
     clearCart();
   };
 
@@ -576,7 +578,7 @@ export default function PosPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="p-2 sm:p-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className={`p-2 sm:p-4 ${cart.length > 0 ? 'pb-24 lg:pb-4' : ''}`}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -632,9 +634,9 @@ export default function PosPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
               gap: '0.5rem',
-              maxHeight: 'calc(100dvh - 280px)',
+              maxHeight: 'calc(100dvh - 160px)',
               overflowY: 'auto',
               padding: '0.25rem',
             }}
@@ -678,7 +680,7 @@ export default function PosPage() {
         </div>
 
         {/* ─── Right: Cart & Payment ────────────────────────────────── */}
-        <div style={{ flex: '0 0 380px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="w-full lg:w-auto lg:flex-none">
+        <div style={{ flex: '0 0 380px', minWidth: 0, flexDirection: 'column', gap: '0.75rem' }} className="hidden lg:flex w-full lg:w-auto">
           
           {/* Cart */}
           <Card className="flex-1 flex flex-col overflow-hidden">
@@ -939,6 +941,290 @@ export default function PosPage() {
           </Card>
         </div>
       </div>
+
+      {/* ─── Mobile Bottom Bar ──────────────────────────────────────────── */}
+      {cart.length > 0 && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t bg-background/95 backdrop-blur-sm shadow-[0_-4px_20px_rgba(0,0,0,0.1)]"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center">
+                  <ShoppingCart className="w-5 h-5 text-white" />
+                </div>
+                <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold border-2 border-background">
+                  {cartItemCount}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{cartItemCount} منتج في السلة</p>
+                <p className="text-base font-bold text-green-600">{formatCurrency(total)}</p>
+              </div>
+            </div>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white font-bold h-11 px-6 rounded-xl"
+              onClick={() => setShowMobileCart(true)}
+            >
+              عرض السلة
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Mobile Cart Dialog ──────────────────────────────────────────── */}
+      <Dialog open={showMobileCart} onOpenChange={setShowMobileCart}>
+        <DialogContent className="max-w-lg max-h-[92dvh] p-0 overflow-hidden flex flex-col">
+          <DialogHeader className="p-4 pb-2 border-b flex-shrink-0">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShoppingCart className="w-5 h-5 text-green-600" />
+                سلة المشتريات
+                {cartItemCount > 0 && (
+                  <Badge className="bg-green-600 text-white text-[10px] h-5 min-w-5">{cartItemCount}</Badge>
+                )}
+              </DialogTitle>
+              {cart.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 h-7 text-xs"
+                  onClick={clearCart}
+                >
+                  <Trash2 className="w-3 h-3 ml-1" />
+                  إفراغ
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          {/* Cart items */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2" style={{ minHeight: 0 }}>
+            {cart.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 0' }}>
+                <ShoppingCart className="w-12 h-12 text-muted-foreground/30 mb-2" />
+                <p className="text-sm text-muted-foreground">السلة فارغة</p>
+                <p className="text-xs text-muted-foreground/60">اضغط على المنتج لإضافته</p>
+              </div>
+            ) : (
+              <AnimatePresence>
+                {cart.map((item) => (
+                  <motion.div
+                    key={item.product_id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="rounded-lg border bg-card p-2.5"
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p className="text-sm font-semibold truncate">{item.item_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCurrency(item.unit_price)} × {item.quantity} = {formatCurrency(item.total_price)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+                        onClick={() => removeFromCart(item.product_id)}
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.375rem' }}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => updateQuantity(item.product_id, -1)}
+                        disabled={item.quantity <= 1}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val)) setItemQuantity(item.product_id, val);
+                        }}
+                        className="h-7 w-14 text-center text-xs p-0"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => updateQuantity(item.product_id, 1)}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                      <span className="text-[10px] text-muted-foreground mr-auto">
+                        متاح: {item.available_qty}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            )}
+          </div>
+
+          {/* Totals + Payment */}
+          {cart.length > 0 && (
+            <div className="border-t flex-shrink-0">
+              {/* Totals */}
+              <div className="p-3 space-y-1.5 bg-muted/30">
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-xs text-muted-foreground">المجموع الفرعي</span>
+                  <span className="text-xs font-medium">{formatCurrency(subtotal)}</span>
+                </div>
+                {taxAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-xs text-muted-foreground">الضريبة</span>
+                    <span className="text-xs font-medium">{formatCurrency(taxAmount)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-sm font-bold">الإجمالي</span>
+                  <span className="text-sm font-bold text-green-600">{formatCurrency(total)}</span>
+                </div>
+              </div>
+
+              {/* Payment details */}
+              <div className="p-3 space-y-2.5">
+                <p className="text-xs font-bold text-muted-foreground">بيانات الدفع</p>
+
+                {/* Customer */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Label className="text-[10px] mb-1">العميل</Label>
+                    <Select value={customerId} onValueChange={setCustomerId}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="اختر العميل" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="walk-in">عميل عادي</SelectItem>
+                        {customers.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}{c.phone ? ` - ${c.phone}` : ''}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 flex-shrink-0"
+                    onClick={() => setNewCustDialog(true)}
+                    title="إضافة عميل جديد"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Payment method */}
+                <div>
+                  <Label className="text-[10px] mb-1">طريقة الدفع</Label>
+                  <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="طريقة الدفع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((pm) => (
+                        <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Extra details */}
+                <details className="group">
+                  <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
+                    <span className="group-open:rotate-90 transition-transform">▶</span>
+                    بيانات إضافية (اختياري)
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    <Input
+                      placeholder="اسم المستلم"
+                      value={receiverName}
+                      onChange={(e) => setReceiverName(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <Input
+                        placeholder="اسم السائق"
+                        value={driverName}
+                        onChange={(e) => setDriverName(e.target.value)}
+                        className="h-9 text-xs"
+                        style={{ flex: 1 }}
+                      />
+                      <Input
+                        placeholder="تليفون السائق"
+                        value={driverPhone}
+                        onChange={(e) => setDriverPhone(e.target.value)}
+                        className="h-9 text-xs"
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                    <Input
+                      placeholder="ملاحظات"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                </details>
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
+                  <Button
+                    className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white font-bold text-sm"
+                    onClick={() => { setShowMobileCart(false); completeSale(false); }}
+                    disabled={saving || cart.length === 0}
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <CheckCircle2 className="w-4 h-4 ml-2" />}
+                    {saving ? 'جاري الحفظ...' : 'إتمام البيع'}
+                  </Button>
+                  {hasPermission('pos', 'print') && (
+                    <Button
+                      variant="outline"
+                      className="h-12 px-4 border-green-600 text-green-600 hover:bg-green-50"
+                      onClick={() => { setShowMobileCart(false); completeSale(true); }}
+                      disabled={saving || cart.length === 0}
+                      title="بيع وطباعة"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                {/* Low stock warnings */}
+                {lowStockWarnings.length > 0 && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 p-2">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <span className="text-xs font-bold text-red-600">تحذير المخزون</span>
+                    </div>
+                    {lowStockWarnings.map((w, i) => (
+                      <p key={i} className="text-[10px] text-red-500">{w}</p>
+                    ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 text-[10px] h-6 mt-1"
+                      onClick={() => setLowStockWarnings([])}
+                    >
+                      إغلاق
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ─── Success Dialog ─────────────────────────────────────────────── */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
