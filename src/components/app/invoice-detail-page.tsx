@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import type { Invoice, InvoiceItem } from '@/lib/types';
+import type { Invoice, InvoiceItem, Branch } from '@/lib/types';
 import { formatCurrency, formatDate, formatDateTime, getStatusLabel, getStatusColor, numberToArabicWords } from '@/lib/utils';
 import { generateInvoiceDocument, generateThermalDocument } from '@/lib/invoice-template';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,7 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [branchName, setBranchName] = useState('');
+  const [branchData, setBranchData] = useState<Branch | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -78,13 +79,16 @@ export default function InvoiceDetailPage() {
       setInvoice(inv);
       setItems(inv.items || []);
 
-      // Load branch name
+      // Load branch data (full branch details for invoices)
       const { data: branch } = await supabase
         .from('branches')
-        .select('name')
+        .select('*')
         .eq('id', inv.branch_id)
         .single();
-      if (branch) setBranchName(branch.name);
+      if (branch) {
+        setBranchName(branch.name);
+        setBranchData(branch as Branch);
+      }
 
       // Load customer name
       if ((inv as any).customer_id) {
@@ -109,6 +113,7 @@ export default function InvoiceDetailPage() {
       invoice,
       items,
       branchName,
+      branch: branchData,
       customerName,
       settings,
       userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
@@ -136,6 +141,7 @@ export default function InvoiceDetailPage() {
       invoice,
       items,
       branchName,
+      branch: branchData,
       customerName,
       settings,
       userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
@@ -169,6 +175,7 @@ export default function InvoiceDetailPage() {
         invoice,
         items,
         branchName,
+        branch: branchData,
         customerName,
         settings,
         userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',

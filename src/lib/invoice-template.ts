@@ -1,19 +1,24 @@
 import { formatCurrency, formatDate, numberToArabicWords } from './utils';
-import type { Invoice, InvoiceItem, Settings } from './types';
+import type { Invoice, InvoiceItem, Settings, Branch } from './types';
 
 /**
  * Invoice Template Generator
  * Generates a complete, self-contained HTML document for printing and PDF export.
  * Uses pure CSS (no Tailwind dependency) so it works in any context.
+ * 
+ * Supports branch-specific data: each branch can have its own logo, address,
+ * phone, tax number, commercial register, etc. that appear on invoices.
  */
 
 interface InvoiceDocumentData {
   invoice: Invoice;
   items: InvoiceItem[];
   branchName: string;
+  branch?: Branch | null;
   customerName?: string;
   settings: Settings | null;
   userFullName: string;
+  showSignatures?: boolean;
 }
 
 function formatTime(time: string | null): string {
@@ -30,6 +35,20 @@ function formatTime(time: string | null): string {
  */
 function hasUnitCount(items: InvoiceItem[]): boolean {
   return items.some(item => Number(item.unit_count) > 1);
+}
+
+/**
+ * Resolves a value: branch-specific data takes priority over global settings.
+ * This allows each branch to override global settings with its own details.
+ */
+function resolveBranchValue(
+  branchValue: string | null | undefined,
+  settingsValue: string | null | undefined,
+  fallback: string = ''
+): string {
+  if (branchValue && branchValue.trim()) return branchValue.trim();
+  if (settingsValue && settingsValue.trim()) return settingsValue.trim();
+  return fallback;
 }
 
 function getInvoiceCSS(showUnitCount: boolean): string {
@@ -157,6 +176,30 @@ function getInvoiceCSS(showUnitCount: boolean): string {
       font-size: 11px;
       color: rgba(255, 255, 255, 0.85);
       margin-top: 3px;
+    }
+
+    /* ===== BRANCH INFO BAR ===== */
+    .inv-branch-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: linear-gradient(135deg, rgba(13,124,102,0.06), rgba(212,168,67,0.04));
+      border: 1px solid rgba(13,124,102,0.15);
+      border-radius: 8px;
+      padding: 8px 16px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: #444;
+    }
+
+    .inv-branch-bar .branch-label {
+      font-weight: 700;
+      color: #0D7C66;
+    }
+
+    .inv-branch-bar .branch-sep {
+      color: #ccc;
     }
 
     /* ===== GOLD DIVIDER ===== */
@@ -479,6 +522,20 @@ function getInvoiceCSS(showUnitCount: boolean): string {
       margin-top: 4px;
     }
 
+    /* ===== BRANCH REG INFO ===== */
+    .inv-reg-info {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 6px;
+      font-size: 10px;
+      color: #999;
+    }
+
+    .inv-reg-info span {
+      white-space: nowrap;
+    }
+
     /* ===== WATERMARK ===== */
     .watermark {
       position: fixed;
@@ -550,6 +607,13 @@ function getInvoiceCSS(showUnitCount: boolean): string {
       }
       .inv-header-title .inv-date {
         color: #999 !important;
+      }
+      .inv-branch-bar {
+        background: #f5f5f5 !important;
+        border-color: #999 !important;
+      }
+      .inv-branch-bar .branch-label {
+        color: #000 !important;
       }
       .gold-divider {
         background: #333 !important;
@@ -661,6 +725,9 @@ function getInvoiceCSS(showUnitCount: boolean): string {
       .inv-footer .footer-brand {
         color: #666 !important;
       }
+      .inv-reg-info {
+        color: #555 !important;
+      }
       .watermark.cancelled {
         color: rgba(0,0,0,0.12) !important;
       }
@@ -675,21 +742,28 @@ function getInvoiceCSS(showUnitCount: boolean): string {
 }
 
 export function generateInvoiceDocument(data: InvoiceDocumentData): string {
-  const { invoice, items, branchName, customerName, settings, userFullName } = data;
+  const { invoice, items, branchName, branch, customerName, settings, userFullName, showSignatures = false } = data;
 
   const invoiceTime = formatTime(invoice.invoice_time);
-  const factoryName = settings?.factory_name || 'مصنع الصادق';
-  const factoryAddress = settings?.address || '';
-  const factoryPhone = settings?.phone || '';
-  const factoryEmail = settings?.email || '';
-  const taxNumber = settings?.tax_number || '';
-  const commercialRegister = settings?.commercial_register || '';
-  const invoiceFooter = settings?.invoice_footer || 'شكراً لتعاملكم معنا';
+
+  // Resolve values: branch-specific data takes priority over global settings
+  const factoryName = resolveBranchValue(
+    branch?.name,
+    settings?.factory_name,
+    'مصنع الصادق'
+  );
+  const factoryAddress = resolveBranchValue(branch?.address, settings?.address);
+  const factoryPhone = resolveBranchValue(branch?.phone, settings?.phone);
+  const factoryEmail = resolveBranchValue(branch?.email, settings?.email);
+  const taxNumber = resolveBranchValue(branch?.tax_number, settings?.tax_number);
+  const commercialRegister = resolveBranchValue(branch?.commercial_register, settings?.commercial_register);
+  const logoUrl = resolveBranchValue(branch?.logo_url, settings?.logo_url);
+  const invoiceFooter = resolveBranchValue(branch?.invoice_footer, settings?.invoice_footer, 'شكراً لتعاملكم معنا');
 
   const showUnitCount = hasUnitCount(items);
 
-  const logoSection = settings?.logo_url
-    ? `<img src="${settings.logo_url}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
+  const logoSection = logoUrl
+    ? `<img src="${logoUrl}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
     : `<span class="logo-text">ص</span>`;
 
   const isCancelled = invoice.status === 'cancelled';
@@ -727,6 +801,26 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
       </tr>`;
   }).join('');
 
+  // Build branch info bar (shows branch-specific contact details)
+  const branchBarParts: string[] = [];
+  if (factoryAddress) branchBarParts.push(factoryAddress);
+  if (factoryPhone) branchBarParts.push(`هاتف: ${factoryPhone}`);
+  if (factoryEmail) branchBarParts.push(factoryEmail);
+  const branchBarHtml = branchBarParts.length > 0
+    ? `<div class="inv-branch-bar">
+        <span class="branch-label">فرع ${branchName}</span>
+        ${branchBarParts.map(p => `<span class="branch-sep">|</span><span>${p}</span>`).join('')}
+      </div>`
+    : '';
+
+  // Registration info line at the bottom
+  const regInfoParts: string[] = [];
+  if (taxNumber) regInfoParts.push(`الرقم الضريبي: ${taxNumber}`);
+  if (commercialRegister) regInfoParts.push(`السجل التجاري: ${commercialRegister}`);
+  const regInfoHtml = regInfoParts.length > 0
+    ? `<div class="inv-reg-info">${regInfoParts.map(p => `<span>${p}</span>`).join('')}</div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -762,10 +856,13 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
       </div>
     </div>
 
+    <!-- BRANCH INFO BAR -->
+    ${branchBarHtml}
+
     <!-- GOLD DIVIDER -->
     <div class="gold-divider"></div>
 
-    <!-- INVOICE INFO (No status - only shown in app UI, not on printed invoice) -->
+    <!-- INVOICE INFO -->
     <div class="inv-info-grid" style="grid-template-columns: repeat(4, 1fr);">
       <div class="inv-info-cell">
         <div class="label">الفرع</div>
@@ -836,7 +933,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
       <span class="amount-text">${numberToArabicWords(Number(invoice.total))}</span>
     </div>
 
-    <!-- SIGNATURES -->
+    ${showSignatures ? `<!-- SIGNATURES -->
     <div class="inv-signatures">
       <div class="sig-box">
         <div class="sig-label">المحاسب</div>
@@ -850,12 +947,13 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
         <div class="sig-label">السائق</div>
         <div class="sig-line">${invoice.driver_name || ''}</div>
       </div>
-    </div>
+    </div>` : ''}
 
     <!-- FOOTER -->
     <div class="inv-footer">
       <p class="footer-text">${invoiceFooter}</p>
       <p class="footer-brand">${factoryName} - نظام علي الصادق</p>
+      ${regInfoHtml}
     </div>
   </div>
 </body>
@@ -878,23 +976,32 @@ export function extractInvoiceParts(htmlDoc: string): { css: string; body: strin
 
 /**
  * Generates a professional thermal receipt HTML document for 80mm thermal printers.
- * Features: brand header, items table, decorative separators, signatures.
+ * Features: brand header with branch data, items table, decorative separators, signatures.
+ * Supports branch-specific data (logo, address, phone, tax number, etc.)
  */
 export function generateThermalDocument(data: InvoiceDocumentData): string {
-  const { invoice, items, branchName, customerName, settings, userFullName } = data;
+  const { invoice, items, branchName, branch, customerName, settings, userFullName, showSignatures = false } = data;
 
   const invoiceTime = formatTime(invoice.invoice_time);
-  const factoryName = settings?.factory_name || 'مصنع الصادق';
-  const factoryPhone = settings?.phone || '';
-  const factoryAddress = settings?.address || '';
-  const factoryEmail = settings?.email || '';
-  const taxNumber = settings?.tax_number || '';
-  const commercialRegister = settings?.commercial_register || '';
-  const invoiceFooter = settings?.invoice_footer || 'شكراً لتعاملكم معنا';
+
+  // Resolve values: branch-specific data takes priority over global settings
+  const factoryName = resolveBranchValue(
+    branch?.name,
+    settings?.factory_name,
+    'مصنع الصادق'
+  );
+  const factoryPhone = resolveBranchValue(branch?.phone, settings?.phone);
+  const factoryAddress = resolveBranchValue(branch?.address, settings?.address);
+  const factoryEmail = resolveBranchValue(branch?.email, settings?.email);
+  const taxNumber = resolveBranchValue(branch?.tax_number, settings?.tax_number);
+  const commercialRegister = resolveBranchValue(branch?.commercial_register, settings?.commercial_register);
+  const logoUrl = resolveBranchValue(branch?.logo_url, settings?.logo_url);
+  const invoiceFooter = resolveBranchValue(branch?.invoice_footer, settings?.invoice_footer, 'شكراً لتعاملكم معنا');
+
   const showUnitCount = hasUnitCount(items);
 
-  const logoSection = settings?.logo_url
-    ? `<img src="${settings.logo_url}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
+  const logoSection = logoUrl
+    ? `<img src="${logoUrl}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
     : `<span class="r-logo-text">ص</span>`;
 
   const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
@@ -934,6 +1041,23 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
   // Cancel reason
   const cancelHtml = invoice.cancel_reason
     ? `<div class="r-cancel"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>`
+    : '';
+
+  // Build branch info lines for thermal receipt
+  const branchInfoLines: string[] = [];
+  if (factoryAddress) branchInfoLines.push(factoryAddress);
+  if (factoryPhone) branchInfoLines.push(`هاتف: ${factoryPhone}`);
+  if (factoryEmail) branchInfoLines.push(factoryEmail);
+  const branchInfoHtml = branchInfoLines.length > 0
+    ? `<div class="r-brand-info">${branchInfoLines.join(' &bull; ')}</div>`
+    : '';
+
+  // Tax/registration info line
+  const regInfoParts: string[] = [];
+  if (taxNumber) regInfoParts.push(`ض: ${taxNumber}`);
+  if (commercialRegister) regInfoParts.push(`سجل: ${commercialRegister}`);
+  const regInfoHtml = regInfoParts.length > 0
+    ? `<div class="r-brand-info">${regInfoParts.join(' &bull; ')}</div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -1025,6 +1149,18 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       color: rgba(255,255,255,0.8);
       line-height: 1.5;
       margin-top: 1px;
+    }
+
+    /* ===== BRANCH NAME BADGE ===== */
+    .r-branch-badge {
+      background: rgba(212,168,67,0.15);
+      border: 1px solid rgba(212,168,67,0.4);
+      border-top: none;
+      text-align: center;
+      padding: 1.5mm 0;
+      font-size: 8px;
+      color: #0D7C66;
+      font-weight: 700;
     }
 
     /* ===== INVOICE TITLE BOX ===== */
@@ -1313,6 +1449,16 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       color: #8B2020;
     }
 
+    /* ===== REG INFO ===== */
+    .r-reg-info {
+      width: calc(100% - 6mm);
+      margin: 1mm 3mm 0;
+      text-align: center;
+      font-size: 7px;
+      color: #888;
+      line-height: 1.5;
+    }
+
     /* ===== SIGNATURES ===== */
     .r-signatures {
       display: flex;
@@ -1406,6 +1552,11 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       }
       .r-brand-bar::after {
         background: #666 !important;
+      }
+      .r-branch-badge {
+        background: #eee !important;
+        border-color: #999 !important;
+        color: #000 !important;
       }
       .r-title-box {
         border-color: #000 !important;
@@ -1512,6 +1663,9 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
         border-color: #999 !important;
         color: #000 !important;
       }
+      .r-reg-info {
+        color: #333 !important;
+      }
       .r-sig-label {
         color: #000 !important;
         font-weight: 800 !important;
@@ -1542,16 +1696,12 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     <div class="r-brand-bar">
       <div class="r-brand-logo">${logoSection}</div>
       <div class="r-brand-name">${factoryName}</div>
-      <div class="r-brand-info">
-        ${factoryAddress ? `${factoryAddress}` : ''}
-        ${factoryPhone ? `${factoryAddress ? ' &bull; ' : ''}هاتف: ${factoryPhone}` : ''}
-        ${factoryEmail ? `${factoryAddress || factoryPhone ? ' &bull; ' : ''}${factoryEmail}` : ''}
-      </div>
-      <div class="r-brand-info">
-        ${taxNumber ? `ض: ${taxNumber}` : ''}
-        ${commercialRegister ? `${taxNumber ? ' &bull; ' : ''}سجل: ${commercialRegister}` : ''}
-      </div>
+      ${branchInfoHtml}
+      ${regInfoHtml}
     </div>
+
+    <!-- ===== BRANCH NAME BADGE ===== -->
+    <div class="r-branch-badge">فرع ${branchName}</div>
 
     <!-- ===== INVOICE TITLE BOX ===== -->
     <div class="r-title-box">
@@ -1632,7 +1782,10 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     ${notesHtml}
     ${cancelHtml}
 
-    <!-- ===== SIGNATURES ===== -->
+    <!-- ===== REG INFO ===== -->
+    ${regInfoParts.length > 0 ? `<div class="r-reg-info">${regInfoParts.join(' | ')}</div>` : ''}
+
+    ${showSignatures ? `<!-- ===== SIGNATURES ===== -->
     <div class="r-signatures">
       <div class="r-sig">
         <div class="r-sig-label">المحاسب</div>
@@ -1651,7 +1804,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       </div>
     </div>
 
-    <hr class="r-sep-star">
+    <hr class="r-sep-star">` : ''}
 
     <!-- ===== FOOTER ===== -->
     <div class="r-footer">

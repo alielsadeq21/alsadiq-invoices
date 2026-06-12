@@ -88,6 +88,12 @@ export interface Branch {
   name: string;
   address: string | null;
   phone: string | null;
+  email: string | null;
+  tax_number: string | null;
+  commercial_register: string | null;
+  logo_url: string | null;
+  manager_name: string | null;
+  invoice_footer: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

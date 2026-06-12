@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +36,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Building2, Plus, Search, Edit, Trash2, Phone, MapPin, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Building2, Plus, Search, Edit, Trash2, Phone, MapPin, CheckCircle2, XCircle,
+  Mail, FileText, Hash, Image, User, MessageSquare,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function BranchesPage() {
@@ -52,6 +56,12 @@ export default function BranchesPage() {
     name: '',
     address: '',
     phone: '',
+    email: '',
+    tax_number: '',
+    commercial_register: '',
+    logo_url: '',
+    manager_name: '',
+    invoice_footer: '',
     is_active: true,
   });
 
@@ -79,7 +89,18 @@ export default function BranchesPage() {
 
   const openAddDialog = () => {
     setEditingBranch(null);
-    setForm({ name: '', address: '', phone: '', is_active: true });
+    setForm({
+      name: '',
+      address: '',
+      phone: '',
+      email: '',
+      tax_number: '',
+      commercial_register: '',
+      logo_url: '',
+      manager_name: '',
+      invoice_footer: '',
+      is_active: true,
+    });
     setDialogOpen(true);
   };
 
@@ -89,6 +110,12 @@ export default function BranchesPage() {
       name: branch.name,
       address: branch.address || '',
       phone: branch.phone || '',
+      email: branch.email || '',
+      tax_number: branch.tax_number || '',
+      commercial_register: branch.commercial_register || '',
+      logo_url: branch.logo_url || '',
+      manager_name: branch.manager_name || '',
+      invoice_footer: branch.invoice_footer || '',
       is_active: branch.is_active,
     });
     setDialogOpen(true);
@@ -101,27 +128,30 @@ export default function BranchesPage() {
     }
 
     try {
+      const branchData = {
+        name: form.name,
+        address: form.address || null,
+        phone: form.phone || null,
+        email: form.email || null,
+        tax_number: form.tax_number || null,
+        commercial_register: form.commercial_register || null,
+        logo_url: form.logo_url || null,
+        manager_name: form.manager_name || null,
+        invoice_footer: form.invoice_footer || null,
+        is_active: form.is_active,
+        updated_at: new Date().toISOString(),
+      };
+
       if (editingBranch) {
         const { error } = await supabase
           .from('branches')
-          .update({
-            name: form.name,
-            address: form.address || null,
-            phone: form.phone || null,
-            is_active: form.is_active,
-            updated_at: new Date().toISOString(),
-          })
+          .update(branchData)
           .eq('id', editingBranch.id);
 
         if (error) throw error;
         toast.success('تم تحديث الفرع بنجاح');
       } else {
-        const { error } = await supabase.from('branches').insert({
-          name: form.name,
-          address: form.address || null,
-          phone: form.phone || null,
-          is_active: form.is_active,
-        });
+        const { error } = await supabase.from('branches').insert(branchData);
 
         if (error) throw error;
         await supabase.from('audit_log').insert({
@@ -308,18 +338,18 @@ export default function BranchesPage() {
                           className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
                           style={{ background: branch.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}
                         >
-                          <Building2 className="w-5 h-5 text-white" />
+                          {branch.logo_url ? (
+                            <img src={branch.logo_url} alt={branch.name} className="w-6 h-6 object-contain rounded" />
+                          ) : (
+                            <Building2 className="w-5 h-5 text-white" />
+                          )}
                         </div>
                         <div>
                           <h3 className="font-bold text-sm leading-tight">{branch.name}</h3>
                           <div className="mt-1">
                             <Badge
                               variant="secondary"
-                              className={
-                                branch.is_active
-                                  ? 'text-[10px] px-2 py-0 border-0 font-medium'
-                                  : 'text-[10px] px-2 py-0 border-0 font-medium'
-                              }
+                              className="border-0 font-medium text-[10px] px-2 py-0"
                               style={
                                 branch.is_active
                                   ? { background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1))', color: '#059669' }
@@ -347,9 +377,21 @@ export default function BranchesPage() {
                       </div>
                     )}
                     {branch.phone && (
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-3 mr-1">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5 mr-1">
                         <Phone className="w-3 h-3 flex-shrink-0 text-emerald-500" />
                         <span dir="ltr">{branch.phone}</span>
+                      </div>
+                    )}
+                    {branch.tax_number && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5 mr-1">
+                        <Hash className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+                        <span>ضريبي: {branch.tax_number}</span>
+                      </div>
+                    )}
+                    {branch.commercial_register && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-3 mr-1">
+                        <FileText className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+                        <span>سجل: {branch.commercial_register}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 border-t pt-3 mt-1">
@@ -393,8 +435,9 @@ export default function BranchesPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3">الفرع</TableHead>
-                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden md:table-cell">العنوان</TableHead>
-                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden sm:table-cell">الهاتف</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden lg:table-cell">العنوان</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden md:table-cell">الهاتف</TableHead>
+                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden xl:table-cell">الرقم الضريبي</TableHead>
                       <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الحالة</TableHead>
                       <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">تفعيل</TableHead>
                       <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الإجراءات</TableHead>
@@ -406,32 +449,56 @@ export default function BranchesPage() {
                         <TableCell>
                           <div className="flex items-center gap-2.5">
                             <div
-                              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+                              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm overflow-hidden"
                               style={{ background: branch.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}
                             >
-                              <Building2 className="w-4 h-4 text-white" />
+                              {branch.logo_url ? (
+                                <img src={branch.logo_url} alt={branch.name} className="w-6 h-6 object-contain" />
+                              ) : (
+                                <Building2 className="w-4 h-4 text-white" />
+                              )}
                             </div>
-                            <span className="font-semibold text-sm">{branch.name}</span>
+                            <div>
+                              <span className="font-semibold text-sm">{branch.name}</span>
+                              {branch.manager_name && (
+                                <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                  <User className="w-2.5 h-2.5" />
+                                  {branch.manager_name}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
+                        <TableCell className="hidden lg:table-cell">
                           <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                             {branch.address ? (
                               <>
                                 <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                                {branch.address}
+                                <span className="max-w-[150px] truncate">{branch.address}</span>
                               </>
                             ) : (
                               <span className="text-muted-foreground/50">—</span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                             {branch.phone ? (
                               <>
                                 <Phone className="w-3.5 h-3.5 text-emerald-500" />
                                 <span dir="ltr">{branch.phone}</span>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                            {branch.tax_number ? (
+                              <>
+                                <Hash className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>{branch.tax_number}</span>
                               </>
                             ) : (
                               <span className="text-muted-foreground/50">—</span>
@@ -496,7 +563,7 @@ export default function BranchesPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-md">
+        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div
@@ -508,34 +575,143 @@ export default function BranchesPage() {
               {editingBranch ? 'تعديل الفرع' : 'إضافة فرع جديد'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="branch-name">اسم الفرع *</Label>
-              <Input
-                id="branch-name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="مثال: فرع المعادي"
-              />
+          <div className="space-y-5 py-4">
+            {/* Basic Info Section */}
+            <div>
+              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                البيانات الأساسية
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="branch-name">اسم الفرع *</Label>
+                  <Input
+                    id="branch-name"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="مثال: فرع المعادي"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch-manager">مدير الفرع</Label>
+                  <Input
+                    id="branch-manager"
+                    value={form.manager_name}
+                    onChange={(e) => setForm({ ...form, manager_name: e.target.value })}
+                    placeholder="مثال: أحمد محمد"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="branch-address">العنوان</Label>
-              <Input
-                id="branch-address"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="مثال: 15 شارع 9 المعادي"
-              />
+
+            <Separator />
+
+            {/* Contact Info Section */}
+            <div>
+              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                بيانات الاتصال
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="branch-address">العنوان</Label>
+                  <Input
+                    id="branch-address"
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    placeholder="مثال: 15 شارع 9 المعادي"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch-phone">الهاتف</Label>
+                  <Input
+                    id="branch-phone"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="مثال: 01012345678"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch-email">البريد الإلكتروني</Label>
+                  <Input
+                    id="branch-email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="مثال: branch@example.com"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="branch-phone">الهاتف</Label>
-              <Input
-                id="branch-phone"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="مثال: 01012345678"
-              />
+
+            <Separator />
+
+            {/* Invoice & Legal Section */}
+            <div>
+              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                بيانات الفواتير والسجلات
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="branch-tax">الرقم الضريبي</Label>
+                  <Input
+                    id="branch-tax"
+                    value={form.tax_number}
+                    onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
+                    placeholder="مثال: 300123456789"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch-commercial">السجل التجاري</Label>
+                  <Input
+                    id="branch-commercial"
+                    value={form.commercial_register}
+                    onChange={(e) => setForm({ ...form, commercial_register: e.target.value })}
+                    placeholder="مثال: 12345"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+                تظهر هذه البيانات على الفواتير المطبوعة لهذا الفرع. إذا لم يتم تحديدها، سيتم استخدام البيانات العامة من الإعدادات.
+              </p>
             </div>
+
+            <Separator />
+
+            {/* Logo & Branding Section */}
+            <div>
+              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                <Image className="w-4 h-4" />
+                الشعار والتخصيص
+              </h4>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="branch-logo">رابط شعار الفرع</Label>
+                  <Input
+                    id="branch-logo"
+                    value={form.logo_url}
+                    onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
+                    placeholder="https://example.com/logo.png"
+                  />
+                  <p className="text-[10px] text-muted-foreground">إذا لم يتم تحديد شعار للفرع، سيتم استخدام الشعار العام من الإعدادات</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch-footer">نص تذييل الفاتورة</Label>
+                  <Input
+                    id="branch-footer"
+                    value={form.invoice_footer}
+                    onChange={(e) => setForm({ ...form, invoice_footer: e.target.value })}
+                    placeholder="مثال: شكراً لتعاملكم معنا - فرع المعادي"
+                  />
+                  <p className="text-[10px] text-muted-foreground">نص يظهر في أسفل الفاتورة المطبوعة لهذا الفرع</p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Status */}
             <div className="flex items-center gap-2">
               <Switch
                 id="branch-active"

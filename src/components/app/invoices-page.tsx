@@ -269,10 +269,10 @@ export default function InvoicesPage() {
         .select('*')
         .eq('invoice_id', invoice.id);
 
-      // Load branch name
+      // Load branch data (full details for invoices)
       const { data: branch } = await supabase
         .from('branches')
-        .select('name')
+        .select('*')
         .eq('id', invoice.branch_id)
         .single();
 
@@ -293,6 +293,7 @@ export default function InvoicesPage() {
         invoice,
         items: items || [],
         branchName: branch?.name || '',
+        branch: branch || null,
         customerName: quickCustomerName,
         settings,
         userFullName: useAppStore.getState().user?.full_name || 'علي محمد الصادق',
