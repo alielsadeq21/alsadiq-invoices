@@ -1093,85 +1093,87 @@ export default function AccountingReportsPage() {
                     {/* Desktop Table */}
                     <div className="hidden sm:block">
                       <ScrollArea className="max-h-[600px]">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-muted/30">
-                              <TableHead className="text-right w-10"></TableHead>
-                              <TableHead className="text-right font-bold">رقم القيد</TableHead>
-                              <TableHead className="text-right font-bold">التاريخ</TableHead>
-                              <TableHead className="text-right font-bold">البيان</TableHead>
-                              <TableHead className="text-right font-bold">مدين</TableHead>
-                              <TableHead className="text-right font-bold">دائن</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {journalEntries.map((entry) => {
-                              const isExpanded = expandedEntries.has(entry.id);
-                              const lines = journalLines[entry.id] || [];
-                              return (
-                                <>
-                                  <TableRow
-                                    key={entry.id}
-                                    className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => toggleEntryExpand(entry.id)}
-                                  >
-                                    <TableCell>
-                                      {isExpanded ? (
-                                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                      ) : (
-                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="font-medium">
-                                      {entry.entry_number}
-                                    </TableCell>
-                                    <TableCell>
-                                      {formatDate(entry.entry_date)}
-                                    </TableCell>
-                                    <TableCell className="max-w-[200px] truncate">
-                                      {entry.description}
-                                    </TableCell>
-                                    <TableCell className="font-semibold text-emerald-600">
-                                      {formatCurrency(entry.total_debit)}
-                                    </TableCell>
-                                    <TableCell className="font-semibold text-orange-600">
-                                      {formatCurrency(entry.total_credit)}
-                                    </TableCell>
-                                  </TableRow>
-                                  {isExpanded &&
-                                    lines.map((line) => (
-                                      <TableRow
-                                        key={line.id}
-                                        className="bg-muted/30"
-                                      >
-                                        <TableCell></TableCell>
-                                        <TableCell className="text-xs text-muted-foreground">
-                                          └
-                                        </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell className="text-sm pr-6">
-                                          <span className="text-muted-foreground ml-1">
-                                            {line.account_name}
-                                          </span>
-                                          {line.description && (
-                                            <span className="text-xs text-muted-foreground">
-                                              ({line.description})
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/30">
+                                <TableHead className="text-right w-10"></TableHead>
+                                <TableHead className="text-right font-bold">رقم القيد</TableHead>
+                                <TableHead className="text-right font-bold">التاريخ</TableHead>
+                                <TableHead className="text-right font-bold">البيان</TableHead>
+                                <TableHead className="text-right font-bold">مدين</TableHead>
+                                <TableHead className="text-right font-bold">دائن</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {journalEntries.map((entry) => {
+                                const isExpanded = expandedEntries.has(entry.id);
+                                const lines = journalLines[entry.id] || [];
+                                return (
+                                  <>
+                                    <TableRow
+                                      key={entry.id}
+                                      className="cursor-pointer hover:bg-muted/50"
+                                      onClick={() => toggleEntryExpand(entry.id)}
+                                    >
+                                      <TableCell>
+                                        {isExpanded ? (
+                                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="font-medium">
+                                        {entry.entry_number}
+                                      </TableCell>
+                                      <TableCell>
+                                        {formatDate(entry.entry_date)}
+                                      </TableCell>
+                                      <TableCell className="max-w-[200px] truncate">
+                                        {entry.description}
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-emerald-600">
+                                        {formatCurrency(entry.total_debit)}
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-orange-600">
+                                        {formatCurrency(entry.total_credit)}
+                                      </TableCell>
+                                    </TableRow>
+                                    {isExpanded &&
+                                      lines.map((line) => (
+                                        <TableRow
+                                          key={line.id}
+                                          className="bg-muted/30"
+                                        >
+                                          <TableCell></TableCell>
+                                          <TableCell className="text-xs text-muted-foreground">
+                                            └
+                                          </TableCell>
+                                          <TableCell></TableCell>
+                                          <TableCell className="text-sm pr-6">
+                                            <span className="text-muted-foreground ml-1">
+                                              {line.account_name}
                                             </span>
-                                          )}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                          {line.debit > 0 ? formatCurrency(line.debit) : ''}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                          {line.credit > 0 ? formatCurrency(line.credit) : ''}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                </>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
+                                            {line.description && (
+                                              <span className="text-xs text-muted-foreground">
+                                                ({line.description})
+                                              </span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-sm">
+                                            {line.debit > 0 ? formatCurrency(line.debit) : ''}
+                                          </TableCell>
+                                          <TableCell className="text-sm">
+                                            {line.credit > 0 ? formatCurrency(line.credit) : ''}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                  </>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </ScrollArea>
                     </div>
                   </>
@@ -1428,6 +1430,7 @@ export default function AccountingReportsPage() {
                     {/* Desktop Table */}
                     <div className="hidden sm:block">
                       <ScrollArea className="max-h-[500px]">
+                        <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30">
@@ -1496,6 +1499,7 @@ export default function AccountingReportsPage() {
                             </TableRow>
                           </TableBody>
                         </Table>
+                        </div>
                       </ScrollArea>
                     </div>
                   </>
@@ -1728,6 +1732,7 @@ export default function AccountingReportsPage() {
                     {/* Desktop Table */}
                     <div className="hidden sm:block">
                       <ScrollArea className="max-h-[500px]">
+                        <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30">
@@ -1823,6 +1828,7 @@ export default function AccountingReportsPage() {
                             </TableRow>
                           </TableBody>
                         </Table>
+                        </div>
                       </ScrollArea>
                     </div>
                   </>
@@ -2080,6 +2086,7 @@ export default function AccountingReportsPage() {
                     {/* Desktop Table */}
                     <div className="hidden sm:block">
                       <ScrollArea className="max-h-[500px]">
+                        <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30">
@@ -2185,6 +2192,7 @@ export default function AccountingReportsPage() {
                             </TableRow>
                           </TableBody>
                         </Table>
+                        </div>
                       </ScrollArea>
                     </div>
                   </>

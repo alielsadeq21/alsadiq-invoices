@@ -869,30 +869,32 @@ export default function ReportsPage() {
                   <div className="hidden sm:block">
                     <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)' }} />
                     <ScrollArea className="max-h-96">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableHead className="text-right">#</TableHead>
-                            <TableHead className="text-right">المنتج</TableHead>
-                            <TableHead className="text-center">الكمية المباعة</TableHead>
-                            <TableHead className="text-right">الإجمالي</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {salesData.byProduct.map((p, i) => (
-                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
-                              <TableCell className="text-muted-foreground">
-                                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
-                                  {i + 1}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-medium">{p.name}</TableCell>
-                              <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
-                              <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              <TableHead className="text-right">#</TableHead>
+                              <TableHead className="text-right">المنتج</TableHead>
+                              <TableHead className="text-center">الكمية المباعة</TableHead>
+                              <TableHead className="text-right">الإجمالي</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {salesData.byProduct.map((p, i) => (
+                              <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                                <TableCell className="text-muted-foreground">
+                                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
+                                    {i + 1}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-medium">{p.name}</TableCell>
+                                <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+                                <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </ScrollArea>
                   </div>
                   {/* Mobile Cards */}
@@ -1055,28 +1057,30 @@ export default function ReportsPage() {
                 <CardContent className="p-0">
                   {/* Desktop Table */}
                   <div className="hidden sm:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30 hover:bg-muted/30">
-                          <TableHead className="text-right">الفرع</TableHead>
-                          <TableHead className="text-right">إجمالي التحويلات</TableHead>
-                          <TableHead className="text-right">إجمالي المدفوعات</TableHead>
-                          <TableHead className="text-right">المبلغ المتبقي</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {branchDebts.map((d, i) => (
-                          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
-                            <TableCell className="font-medium">{d.branch_name}</TableCell>
-                            <TableCell>{formatCurrency(d.total_transferred)}</TableCell>
-                            <TableCell className="text-emerald-600">{formatCurrency(d.total_paid)}</TableCell>
-                            <TableCell className={`font-semibold ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                              {formatCurrency(d.remaining)}
-                            </TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="text-right">الفرع</TableHead>
+                            <TableHead className="text-right">إجمالي التحويلات</TableHead>
+                            <TableHead className="text-right">إجمالي المدفوعات</TableHead>
+                            <TableHead className="text-right">المبلغ المتبقي</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {branchDebts.map((d, i) => (
+                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                              <TableCell className="font-medium">{d.branch_name}</TableCell>
+                              <TableCell>{formatCurrency(d.total_transferred)}</TableCell>
+                              <TableCell className="text-emerald-600">{formatCurrency(d.total_paid)}</TableCell>
+                              <TableCell className={`font-semibold ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(d.remaining)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                   {/* Mobile Cards */}
                   <div className="sm:hidden p-3 space-y-2">
@@ -1128,39 +1132,41 @@ export default function ReportsPage() {
                   {/* Desktop Table */}
                   <div className="hidden sm:block">
                     <ScrollArea className="max-h-96">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableHead className="text-right">المنتج</TableHead>
-                            <TableHead className="text-right">الفرع</TableHead>
-                            <TableHead className="text-center">الكمية الحالية</TableHead>
-                            <TableHead className="text-center">الحد الأدنى</TableHead>
-                            <TableHead className="text-center">الحالة</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {invBalances.lowStock.map((item, i) => (
-                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
-                              <TableCell className="font-medium">{item.product_name}</TableCell>
-                              <TableCell>{item.branch_name}</TableCell>
-                              <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
-                              <TableCell className="text-center">{item.min_quantity}</TableCell>
-                              <TableCell className="text-center">
-                                <Badge
-                                  variant="secondary"
-                                  className={
-                                    item.quantity <= 0
-                                      ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                      : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-                                  }
-                                >
-                                  {item.quantity <= 0 ? 'نفد' : 'منخفض'}
-                                </Badge>
-                              </TableCell>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              <TableHead className="text-right">المنتج</TableHead>
+                              <TableHead className="text-right">الفرع</TableHead>
+                              <TableHead className="text-center">الكمية الحالية</TableHead>
+                              <TableHead className="text-center">الحد الأدنى</TableHead>
+                              <TableHead className="text-center">الحالة</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {invBalances.lowStock.map((item, i) => (
+                              <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                                <TableCell className="font-medium">{item.product_name}</TableCell>
+                                <TableCell>{item.branch_name}</TableCell>
+                                <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
+                                <TableCell className="text-center">{item.min_quantity}</TableCell>
+                                <TableCell className="text-center">
+                                  <Badge
+                                    variant="secondary"
+                                    className={
+                                      item.quantity <= 0
+                                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                                    }
+                                  >
+                                    {item.quantity <= 0 ? 'نفد' : 'منخفض'}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </ScrollArea>
                   </div>
                   {/* Mobile Cards */}
@@ -1408,24 +1414,26 @@ export default function ReportsPage() {
                   {/* Desktop Table */}
                   <div className="hidden sm:block">
                     <ScrollArea className="max-h-96">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableHead className="text-right">العميل</TableHead>
-                            <TableHead className="text-center">عدد الفواتير</TableHead>
-                            <TableHead className="text-right">المبلغ المستحق</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {finData.customerDebts.map((c, i) => (
-                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
-                              <TableCell className="font-medium">{c.customer_name}</TableCell>
-                              <TableCell className="text-center">{c.invoice_count}</TableCell>
-                              <TableCell className="font-semibold text-red-600">{formatCurrency(c.total_unpaid)}</TableCell>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              <TableHead className="text-right">العميل</TableHead>
+                              <TableHead className="text-center">عدد الفواتير</TableHead>
+                              <TableHead className="text-right">المبلغ المستحق</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {finData.customerDebts.map((c, i) => (
+                              <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                                <TableCell className="font-medium">{c.customer_name}</TableCell>
+                                <TableCell className="text-center">{c.invoice_count}</TableCell>
+                                <TableCell className="font-semibold text-red-600">{formatCurrency(c.total_unpaid)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </ScrollArea>
                   </div>
                   {/* Mobile Cards */}
@@ -1549,35 +1557,37 @@ export default function ReportsPage() {
                   {/* Desktop Table */}
                   <div className="hidden sm:block">
                     <ScrollArea className="max-h-96">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableHead className="text-right">الفرع</TableHead>
-                            <TableHead className="text-center">الفواتير</TableHead>
-                            <TableHead className="text-right">الإيرادات</TableHead>
-                            <TableHead className="text-right">المرتجعات</TableHead>
-                            <TableHead className="text-right">المصروفات</TableHead>
-                            <TableHead className="text-right">صافي</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {generalData.branchPerformance.map((b, i) => {
-                            const net = b.revenue - b.returns - b.expenses;
-                            return (
-                              <TableRow key={i} className="hover:bg-muted/40 transition-colors">
-                                <TableCell className="font-medium">{b.name}</TableCell>
-                                <TableCell className="text-center">{b.invoices}</TableCell>
-                                <TableCell className="text-emerald-600">{formatCurrency(b.revenue)}</TableCell>
-                                <TableCell className="text-red-600">{formatCurrency(b.returns)}</TableCell>
-                                <TableCell className="text-amber-600">{formatCurrency(b.expenses)}</TableCell>
-                                <TableCell className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {formatCurrency(net)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              <TableHead className="text-right">الفرع</TableHead>
+                              <TableHead className="text-center">الفواتير</TableHead>
+                              <TableHead className="text-right">الإيرادات</TableHead>
+                              <TableHead className="text-right">المرتجعات</TableHead>
+                              <TableHead className="text-right">المصروفات</TableHead>
+                              <TableHead className="text-right">صافي</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {generalData.branchPerformance.map((b, i) => {
+                              const net = b.revenue - b.returns - b.expenses;
+                              return (
+                                <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                                  <TableCell className="font-medium">{b.name}</TableCell>
+                                  <TableCell className="text-center">{b.invoices}</TableCell>
+                                  <TableCell className="text-emerald-600">{formatCurrency(b.revenue)}</TableCell>
+                                  <TableCell className="text-red-600">{formatCurrency(b.returns)}</TableCell>
+                                  <TableCell className="text-amber-600">{formatCurrency(b.expenses)}</TableCell>
+                                  <TableCell className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {formatCurrency(net)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </ScrollArea>
                   </div>
                   {/* Mobile Cards */}
@@ -1633,30 +1643,32 @@ export default function ReportsPage() {
                 <CardContent className="p-0">
                   {/* Desktop Table */}
                   <div className="hidden sm:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30 hover:bg-muted/30">
-                          <TableHead className="text-right">#</TableHead>
-                          <TableHead className="text-right">المنتج</TableHead>
-                          <TableHead className="text-center">الكمية</TableHead>
-                          <TableHead className="text-right">الإجمالي</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {generalData.topProducts.map((p, i) => (
-                          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
-                            <TableCell className="text-muted-foreground">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
-                                {i + 1}
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
-                            <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="text-right">#</TableHead>
+                            <TableHead className="text-right">المنتج</TableHead>
+                            <TableHead className="text-center">الكمية</TableHead>
+                            <TableHead className="text-right">الإجمالي</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {generalData.topProducts.map((p, i) => (
+                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+                              <TableCell className="text-muted-foreground">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
+                                  {i + 1}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">{p.name}</TableCell>
+                              <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+                              <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                   {/* Mobile Cards */}
                   <div className="sm:hidden p-3 space-y-2">

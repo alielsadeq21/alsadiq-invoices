@@ -499,6 +499,7 @@ export default function UsersPage() {
                 <div className="hidden sm:block">
                   <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb, #1d4ed8)' }} />
                   <ScrollArea className="max-h-[calc(100vh-320px)]">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/30">
@@ -606,6 +607,7 @@ export default function UsersPage() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   </ScrollArea>
                 </div>
 

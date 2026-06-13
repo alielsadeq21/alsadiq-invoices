@@ -725,7 +725,8 @@ export default function BranchAccountsPage() {
               </div>
             </div>
           ) : (
-            <div className="border rounded-xl overflow-hidden shadow-sm">
+            <div className="border rounded-xl shadow-sm">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -779,6 +780,7 @@ export default function BranchAccountsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </div>
           )}
           </div>

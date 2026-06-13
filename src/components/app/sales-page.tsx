@@ -644,6 +644,7 @@ export default function SalesPage() {
                   <div className="hidden sm:block">
                     <div className="h-[3px] bg-gradient-to-l from-emerald-500 via-teal-500 to-cyan-500" />
                     <ScrollArea className="max-h-96">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -668,6 +669,7 @@ export default function SalesPage() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </ScrollArea>
                   </div>
                 </CardContent>
