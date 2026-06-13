@@ -905,16 +905,18 @@ export default function ExpensesPage() {
 
       {/* Create/Edit Expense Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
-                <Receipt className="w-4 h-4 text-white" />
-              </div>
-              {isEditing ? 'تعديل المصروف' : 'تسجيل مصروف جديد'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 space-y-4 pb-2">
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                  <Receipt className="w-4 h-4 text-white" />
+                </div>
+                {isEditing ? 'تعديل المصروف' : 'تسجيل مصروف جديد'}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4" style={{ minHeight: 0 }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>رقم المصروف</Label>
@@ -1013,17 +1015,19 @@ export default function ExpensesPage() {
               />
             </div>
           </div>
-          <DialogFooter className="px-6 pb-6 pt-3 shrink-0 border-t">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
-            <Button onClick={handleSave} disabled={saving} className="text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري الحفظ...
-                </>
-              ) : isEditing ? 'حفظ التعديلات' : 'حفظ المصروف'}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
+              <Button onClick={handleSave} disabled={saving} className="text-white" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري الحفظ...
+                  </>
+                ) : isEditing ? 'حفظ التعديلات' : 'حفظ المصروف'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

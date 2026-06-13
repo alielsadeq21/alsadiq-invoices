@@ -708,16 +708,18 @@ export default function RolesPage() {
 
       {/* Add/Edit Role Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-                <Shield className="w-4 h-4 text-white" />
-              </div>
-              {editingRole ? 'تعديل الدور' : 'إضافة دور جديد'}
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                  <Shield className="w-4 h-4 text-white" />
+                </div>
+                {editingRole ? 'تعديل الدور' : 'إضافة دور جديد'}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
             <div className="space-y-6 py-4 px-1">
               {/* Basic Info */}
               <div className="space-y-4">
@@ -910,16 +912,18 @@ export default function RolesPage() {
                 )}
               </div>
             </div>
-          </ScrollArea>
-          <DialogFooter className="flex-row gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
-              إلغاء
-            </Button>
-            <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none gap-1" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editingRole ? 'تحديث' : 'إضافة'}
-            </Button>
-          </DialogFooter>
+          </div>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter className="flex-row gap-2 sm:justify-end">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
+                إلغاء
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none gap-1" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editingRole ? 'تحديث' : 'إضافة'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

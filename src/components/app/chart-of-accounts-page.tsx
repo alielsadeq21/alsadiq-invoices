@@ -855,17 +855,18 @@ export default function ChartOfAccountsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-lg max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
-                <Network className="w-4 h-4 text-white" />
-              </div>
-              {editingAccount ? 'تعديل حساب' : 'إضافة حساب جديد'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-lg max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+                  <Network className="w-4 h-4 text-white" />
+                </div>
+                {editingAccount ? 'تعديل حساب' : 'إضافة حساب جديد'}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4" style={{ minHeight: 0 }}>
             {/* Account Code */}
             <div className="space-y-2">
               <Label>كود الحساب *</Label>
@@ -965,16 +966,17 @@ export default function ChartOfAccountsPage() {
               </div>
             )}
           </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
-              {editingAccount ? 'تحديث الحساب' : 'إضافة الحساب'}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+                {editingAccount ? 'تحديث الحساب' : 'إضافة الحساب'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

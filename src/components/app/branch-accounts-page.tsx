@@ -645,16 +645,19 @@ export default function BranchAccountsPage() {
 
       {/* Branch Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-emerald-700 flex items-center justify-center shadow-md shadow-primary/20">
-                <Wallet className="w-4.5 h-4.5 text-white" />
-              </div>
-              <span>كشف حساب: {selectedBranch?.name}</span>
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-4xl max-h-[90dvh] w-[95vw] sm:w-auto p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-emerald-700 flex items-center justify-center shadow-md shadow-primary/20">
+                  <Wallet className="w-4.5 h-4.5 text-white" />
+                </div>
+                <span>كشف حساب: {selectedBranch?.name}</span>
+              </DialogTitle>
+            </DialogHeader>
+          </div>
 
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
           {/* Summary Cards */}
           {selectedAccount && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
@@ -778,6 +781,7 @@ export default function BranchAccountsPage() {
               </Table>
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

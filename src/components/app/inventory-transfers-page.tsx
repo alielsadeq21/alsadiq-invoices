@@ -36,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -1390,17 +1389,19 @@ export default function InventoryTransfersPage() {
 
       {/* ─── CREATE TRANSFER DIALOG ─────────────────────────────────────────── */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
-                <ArrowRightLeft className="w-4 h-4 text-white" />
-              </div>
-              تصبين جديد - تحويل مخزون
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                  <ArrowRightLeft className="w-4 h-4 text-white" />
+                </div>
+                تصبين جديد - تحويل مخزون
+              </DialogTitle>
+            </DialogHeader>
+          </div>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1565,40 +1566,44 @@ export default function InventoryTransfersPage() {
                 />
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
-          <DialogFooter className="pt-2 border-t">
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleCreateTransfer} disabled={creating} style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
-              {creating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري الإنشاء...
-                </>
-              ) : (
-                'إنشاء التصبين'
-              )}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleCreateTransfer} disabled={creating} style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري الإنشاء...
+                  </>
+                ) : (
+                  'إنشاء التصبين'
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* ─── DETAIL DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
-                <Eye className="w-4 h-4 text-white" />
-              </div>
-              تفاصيل التحويل
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                  <Eye className="w-4 h-4 text-white" />
+                </div>
+                تفاصيل التحويل
+              </DialogTitle>
+            </DialogHeader>
+          </div>
 
-          {detailTransfer ? (
-            <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
+            {detailTransfer ? (
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -1695,41 +1700,43 @@ export default function InventoryTransfersPage() {
                   <span>آخر تحديث: {formatDateTime(detailTransfer.updated_at)}</span>
                 </div>
               </div>
-            </ScrollArea>
-          ) : (
-            <div className="py-12 text-center text-muted-foreground">لا توجد بيانات</div>
-          )}
-
-          <DialogFooter className="pt-2 border-t gap-2">
-            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
-              إغلاق
-            </Button>
-            {detailTransfer?.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
-              <>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setDetailDialogOpen(false);
-                    if (detailTransfer) openCancelDialog(detailTransfer);
-                  }}
-                  className="gap-2"
-                >
-                  <XCircle className="w-4 h-4" />
-                  إلغاء التصبين
-                </Button>
-                <Button
-                  onClick={() => {
-                    setDetailDialogOpen(false);
-                    if (detailTransfer) openConfirmDialog(detailTransfer);
-                  }}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  تأكيد التصبين
-                </Button>
-              </>
+            ) : (
+              <div className="py-12 text-center text-muted-foreground">لا توجد بيانات</div>
             )}
-          </DialogFooter>
+          </div>
+
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+                إغلاق
+              </Button>
+              {detailTransfer?.status === 'pending' && hasPermission('inventory_transfers', 'edit') && (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setDetailDialogOpen(false);
+                      if (detailTransfer) openCancelDialog(detailTransfer);
+                    }}
+                    className="gap-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    إلغاء التصبين
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setDetailDialogOpen(false);
+                      if (detailTransfer) openConfirmDialog(detailTransfer);
+                    }}
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    تأكيد التصبين
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

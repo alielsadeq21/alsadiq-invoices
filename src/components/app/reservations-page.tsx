@@ -1073,16 +1073,18 @@ export default function ReservationsPage() {
 
       {/* Add/Edit Reservation Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
-                <CalendarHeart className="w-4 h-4 text-white" />
-              </div>
-              {editingReservation ? 'تعديل الحجز' : 'إضافة حجز جديد'}
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+                  <CalendarHeart className="w-4 h-4 text-white" />
+                </div>
+                {editingReservation ? 'تعديل الحجز' : 'إضافة حجز جديد'}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
             <div className="space-y-5 py-4 px-1">
               {/* Customer Section */}
               <div className="space-y-3">
@@ -1361,32 +1363,36 @@ export default function ReservationsPage() {
                 />
               </div>
             </div>
-          </ScrollArea>
-          <DialogFooter className="flex-row gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
-              إلغاء
-            </Button>
-            <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none gap-1" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editingReservation ? 'تحديث' : 'إضافة'}
-            </Button>
-          </DialogFooter>
+          </div>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter className="flex-row gap-2 sm:justify-end">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
+                إلغاء
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none gap-1" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editingReservation ? 'تحديث' : 'إضافة'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
-                <CalendarHeart className="w-4 h-4 text-white" />
-              </div>
-              تفاصيل الحجز
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+                  <CalendarHeart className="w-4 h-4 text-white" />
+                </div>
+                تفاصيل الحجز
+              </DialogTitle>
+            </DialogHeader>
+          </div>
           {detailReservation && (
-            <ScrollArea className="max-h-[calc(90vh-180px)]">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
               <div className="space-y-4 py-2 px-1">
                 {/* Status badge */}
                 <div className="flex items-center justify-between">
@@ -1530,7 +1536,7 @@ export default function ReservationsPage() {
                   </Button>
                 </div>
               </div>
-            </ScrollArea>
+          </div>
           )}
         </DialogContent>
       </Dialog>

@@ -885,16 +885,18 @@ export default function AccountingPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
-                <BookOpen className="w-4 h-4 text-white" />
-              </div>
-              {editingEntry ? 'تعديل القيد' : 'إنشاء قيد جديد'}
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                  <BookOpen className="w-4 h-4 text-white" />
+                </div>
+                {editingEntry ? 'تعديل القيد' : 'إنشاء قيد جديد'}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
             <div className="space-y-5 py-4">
               {/* Basic Info */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1053,31 +1055,35 @@ export default function AccountingPage() {
                 )}
               </div>
             </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
-              {editingEntry ? 'تحديث القيد' : 'حفظ القيد'}
-            </Button>
-          </DialogFooter>
+          </div>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+                {editingEntry ? 'تحديث القيد' : 'حفظ القيد'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* View Detail Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
-                <FileText className="w-4 h-4 text-white" />
-              </div>
-              تفاصيل القيد {viewEntry?.entry_number}
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+                  <FileText className="w-4 h-4 text-white" />
+                </div>
+                تفاصيل القيد {viewEntry?.entry_number}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
             {viewEntry && (
               <div className="space-y-5 py-4">
                 {/* Entry Info */}
@@ -1185,12 +1191,14 @@ export default function AccountingPage() {
                 </div>
               </div>
             )}
-          </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-              إغلاق
-            </Button>
-          </DialogFooter>
+          </div>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+                إغلاق
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

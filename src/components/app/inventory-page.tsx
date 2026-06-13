@@ -1046,14 +1046,16 @@ export default function InventoryPage() {
 
       {/* Stock Adjustment Dialog */}
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <SlidersHorizontal className="w-5 h-5" />
-              تسوية المخزون
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+        <DialogContent className="w-[95vw] sm:max-w-md max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <SlidersHorizontal className="w-5 h-5" />
+                تسوية المخزون
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4" style={{ minHeight: 0 }}>
             <div className="space-y-2">
               <Label>المنتج *</Label>
               <Select
@@ -1144,34 +1146,38 @@ export default function InventoryPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleAdjust} disabled={adjusting}>
-              {adjusting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري التنفيذ...
-                </>
-              ) : (
-                'تسوية'
-              )}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAdjustDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleAdjust} disabled={adjusting}>
+                {adjusting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري التنفيذ...
+                  </>
+                ) : (
+                  'تسوية'
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Stock Transfer Dialog */}
       <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ArrowLeftRight className="w-5 h-5" />
-              تحويل مخزون
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+        <DialogContent className="w-[95vw] sm:max-w-md max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ArrowLeftRight className="w-5 h-5" />
+                تحويل مخزون
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4" style={{ minHeight: 0 }}>
             <div className="space-y-2">
               <Label>المنتج *</Label>
               <Select
@@ -1252,34 +1258,38 @@ export default function InventoryPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleTransfer} disabled={transferring}>
-              {transferring ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري التنفيذ...
-                </>
-              ) : (
-                'تحويل'
-              )}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleTransfer} disabled={transferring}>
+                {transferring ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري التنفيذ...
+                  </>
+                ) : (
+                  'تحويل'
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Transaction History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5" />
-              سجل الحركات
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="w-5 h-5" />
+                سجل الحركات
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3" style={{ minHeight: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} className="p-3 bg-muted/50 rounded-lg">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
                 <Package className="w-5 h-5 text-white" />
@@ -1305,7 +1315,7 @@ export default function InventoryPage() {
                 <p className="text-muted-foreground text-sm">لا توجد حركات سابقة</p>
               </div>
             ) : (
-              <ScrollArea className="max-h-96">
+              <div className="space-y-2" style={{ maxHeight: '60vh' }}>
                 <div className="space-y-2">
                   {transactions.map((tx) => (
                     <div
@@ -1357,7 +1367,7 @@ export default function InventoryPage() {
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             )}
           </div>
         </DialogContent>

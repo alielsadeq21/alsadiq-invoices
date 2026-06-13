@@ -993,17 +993,18 @@ export default function InventoryCountsPage() {
 
       {/* ─── CREATE DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
-                <ClipboardCheck className="w-4 h-4 text-white" />
-              </div>
-              جرد جديد
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+                  <ClipboardCheck className="w-4 h-4 text-white" />
+                </div>
+                جرد جديد
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="branch">الفرع</Label>
@@ -1150,51 +1151,53 @@ export default function InventoryCountsPage() {
               </div>
             )}
           </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setCreateDialogOpen(false)}
-              disabled={creating}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleCreateCount}
-              disabled={creating || formItems.length === 0}
-              className="gap-2"
-              style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  جاري الإنشاء...
-                </>
-              ) : (
-                <>
-                  <ClipboardCheck className="w-4 h-4" />
-                  إنشاء الجرد
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+                disabled={creating}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleCreateCount}
+                disabled={creating || formItems.length === 0}
+                className="gap-2"
+                style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جاري الإنشاء...
+                  </>
+                ) : (
+                  <>
+                    <ClipboardCheck className="w-4 h-4" />
+                    إنشاء الجرد
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* ─── DETAIL DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
-                <Eye className="w-4 h-4 text-white" />
-              </div>
-              تفاصيل الجرد
-            </DialogTitle>
-          </DialogHeader>
-
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)' }}>
+                  <Eye className="w-4 h-4 text-white" />
+                </div>
+                تفاصيل الجرد
+              </DialogTitle>
+            </DialogHeader>
+          </div>
           {detailCount && (
-            <div className="space-y-4 py-2">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6" style={{ minHeight: 0 }}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">رقم الجرد</p>
@@ -1329,12 +1332,13 @@ export default function InventoryCountsPage() {
               </div>
             </div>
           )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
-              إغلاق
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+                إغلاق
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

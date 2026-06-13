@@ -716,16 +716,18 @@ export default function PaymentsPage() {
 
       {/* Create Payment Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                <Banknote className="w-4 h-4" />
-              </div>
-              تسجيل إيصال قبض
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                  <Banknote className="w-4 h-4" />
+                </div>
+                تسجيل إيصال قبض
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4" style={{ minHeight: 0 }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>رقم الإيصال</Label>
@@ -791,17 +793,19 @@ export default function PaymentsPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="text-white shadow-md transition-all duration-200 hover:shadow-lg hover:scale-[1.02]"
-              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-            >
-              {saving ? 'جاري الحفظ...' : 'حفظ الإيصال'}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="text-white shadow-md transition-all duration-200 hover:shadow-lg hover:scale-[1.02]"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              >
+                {saving ? 'جاري الحفظ...' : 'حفظ الإيصال'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

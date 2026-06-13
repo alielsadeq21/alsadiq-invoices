@@ -563,19 +563,21 @@ export default function BranchesPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-              >
-                {editingBranch ? <Edit className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
-              </div>
-              {editingBranch ? 'تعديل الفرع' : 'إضافة فرع جديد'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5 py-4">
+        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                >
+                  {editingBranch ? <Edit className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+                </div>
+                {editingBranch ? 'تعديل الفرع' : 'إضافة فرع جديد'}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-5" style={{ minHeight: 0 }}>
             {/* Basic Info Section */}
             <div>
               <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
@@ -721,18 +723,20 @@ export default function BranchesPage() {
               <Label htmlFor="branch-active">فرع نشط</Label>
             </div>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSave}
-              className="text-white font-medium"
-              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-            >
-              {editingBranch ? 'تحديث' : 'إضافة'}
-            </Button>
-          </DialogFooter>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleSave}
+                className="text-white font-medium"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              >
+                {editingBranch ? 'تحديث' : 'إضافة'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
