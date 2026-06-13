@@ -177,7 +177,7 @@ export default function PosPage() {
 
   // ─── Cart calculations ──────────────────────────────────────────────────
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.total_price, 0), [cart]);
-  const taxRate = 0;
+  const taxRate = useAppStore().settings?.default_tax_rate || 0;
   const taxAmount = useMemo(() => subtotal * (taxRate / 100), [subtotal, taxRate]);
   const total = useMemo(() => subtotal + taxAmount, [subtotal, taxAmount]);
   const cartItemCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
@@ -417,8 +417,9 @@ export default function PosPage() {
           driver_name: driverName || null,
           driver_phone: driverPhone || null,
           subtotal,
-          tax_rate: 0,
+          tax_rate: taxRate,
           tax_amount: taxAmount,
+          payment_method_id: paymentMethodId || null,
           total,
           notes: notes || null,
         })
@@ -504,6 +505,15 @@ export default function PosPage() {
           credit: subtotal,
           description: `نقطة بيع - فاتورة رقم ${invoiceNumber}`,
         });
+        // Tax credit line
+        if (taxAmount > 0) {
+          jeLines.push({
+            account_name: 'ضريبة القيمة المضافة',
+            debit: 0,
+            credit: taxAmount,
+            description: `نقطة بيع - ضريبة فاتورة رقم ${invoiceNumber}`,
+          });
+        }
 
         const { data: jeData } = await supabase
           .from('journal_entries')

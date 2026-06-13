@@ -465,7 +465,7 @@ export default function InvoiceFormPage() {
           await supabase.from('inventory_transactions').insert({
             product_id: productId,
             branch_id: branchId,
-            transaction_type: 'sale',
+            transaction_type: 'out',
             quantity: -totalPieces,
             reference_type: 'invoice',
             reference_id: id,
@@ -607,7 +607,7 @@ export default function InvoiceFormPage() {
           await supabase.from('inventory_transactions').insert({
             product_id: productId,
             branch_id: branchId,
-            transaction_type: 'sale',
+            transaction_type: 'out',
             quantity: -totalPieces,
             reference_type: 'invoice',
             reference_id: invData.id,
