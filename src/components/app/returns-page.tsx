@@ -795,7 +795,7 @@ export default function ReturnsPage() {
           </DialogHeader>
           <div className="space-y-4">
             {/* Info Cards */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div
                 className="p-3 rounded-xl"
                 style={{ background: 'rgba(244,63,94,0.05)', border: '1px solid rgba(244,63,94,0.1)' }}

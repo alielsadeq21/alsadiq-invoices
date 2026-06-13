@@ -252,8 +252,8 @@ export default function PosPage() {
         if (newQty <= 0) return item;
         // Check stock
         const totalPieces = newQty * item.unit_count;
-        if (totalPieces > item.available_qty && item.available_qty > 0) {
-          toast.error(`الكمية المتاحة هي ${item.available_qty} قطعة فقط`);
+        if (totalPieces > item.available_qty) {
+          toast.error(item.available_qty <= 0 ? 'هذا الصنف غير متوفر في المخزون' : `الكمية المتاحة هي ${item.available_qty} قطعة فقط`);
           return item;
         }
         return {
@@ -272,8 +272,8 @@ export default function PosPage() {
         if (item.product_id !== productId) return item;
         if (qty <= 0) return { ...item, quantity: 1, total_price: item.unit_price };
         const totalPieces = qty * item.unit_count;
-        if (totalPieces > item.available_qty && item.available_qty > 0) {
-          toast.error(`الكمية المتاحة هي ${item.available_qty} قطعة فقط`);
+        if (totalPieces > item.available_qty) {
+          toast.error(item.available_qty <= 0 ? 'هذا الصنف غير متوفر في المخزون' : `الكمية المتاحة هي ${item.available_qty} قطعة فقط`);
           return item;
         }
         return {

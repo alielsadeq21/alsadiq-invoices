@@ -35,8 +35,8 @@ export default function ForceChangePasswordDialog() {
       return;
     }
 
-    if (newPassword.length < 4) {
-      toast.error('كلمة المرور الجديدة يجب أن تكون 4 أحرف على الأقل');
+    if (newPassword.length < 8) {
+      toast.error('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل');
       return;
     }
 

@@ -398,11 +398,17 @@ export default function ReportsPage() {
         monthlyTrend.push({ month: monthLabel, revenue: rev, expenses: exp });
       }
 
-      // Customer debts: invoices with no payments
+      // Customer debts: invoices minus payments
       const { data: unpaidInvoices } = await supabase
         .from('invoices')
         .select('customer_id, total, customers(name)')
         .eq('status', 'active');
+
+      // Get payments for customers
+      const { data: customerPayments } = await supabase
+        .from('payments')
+        .select('customer_id, amount')
+        .not('customer_id', 'is', null);
 
       const custDebtMap: Record<string, { customer_name: string; total_unpaid: number; invoice_count: number }> = {};
       (unpaidInvoices || []).forEach((inv: any) => {
@@ -412,6 +418,14 @@ export default function ReportsPage() {
         custDebtMap[inv.customer_id].total_unpaid += Number(inv.total);
         custDebtMap[inv.customer_id].invoice_count += 1;
       });
+
+      // Subtract payments from customer debts
+      (customerPayments || []).forEach((pay: any) => {
+        if (pay.customer_id && custDebtMap[pay.customer_id]) {
+          custDebtMap[pay.customer_id].total_unpaid -= Number(pay.amount);
+        }
+      });
+
       const customerDebts = Object.values(custDebtMap)
         .filter((c) => c.total_unpaid > 0)
         .sort((a, b) => b.total_unpaid - a.total_unpaid);
@@ -742,7 +756,7 @@ export default function ReportsPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="sales" className="gap-1.5 text-xs sm:text-sm">
             <TrendingUp className="w-4 h-4" />
             <span className="hidden sm:inline">تقارير</span> المبيعات

@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate, numberToArabicWords } from './utils';
+import { escapeHtml, formatCurrency, formatDate, numberToArabicWords } from './utils';
 import type { Settings } from './types';
 
 /**
@@ -662,7 +662,7 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
   const commercialRegister = settings?.commercial_register || '';
 
   const logoSection = settings?.logo_url
-    ? `<img src="${settings.logo_url}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
+    ? `<img src="${escapeHtml(settings.logo_url)}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
     : `<span class="logo-text">ص</span>`;
 
   // Period label
@@ -686,7 +686,7 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
       return: 'مرتجع',
       payment: 'دفعة',
     };
-    return `<span class="type-badge ${type}">${labels[type] || notes}</span>`;
+    return `<span class="type-badge ${type}">${labels[type] || escapeHtml(notes)}</span>`;
   };
 
   // Transaction rows
@@ -694,7 +694,7 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
     ? rowsWithBalance.map((txn, index) => `
       <tr class="${index % 2 === 1 ? 'even-row' : ''}">
         <td class="col-type">${typeBadge(txn.type, txn.notes)}</td>
-        <td class="col-number">${txn.number}</td>
+        <td class="col-number">${escapeHtml(txn.number)}</td>
         <td class="col-date">${formatDate(txn.date)}</td>
         <td class="col-debit">${txn.debit > 0 ? formatCurrency(txn.debit) : '—'}</td>
         <td class="col-credit">${txn.credit > 0 ? formatCurrency(txn.credit) : '—'}</td>
@@ -720,7 +720,7 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>كشف حساب - ${branchName}</title>
+  <title>كشف حساب - ${escapeHtml(branchName)}</title>
   <style>${getStatementCSS()}</style>
 </head>
 <body>
@@ -731,15 +731,15 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
         ${logoSection}
       </div>
       <div class="stmt-header-info">
-        <h1>${factoryName}</h1>
+        <h1>${escapeHtml(factoryName)}</h1>
         <div class="contact-line">
-          ${factoryAddress ? `<span>${factoryAddress}</span>` : ''}
-          ${factoryPhone ? `<span>هاتف: ${factoryPhone}</span>` : ''}
-          ${factoryEmail ? `<span>${factoryEmail}</span>` : ''}
+          ${factoryAddress ? `<span>${escapeHtml(factoryAddress)}</span>` : ''}
+          ${factoryPhone ? `<span>هاتف: ${escapeHtml(factoryPhone)}</span>` : ''}
+          ${factoryEmail ? `<span>${escapeHtml(factoryEmail)}</span>` : ''}
         </div>
         <div class="contact-line">
-          ${taxNumber ? `<span>الرقم الضريبي: ${taxNumber}</span>` : ''}
-          ${commercialRegister ? `<span>السجل التجاري: ${commercialRegister}</span>` : ''}
+          ${taxNumber ? `<span>الرقم الضريبي: ${escapeHtml(taxNumber)}</span>` : ''}
+          ${commercialRegister ? `<span>السجل التجاري: ${escapeHtml(commercialRegister)}</span>` : ''}
         </div>
       </div>
       <div class="stmt-header-title">
@@ -756,15 +756,15 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
     <div class="stmt-branch-info">
       <div class="stmt-branch-cell">
         <div class="label">اسم الفرع</div>
-        <div class="value">${branchName}</div>
+        <div class="value">${escapeHtml(branchName)}</div>
       </div>
       <div class="stmt-branch-cell">
         <div class="label">العنوان</div>
-        <div class="value">${branchAddress || '—'}</div>
+        <div class="value">${escapeHtml(branchAddress) || '—'}</div>
       </div>
       <div class="stmt-branch-cell">
         <div class="label">الهاتف</div>
-        <div class="value">${branchPhone || '—'}</div>
+        <div class="value">${escapeHtml(branchPhone) || '—'}</div>
       </div>
     </div>
 
@@ -830,8 +830,8 @@ export function generateAccountStatementDocument(data: AccountStatementData): st
 
     <!-- FOOTER -->
     <div class="stmt-footer">
-      <p class="footer-text">هذا الكشف صادر من ${factoryName} ويعتبر مستند رسمي للمراجعة</p>
-      <p class="footer-brand">${factoryName} - نظام كشف الحسابات</p>
+      <p class="footer-text">هذا الكشف صادر من ${escapeHtml(factoryName)} ويعتبر مستند رسمي للمراجعة</p>
+      <p class="footer-brand">${escapeHtml(factoryName)} - نظام كشف الحسابات</p>
     </div>
   </div>
 </body>

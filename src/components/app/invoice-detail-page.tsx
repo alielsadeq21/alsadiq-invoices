@@ -33,7 +33,7 @@ import {
 import { toast } from 'sonner';
 
 export default function InvoiceDetailPage() {
-  const { navigateTo, pageParams, settings, hasPermission } = useAppStore();
+  const { navigateTo, pageParams, settings, hasPermission, user } = useAppStore();
   const invoiceId = pageParams.id;
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -251,6 +251,7 @@ export default function InvoiceDetailPage() {
     }
 
     try {
+      // 1. Update invoice status
       const { error } = await supabase
         .from('invoices')
         .update({
@@ -262,12 +263,129 @@ export default function InvoiceDetailPage() {
 
       if (error) throw error;
 
-      toast.success('تم إلغاء الفاتورة');
+      // 2. Restore inventory for each item
+      for (const item of items) {
+        const productId = (item as any).product_id;
+        if (!productId) continue;
+        const totalPieces = Number(item.quantity) * (Number(item.unit_count) || 1);
+
+        // Check if inventory record exists
+        const { data: invRecord } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('branch_id', invoice.branch_id)
+          .single();
+
+        if (invRecord) {
+          // Update existing inventory record (add back the quantity)
+          await supabase
+            .from('inventory')
+            .update({
+              quantity: invRecord.quantity + totalPieces,
+              last_updated: new Date().toISOString(),
+            })
+            .eq('id', invRecord.id);
+        } else {
+          // Create inventory record if it doesn't exist
+          await supabase.from('inventory').insert({
+            product_id: productId,
+            branch_id: invoice.branch_id,
+            quantity: totalPieces,
+            last_updated: new Date().toISOString(),
+          });
+        }
+
+        // Log inventory transaction (restoration)
+        await supabase.from('inventory_transactions').insert({
+          product_id: productId,
+          branch_id: invoice.branch_id,
+          transaction_type: 'adjust',
+          quantity: totalPieces,
+          reference_type: 'invoice_cancel',
+          reference_id: invoice.id,
+          notes: `إلغاء فاتورة: ${invoice.invoice_number}`,
+          created_by: user?.id || null,
+        });
+      }
+
+      // 3. Reverse accounting entries
+      const { data: existingEntries } = await supabase
+        .from('journal_entries')
+        .select('id, entry_number')
+        .eq('source_type', 'invoice')
+        .eq('source_id', invoice.id);
+
+      if (existingEntries && existingEntries.length > 0) {
+        for (const entry of existingEntries) {
+          // Get the original entry lines
+          const { data: originalLines } = await supabase
+            .from('journal_entry_lines')
+            .select('*')
+            .eq('journal_entry_id', entry.id);
+
+          if (originalLines && originalLines.length > 0) {
+            // Create a reversing entry
+            const year = new Date().getFullYear();
+            const { data: lastJe } = await supabase
+              .from('journal_entries')
+              .select('entry_number')
+              .like('entry_number', `JE-${year}-%`)
+              .order('entry_number', { ascending: false })
+              .limit(1);
+            let lastJeNum = 0;
+            if (lastJe && lastJe.length > 0) {
+              const parts = lastJe[0].entry_number.split('-');
+              lastJeNum = parseInt(parts[parts.length - 1]) || 0;
+            }
+            const jeNum = `JE-${year}-${(lastJeNum + 1).toString().padStart(4, '0')}`;
+
+            // Reverse: swap debit and credit
+            const reversingLines = originalLines.map(line => ({
+              account_name: line.account_name,
+              debit: line.credit,
+              credit: line.debit,
+              description: `عكس قيد - إلغاء فاتورة ${invoice.invoice_number}`,
+            }));
+
+            const totalDebit = reversingLines.reduce((s, l) => s + l.debit, 0);
+            const totalCredit = reversingLines.reduce((s, l) => s + l.credit, 0);
+
+            const { data: jeData } = await supabase
+              .from('journal_entries')
+              .insert({
+                entry_number: jeNum,
+                entry_date: new Date().toISOString().split('T')[0],
+                description: `قيد عكس تلقائي - إلغاء فاتورة رقم ${invoice.invoice_number}`,
+                total_debit: totalDebit,
+                total_credit: totalCredit,
+                is_posted: true,
+                source_type: 'invoice_cancel',
+                source_id: invoice.id,
+                created_by: user?.id || null,
+              })
+              .select('id')
+              .single();
+
+            if (jeData) {
+              await supabase.from('journal_entry_lines').insert(
+                reversingLines.map(line => ({
+                  ...line,
+                  journal_entry_id: jeData.id,
+                }))
+              );
+            }
+          }
+        }
+      }
+
+      toast.success('تم إلغاء الفاتورة واسترجاع المخزون وعكس القيود المحاسبية');
       setCancelDialogOpen(false);
       setCancelReason('');
       loadInvoice();
     } catch (err) {
-      toast.error('حدث خطأ');
+      console.error('Cancel invoice error:', err);
+      toast.error('حدث خطأ أثناء إلغاء الفاتورة');
     }
   };
 
@@ -413,7 +531,7 @@ export default function InvoiceDetailPage() {
           <div className="h-[3px] bg-gradient-to-l from-[#0D7C66] via-[#D4A843] to-[#0D7C66] mx-1 mt-4 rounded-full" />
 
           {/* === INVOICE INFO (NO STATUS - status only shown in UI, not on printed invoice) === */}
-          <div className="grid grid-cols-4 gap-0 border border-gray-200 rounded-lg overflow-hidden mx-1 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 border border-gray-200 rounded-lg overflow-hidden mx-1 mt-4">
             <div className="px-4 py-3 border-l border-gray-200">
               <div className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">الفرع</div>
               <div className="text-[13px] font-semibold text-gray-800">{branchName}</div>
@@ -538,7 +656,7 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* === SIGNATURES === */}
-          <div className="grid grid-cols-3 gap-4 mx-1 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mx-1 mt-6">
             <div className="border border-gray-300 rounded-lg p-3 text-center">
               <div className="text-[11px] font-bold text-[#0D7C66] mb-8">المحاسب</div>
               <div className="border-t border-dashed border-gray-400 pt-2">

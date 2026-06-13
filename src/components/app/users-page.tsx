@@ -199,8 +199,8 @@ export default function UsersPage() {
         toast.error('يرجى إدخال كلمة المرور');
         return;
       }
-      if (form.password.length < 4) {
-        toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+      if (form.password.length < 8) {
+        toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
         return;
       }
       if (form.password !== form.confirmPassword) {
@@ -332,8 +332,8 @@ export default function UsersPage() {
       toast.error('يرجى إدخال كلمة المرور الجديدة');
       return;
     }
-    if (resetForm.password.length < 4) {
-      toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+    if (resetForm.password.length < 8) {
+      toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
       return;
     }
     if (resetForm.password !== resetForm.confirmPassword) {

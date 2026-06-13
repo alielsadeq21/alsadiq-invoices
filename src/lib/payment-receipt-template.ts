@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate, numberToArabicWords } from './utils';
+import { escapeHtml, formatCurrency, formatDate, numberToArabicWords } from './utils';
 import type { Settings } from './types';
 
 /**
@@ -445,11 +445,11 @@ export function generatePaymentReceiptDocument(data: PaymentReceiptData): string
   const commercialRegister = settings?.commercial_register || '';
 
   const logoSection = settings?.logo_url
-    ? `<img src="${settings.logo_url}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
+    ? `<img src="${escapeHtml(settings.logo_url)}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
     : `<span class="logo-text">ص</span>`;
 
   const notesHtml = notes
-    ? `<div class="rcpt-notes"><span class="notes-label">ملاحظات: </span><span class="notes-text">${notes}</span></div>`
+    ? `<div class="rcpt-notes"><span class="notes-label">ملاحظات: </span><span class="notes-text">${escapeHtml(notes)}</span></div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -457,7 +457,7 @@ export function generatePaymentReceiptDocument(data: PaymentReceiptData): string
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إيصال قبض - ${paymentNumber}</title>
+  <title>إيصال قبض - ${escapeHtml(paymentNumber)}</title>
   <style>${getReceiptCSS()}</style>
 </head>
 <body>
@@ -468,20 +468,20 @@ export function generatePaymentReceiptDocument(data: PaymentReceiptData): string
         ${logoSection}
       </div>
       <div class="rcpt-header-info">
-        <h1>${factoryName}</h1>
+        <h1>${escapeHtml(factoryName)}</h1>
         <div class="contact-line">
-          ${factoryAddress ? `<span>${factoryAddress}</span>` : ''}
-          ${factoryPhone ? `<span>هاتف: ${factoryPhone}</span>` : ''}
-          ${factoryEmail ? `<span>${factoryEmail}</span>` : ''}
+          ${factoryAddress ? `<span>${escapeHtml(factoryAddress)}</span>` : ''}
+          ${factoryPhone ? `<span>هاتف: ${escapeHtml(factoryPhone)}</span>` : ''}
+          ${factoryEmail ? `<span>${escapeHtml(factoryEmail)}</span>` : ''}
         </div>
         <div class="contact-line">
-          ${taxNumber ? `<span>الرقم الضريبي: ${taxNumber}</span>` : ''}
-          ${commercialRegister ? `<span>السجل التجاري: ${commercialRegister}</span>` : ''}
+          ${taxNumber ? `<span>الرقم الضريبي: ${escapeHtml(taxNumber)}</span>` : ''}
+          ${commercialRegister ? `<span>السجل التجاري: ${escapeHtml(commercialRegister)}</span>` : ''}
         </div>
       </div>
       <div class="rcpt-header-title">
         <h2>إيصال قبض</h2>
-        <span class="rcpt-num">${paymentNumber}</span>
+        <span class="rcpt-num">${escapeHtml(paymentNumber)}</span>
         <span class="rcpt-date">${formatDate(paymentDate)}</span>
       </div>
     </div>
@@ -493,11 +493,11 @@ export function generatePaymentReceiptDocument(data: PaymentReceiptData): string
     <div class="rcpt-info-grid">
       <div class="rcpt-info-cell">
         <div class="label">الفرع</div>
-        <div class="value">${branchName}</div>
+        <div class="value">${escapeHtml(branchName)}</div>
       </div>
       <div class="rcpt-info-cell">
         <div class="label">طريقة الدفع</div>
-        <div class="value">${getPaymentMethodLabel(paymentMethod)}</div>
+        <div class="value">${escapeHtml(getPaymentMethodLabel(paymentMethod))}</div>
       </div>
       <div class="rcpt-info-cell">
         <div class="label">تاريخ الاستلام</div>
@@ -509,7 +509,7 @@ export function generatePaymentReceiptDocument(data: PaymentReceiptData): string
     <div class="rcpt-amount-box">
       <div class="amount-label">المبلغ المستلم</div>
       <div class="amount-value">${formatCurrency(amount)}</div>
-      <div class="amount-method">طريقة الدفع: ${getPaymentMethodLabel(paymentMethod)}</div>
+      <div class="amount-method">طريقة الدفع: ${escapeHtml(getPaymentMethodLabel(paymentMethod))}</div>
     </div>
 
     <!-- AMOUNT IN WORDS -->
@@ -539,8 +539,8 @@ export function generatePaymentReceiptDocument(data: PaymentReceiptData): string
 
     <!-- FOOTER -->
     <div class="rcpt-footer">
-      <p class="footer-text">هذا الإيصال صادر من ${factoryName} ويعتبر مستند رسمي</p>
-      <p class="footer-brand">${factoryName} - نظام إيصالات القبض</p>
+      <p class="footer-text">هذا الإيصال صادر من ${escapeHtml(factoryName)} ويعتبر مستند رسمي</p>
+      <p class="footer-brand">${escapeHtml(factoryName)} - نظام إيصالات القبض</p>
     </div>
   </div>
 </body>
@@ -565,7 +565,7 @@ export function generateThermalPaymentReceiptDocument(data: PaymentReceiptData):
   const factoryPhone = settings?.phone || '';
 
   const logoSection = settings?.logo_url
-    ? `<img src="${settings.logo_url}" alt="شعار" style="width:32px;height:32px;object-fit:contain;vertical-align:middle;" />`
+    ? `<img src="${escapeHtml(settings.logo_url)}" alt="شعار" style="width:32px;height:32px;object-fit:contain;vertical-align:middle;" />`
     : `<span style="font-size:28px;font-weight:800;color:#D4A843;line-height:1;">ص</span>`;
 
   return `<!DOCTYPE html>
@@ -573,7 +573,7 @@ export function generateThermalPaymentReceiptDocument(data: PaymentReceiptData):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إيصال قبض - ${paymentNumber}</title>
+  <title>إيصال قبض - ${escapeHtml(paymentNumber)}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
 
@@ -694,8 +694,8 @@ export function generateThermalPaymentReceiptDocument(data: PaymentReceiptData):
     <!-- Brand Bar -->
     <div class="r-brand-bar">
       <div>${logoSection}</div>
-      <div class="r-brand-name">${factoryName}</div>
-      ${factoryPhone ? `<div class="r-brand-info">هاتف: ${factoryPhone}</div>` : ''}
+      <div class="r-brand-name">${escapeHtml(factoryName)}</div>
+      ${factoryPhone ? `<div class="r-brand-info">هاتف: ${escapeHtml(factoryPhone)}</div>` : ''}
     </div>
 
     <!-- Title -->
@@ -707,10 +707,10 @@ export function generateThermalPaymentReceiptDocument(data: PaymentReceiptData):
 
     <!-- Info -->
     <table class="r-info-table">
-      <tr><td class="r-info-label">رقم الإيصال</td><td class="r-info-value">${paymentNumber}</td></tr>
+      <tr><td class="r-info-label">رقم الإيصال</td><td class="r-info-value">${escapeHtml(paymentNumber)}</td></tr>
       <tr><td class="r-info-label">التاريخ</td><td class="r-info-value">${formatDate(paymentDate)}</td></tr>
-      <tr><td class="r-info-label">الفرع</td><td class="r-info-value">${branchName}</td></tr>
-      <tr><td class="r-info-label">طريقة الدفع</td><td class="r-info-value">${getPaymentMethodLabel(paymentMethod)}</td></tr>
+      <tr><td class="r-info-label">الفرع</td><td class="r-info-value">${escapeHtml(branchName)}</td></tr>
+      <tr><td class="r-info-label">طريقة الدفع</td><td class="r-info-value">${escapeHtml(getPaymentMethodLabel(paymentMethod))}</td></tr>
     </table>
 
     <hr class="r-sep-dashed" />
@@ -726,7 +726,7 @@ export function generateThermalPaymentReceiptDocument(data: PaymentReceiptData):
       المبلغ: ${numberToArabicWords(amount)}
     </div>
 
-    ${notes ? `<div class="r-notes"><strong>ملاحظات:</strong> ${notes}</div>` : ''}
+    ${notes ? `<div class="r-notes"><strong>ملاحظات:</strong> ${escapeHtml(notes)}</div>` : ''}
 
     <hr class="r-sep-dashed" />
 
@@ -745,7 +745,7 @@ export function generateThermalPaymentReceiptDocument(data: PaymentReceiptData):
     <!-- Footer -->
     <div class="r-footer">
       <div class="r-footer-msg">شكراً لتعاملكم معنا</div>
-      <div class="r-footer-brand">${factoryName} - إيصالات القبض</div>
+      <div class="r-footer-brand">${escapeHtml(factoryName)} - إيصالات القبض</div>
     </div>
 
     <div class="r-bottom-bar"></div>

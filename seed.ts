@@ -2,11 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 
-// Password hashing using SHA-256 with salt (same as auth.ts)
-const SALT = 'alsadeq-invoice-system-2026';
+// Password hashing using SHA-256 with salt (same legacy salt as auth.ts)
+// New passwords will be auto-upgraded to per-user random salt on first login
+const LEGACY_SALT = 'alsadeq-system-2026';
 
 function hashPasswordSync(password: string): string {
-  return createHash('sha256').update(password + SALT).digest('hex');
+  return createHash('sha256').update(password + LEGACY_SALT).digest('hex');
 }
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

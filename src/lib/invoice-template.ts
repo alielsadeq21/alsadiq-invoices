@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate, numberToArabicWords } from './utils';
+import { formatCurrency, formatDate, numberToArabicWords, escapeHtml } from './utils';
 import type { Invoice, InvoiceItem, Settings, Branch } from './types';
 
 /**
@@ -763,7 +763,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
   const showUnitCount = hasUnitCount(items);
 
   const logoSection = logoUrl
-    ? `<img src="${logoUrl}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
+    ? `<img src="${escapeHtml(logoUrl)}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
     : `<span class="logo-text">ص</span>`;
 
   const isCancelled = invoice.status === 'cancelled';
@@ -772,11 +772,11 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
     : '';
 
   const notesHtml = invoice.notes
-    ? `<div class="inv-notes"><span class="notes-label">ملاحظات: </span><span class="notes-text">${invoice.notes}</span></div>`
+    ? `<div class="inv-notes"><span class="notes-label">ملاحظات: </span><span class="notes-text">${escapeHtml(invoice.notes)}</span></div>`
     : '';
 
   const cancelHtml = invoice.cancel_reason
-    ? `<div class="inv-cancel"><span class="cancel-label">سبب الإلغاء: </span><span class="cancel-text">${invoice.cancel_reason}</span></div>`
+    ? `<div class="inv-cancel"><span class="cancel-label">سبب الإلغاء: </span><span class="cancel-text">${escapeHtml(invoice.cancel_reason)}</span></div>`
     : '';
 
   const taxRow = invoice.tax_rate > 0
@@ -792,7 +792,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
     return `
       <tr class="${index % 2 === 1 ? 'even-row' : ''}">
         <td class="col-num">${index + 1}</td>
-        <td class="col-name">${item.item_name}</td>
+        <td class="col-name">${escapeHtml(item.item_name)}</td>
         <td class="col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
         <td class="col-unit-count">${unitCount > 1 ? unitCount.toLocaleString('ar-EG') : '—'}</td>
         <td class="col-total-pieces">${unitCount > 1 ? itemTotalPieces.toLocaleString('ar-EG') : '—'}</td>
@@ -803,20 +803,20 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
 
   // Build branch info bar (shows branch-specific contact details)
   const branchBarParts: string[] = [];
-  if (factoryAddress) branchBarParts.push(factoryAddress);
-  if (factoryPhone) branchBarParts.push(`هاتف: ${factoryPhone}`);
-  if (factoryEmail) branchBarParts.push(factoryEmail);
+  if (factoryAddress) branchBarParts.push(escapeHtml(factoryAddress));
+  if (factoryPhone) branchBarParts.push(`هاتف: ${escapeHtml(factoryPhone)}`);
+  if (factoryEmail) branchBarParts.push(escapeHtml(factoryEmail));
   const branchBarHtml = branchBarParts.length > 0
     ? `<div class="inv-branch-bar">
-        <span class="branch-label">فرع ${branchName}</span>
+        <span class="branch-label">فرع ${escapeHtml(branchName)}</span>
         ${branchBarParts.map(p => `<span class="branch-sep">|</span><span>${p}</span>`).join('')}
       </div>`
     : '';
 
   // Registration info line at the bottom
   const regInfoParts: string[] = [];
-  if (taxNumber) regInfoParts.push(`الرقم الضريبي: ${taxNumber}`);
-  if (commercialRegister) regInfoParts.push(`السجل التجاري: ${commercialRegister}`);
+  if (taxNumber) regInfoParts.push(`الرقم الضريبي: ${escapeHtml(taxNumber)}`);
+  if (commercialRegister) regInfoParts.push(`السجل التجاري: ${escapeHtml(commercialRegister)}`);
   const regInfoHtml = regInfoParts.length > 0
     ? `<div class="inv-reg-info">${regInfoParts.map(p => `<span>${p}</span>`).join('')}</div>`
     : '';
@@ -826,7 +826,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>فاتورة مبيعات - ${invoice.invoice_number}</title>
+  <title>فاتورة مبيعات - ${escapeHtml(invoice.invoice_number)}</title>
   <style>${getInvoiceCSS(showUnitCount)}</style>
 </head>
 <body>
@@ -838,20 +838,20 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
         ${logoSection}
       </div>
       <div class="inv-header-info">
-        <h1>${factoryName}</h1>
+        <h1>${escapeHtml(factoryName)}</h1>
         <div class="contact-line">
-          ${factoryAddress ? `<span>${factoryAddress}</span>` : ''}
-          ${factoryPhone ? `<span>هاتف: ${factoryPhone}</span>` : ''}
-          ${factoryEmail ? `<span>${factoryEmail}</span>` : ''}
+          ${factoryAddress ? `<span>${escapeHtml(factoryAddress)}</span>` : ''}
+          ${factoryPhone ? `<span>هاتف: ${escapeHtml(factoryPhone)}</span>` : ''}
+          ${factoryEmail ? `<span>${escapeHtml(factoryEmail)}</span>` : ''}
         </div>
         <div class="contact-line">
-          ${taxNumber ? `<span>الرقم الضريبي: ${taxNumber}</span>` : ''}
-          ${commercialRegister ? `<span>السجل التجاري: ${commercialRegister}</span>` : ''}
+          ${taxNumber ? `<span>الرقم الضريبي: ${escapeHtml(taxNumber)}</span>` : ''}
+          ${commercialRegister ? `<span>السجل التجاري: ${escapeHtml(commercialRegister)}</span>` : ''}
         </div>
       </div>
       <div class="inv-header-title">
         <h2>فاتورة مبيعات</h2>
-        <span class="inv-num">${invoice.invoice_number}</span>
+        <span class="inv-num">${escapeHtml(invoice.invoice_number)}</span>
         <span class="inv-date">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</span>
       </div>
     </div>
@@ -866,19 +866,19 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
     <div class="inv-info-grid" style="grid-template-columns: repeat(4, 1fr);">
       <div class="inv-info-cell">
         <div class="label">الفرع</div>
-        <div class="value">${branchName}</div>
+        <div class="value">${escapeHtml(branchName)}</div>
       </div>
       <div class="inv-info-cell">
         <div class="label">العميل</div>
-        <div class="value">${customerName || '—'}</div>
+        <div class="value">${escapeHtml(customerName) || '—'}</div>
       </div>
       <div class="inv-info-cell">
         <div class="label">المستلم</div>
-        <div class="value">${invoice.receiver_name || '—'}</div>
+        <div class="value">${escapeHtml(invoice.receiver_name) || '—'}</div>
       </div>
       <div class="inv-info-cell">
         <div class="label">السائق</div>
-        <div class="value">${invoice.driver_name || '—'}${invoice.driver_phone ? ` <span style="color:#999;font-size:11px;">(${invoice.driver_phone})</span>` : ''}</div>
+        <div class="value">${escapeHtml(invoice.driver_name) || '—'}${invoice.driver_phone ? ` <span style="color:#999;font-size:11px;">(${escapeHtml(invoice.driver_phone)})</span>` : ''}</div>
       </div>
     </div>
 
@@ -937,22 +937,22 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
     <div class="inv-signatures">
       <div class="sig-box">
         <div class="sig-label">المحاسب</div>
-        <div class="sig-line">${userFullName}</div>
+        <div class="sig-line">${escapeHtml(userFullName)}</div>
       </div>
       <div class="sig-box">
         <div class="sig-label">المستلم</div>
-        <div class="sig-line">${invoice.receiver_name || ''}</div>
+        <div class="sig-line">${escapeHtml(invoice.receiver_name) || ''}</div>
       </div>
       <div class="sig-box">
         <div class="sig-label">السائق</div>
-        <div class="sig-line">${invoice.driver_name || ''}</div>
+        <div class="sig-line">${escapeHtml(invoice.driver_name) || ''}</div>
       </div>
     </div>` : ''}
 
     <!-- FOOTER -->
     <div class="inv-footer">
-      <p class="footer-text">${invoiceFooter}</p>
-      <p class="footer-brand">${factoryName} - نظام علي الصادق</p>
+      <p class="footer-text">${escapeHtml(invoiceFooter)}</p>
+      <p class="footer-brand">${escapeHtml(factoryName)} - نظام علي الصادق</p>
       ${regInfoHtml}
     </div>
   </div>
@@ -1001,7 +1001,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
   const showUnitCount = hasUnitCount(items);
 
   const logoSection = logoUrl
-    ? `<img src="${logoUrl}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
+    ? `<img src="${escapeHtml(logoUrl)}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
     : `<span class="r-logo-text">ص</span>`;
 
   const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
@@ -1015,7 +1015,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     return `
       <tr class="${index % 2 === 1 ? 'r-row-alt' : ''}">
         <td class="r-col-num">${index + 1}</td>
-        <td class="r-col-name">${item.item_name}</td>
+        <td class="r-col-name">${escapeHtml(item.item_name)}</td>
         <td class="r-col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
         ${hasUnitInfo ? `<td class="r-col-uc">${unitCount}</td>` : ''}
         <td class="r-col-price">${formatCurrency(Number(item.unit_price))}</td>
@@ -1035,27 +1035,27 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
 
   // Notes
   const notesHtml = invoice.notes
-    ? `<div class="r-notes"><strong>ملاحظات:</strong> ${invoice.notes}</div>`
+    ? `<div class="r-notes"><strong>ملاحظات:</strong> ${escapeHtml(invoice.notes)}</div>`
     : '';
 
   // Cancel reason
   const cancelHtml = invoice.cancel_reason
-    ? `<div class="r-cancel"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>`
+    ? `<div class="r-cancel"><strong>سبب الإلغاء:</strong> ${escapeHtml(invoice.cancel_reason)}</div>`
     : '';
 
   // Build branch info lines for thermal receipt
   const branchInfoLines: string[] = [];
-  if (factoryAddress) branchInfoLines.push(factoryAddress);
-  if (factoryPhone) branchInfoLines.push(`هاتف: ${factoryPhone}`);
-  if (factoryEmail) branchInfoLines.push(factoryEmail);
+  if (factoryAddress) branchInfoLines.push(escapeHtml(factoryAddress));
+  if (factoryPhone) branchInfoLines.push(`هاتف: ${escapeHtml(factoryPhone)}`);
+  if (factoryEmail) branchInfoLines.push(escapeHtml(factoryEmail));
   const branchInfoHtml = branchInfoLines.length > 0
     ? `<div class="r-brand-info">${branchInfoLines.join(' &bull; ')}</div>`
     : '';
 
   // Tax/registration info line
   const regInfoParts: string[] = [];
-  if (taxNumber) regInfoParts.push(`ض: ${taxNumber}`);
-  if (commercialRegister) regInfoParts.push(`سجل: ${commercialRegister}`);
+  if (taxNumber) regInfoParts.push(`ض: ${escapeHtml(taxNumber)}`);
+  if (commercialRegister) regInfoParts.push(`سجل: ${escapeHtml(commercialRegister)}`);
   const regInfoHtml = regInfoParts.length > 0
     ? `<div class="r-brand-info">${regInfoParts.join(' &bull; ')}</div>`
     : '';
@@ -1065,7 +1065,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>فاتورة حرارية - ${invoice.invoice_number}</title>
+  <title>فاتورة حرارية - ${escapeHtml(invoice.invoice_number)}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
 
@@ -1695,13 +1695,13 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     <!-- ===== TOP BRAND BAR ===== -->
     <div class="r-brand-bar">
       <div class="r-brand-logo">${logoSection}</div>
-      <div class="r-brand-name">${factoryName}</div>
+      <div class="r-brand-name">${escapeHtml(factoryName)}</div>
       ${branchInfoHtml}
       ${regInfoHtml}
     </div>
 
     <!-- ===== BRANCH NAME BADGE ===== -->
-    <div class="r-branch-badge">فرع ${branchName}</div>
+    <div class="r-branch-badge">فرع ${escapeHtml(branchName)}</div>
 
     <!-- ===== INVOICE TITLE BOX ===== -->
     <div class="r-title-box">
@@ -1714,7 +1714,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
     <table class="r-info-table">
       <tr>
         <td class="r-info-label">رقم الفاتورة</td>
-        <td class="r-info-value">${invoice.invoice_number}</td>
+        <td class="r-info-value">${escapeHtml(invoice.invoice_number)}</td>
       </tr>
       <tr>
         <td class="r-info-label">التاريخ</td>
@@ -1722,11 +1722,11 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       </tr>
       <tr>
         <td class="r-info-label">الفرع</td>
-        <td class="r-info-value">${branchName}</td>
+        <td class="r-info-value">${escapeHtml(branchName)}</td>
       </tr>
-      ${customerName ? `<tr><td class="r-info-label">العميل</td><td class="r-info-value">${customerName}</td></tr>` : ''}
-      ${invoice.receiver_name ? `<tr><td class="r-info-label">المستلم</td><td class="r-info-value">${invoice.receiver_name}</td></tr>` : ''}
-      ${invoice.driver_name ? `<tr><td class="r-info-label">السائق</td><td class="r-info-value">${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</td></tr>` : ''}
+      ${customerName ? `<tr><td class="r-info-label">العميل</td><td class="r-info-value">${escapeHtml(customerName)}</td></tr>` : ''}
+      ${invoice.receiver_name ? `<tr><td class="r-info-label">المستلم</td><td class="r-info-value">${escapeHtml(invoice.receiver_name)}</td></tr>` : ''}
+      ${invoice.driver_name ? `<tr><td class="r-info-label">السائق</td><td class="r-info-value">${escapeHtml(invoice.driver_name)}${invoice.driver_phone ? ` (${escapeHtml(invoice.driver_phone)})` : ''}</td></tr>` : ''}
     </table>
 
     <hr class="r-sep-double">
@@ -1790,17 +1790,17 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
       <div class="r-sig">
         <div class="r-sig-label">المحاسب</div>
         <div class="r-sig-line"></div>
-        <div class="r-sig-name">${userFullName}</div>
+        <div class="r-sig-name">${escapeHtml(userFullName)}</div>
       </div>
       <div class="r-sig">
         <div class="r-sig-label">المستلم</div>
         <div class="r-sig-line"></div>
-        <div class="r-sig-name">${invoice.receiver_name || ''}</div>
+        <div class="r-sig-name">${escapeHtml(invoice.receiver_name) || ''}</div>
       </div>
       <div class="r-sig">
         <div class="r-sig-label">السائق</div>
         <div class="r-sig-line"></div>
-        <div class="r-sig-name">${invoice.driver_name || ''}</div>
+        <div class="r-sig-name">${escapeHtml(invoice.driver_name) || ''}</div>
       </div>
     </div>
 
@@ -1808,8 +1808,8 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
 
     <!-- ===== FOOTER ===== -->
     <div class="r-footer">
-      <p class="r-footer-msg">${invoiceFooter}</p>
-      <p class="r-footer-brand">${factoryName} - نظام علي الصادق</p>
+      <p class="r-footer-msg">${escapeHtml(invoiceFooter)}</p>
+      <p class="r-footer-brand">${escapeHtml(factoryName)} - نظام علي الصادق</p>
     </div>
 
     <!-- ===== BOTTOM BRAND BAR ===== -->

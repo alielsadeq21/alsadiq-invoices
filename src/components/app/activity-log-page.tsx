@@ -94,7 +94,8 @@ export default function ActivityLogPage() {
           });
         }
         setLogs(filteredData);
-        setTotalCount(!isAdmin && user?.branch_id ? filteredData.length : (count || 0));
+        // Use server count for accurate pagination (approximate for non-admin, exact for admin)
+        setTotalCount(count || 0);
       }
     } catch (err) {
       console.error(err);

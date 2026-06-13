@@ -961,7 +961,7 @@ export default function AccountingReportsPage() {
             </Card>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -1257,7 +1257,7 @@ export default function AccountingReportsPage() {
                 ? ledgerLines[ledgerLines.length - 1].running_balance
                 : 0;
               return (
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <Card className="border-0 shadow-md col-span-2 lg:col-span-1">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">

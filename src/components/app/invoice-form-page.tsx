@@ -43,6 +43,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function InvoiceFormPage() {
   const { navigateTo, pageParams, settings, user, isAdmin } = useAppStore();
@@ -76,6 +86,7 @@ export default function InvoiceFormPage() {
   const [applyTax, setApplyTax] = useState(false);
   const [taxRate, setTaxRate] = useState(settings?.default_tax_rate || 0);
   const [notes, setNotes] = useState('');
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   // Track if form has been modified for beforeunload warning
   const [hasChanges, setHasChanges] = useState(false);
@@ -763,10 +774,10 @@ export default function InvoiceFormPage() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => {
             if (hasChanges) {
-              const confirmed = window.confirm('لديك تغييرات غير محفوظة. هل تريد المغادرة؟');
-              if (!confirmed) return;
+              setShowDiscardDialog(true);
+            } else {
+              navigateTo('invoices');
             }
-            navigateTo('invoices');
           }}>
             <ArrowRight className="w-5 h-5" />
           </Button>
@@ -1272,6 +1283,24 @@ export default function InvoiceFormPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Discard Changes Dialog */}
+      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تغييرات غير محفوظة</AlertDialogTitle>
+            <AlertDialogDescription>
+              لديك تغييرات غير محفوظة. هل تريد المغادرة بدون حفظ؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>البقاء</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowDiscardDialog(false); navigateTo('invoices'); }}>
+              مغادرة بدون حفظ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

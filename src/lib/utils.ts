@@ -2,6 +2,20 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { clsx } from 'clsx';
 
+/**
+ * Escape HTML special characters to prevent XSS attacks.
+ * Must be used for all user-controlled data injected into HTML templates.
+ */
+export function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 export function formatCurrency(amount: number): string {
   return amount.toLocaleString('ar-EG', {
     minimumFractionDigits: 2,

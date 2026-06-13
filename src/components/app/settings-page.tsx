@@ -61,8 +61,8 @@ export default function SettingsPage() {
         email: settings.email || '',
         default_tax_rate: settings.default_tax_rate || 0,
         invoice_footer: settings.invoice_footer || '',
-        bw_print: (settings as any).bw_print || false,
-        idle_timeout_minutes: (settings as any).idle_timeout_minutes || 0,
+        bw_print: settings.bw_print || false,
+        idle_timeout_minutes: settings.idle_timeout_minutes || 0,
       });
       if (settings.logo_url) {
         setLogoPreview(settings.logo_url);
@@ -89,7 +89,7 @@ export default function SettingsPage() {
         invoice_footer: form.invoice_footer || null,
         bw_print: form.bw_print,
         idle_timeout_minutes: form.idle_timeout_minutes,
-      } as any);
+      });
       toast.success('تم حفظ الإعدادات بنجاح');
     } catch (err) {
       toast.error('حدث خطأ أثناء الحفظ');
@@ -144,8 +144,8 @@ export default function SettingsPage() {
       return;
     }
 
-    if (passwordForm.new_password.length < 4) {
-      toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+    if (passwordForm.new_password.length < 8) {
+      toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
       return;
     }
 

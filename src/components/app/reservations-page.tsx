@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { escapeHtml } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -617,14 +618,14 @@ export default function ReservationsPage() {
       </head>
       <body>
         <div class="header">
-          <h1>${factoryName}</h1>
-          ${factoryAddress ? `<p>${factoryAddress}</p>` : ''}
-          ${factoryPhone ? `<p>هاتف: ${factoryPhone}</p>` : ''}
+          <h1>${escapeHtml(factoryName)}</h1>
+          ${factoryAddress ? `<p>${escapeHtml(factoryAddress)}</p>` : ''}
+          ${factoryPhone ? `<p>هاتف: ${escapeHtml(factoryPhone)}</p>` : ''}
         </div>
         <div class="info">
           <div class="info-row"><span class="label">رقم الحجز:</span><span>${reservation.reservation_number}</span></div>
-          <div class="info-row"><span class="label">العميل:</span><span>${reservation.customer_name}</span></div>
-          ${reservation.customer_phone ? `<div class="info-row"><span class="label">الهاتف:</span><span>${reservation.customer_phone}</span></div>` : ''}
+          <div class="info-row"><span class="label">العميل:</span><span>${escapeHtml(reservation.customer_name)}</span></div>
+          ${reservation.customer_phone ? `<div class="info-row"><span class="label">الهاتف:</span><span>${escapeHtml(reservation.customer_phone)}</span></div>` : ''}
           <div class="info-row"><span class="label">المناسبة:</span><span>${eventTypeLabel}</span></div>
           <div class="info-row"><span class="label">التاريخ:</span><span>${reservation.event_date}</span></div>
           ${reservation.event_time ? `<div class="info-row"><span class="label">الوقت:</span><span>${reservation.event_time}</span></div>` : ''}
@@ -634,7 +635,7 @@ export default function ReservationsPage() {
           <table>
             <thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
             <tbody>
-              ${reservation.items.map(item => `<tr><td>${item.item_name}</td><td>${item.quantity}</td><td>${item.unit_price.toFixed(2)}</td><td>${item.total_price.toFixed(2)}</td></tr>`).join('')}
+              ${reservation.items.map(item => `<tr><td>${escapeHtml(item.item_name)}</td><td>${item.quantity}</td><td>${item.unit_price.toFixed(2)}</td><td>${item.total_price.toFixed(2)}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -646,7 +647,7 @@ export default function ReservationsPage() {
           <div class="total-row grand"><span>المتبقي:</span><span>${reservation.remaining_amount.toFixed(2)} ج.م</span></div>
           ` : `<div class="total-row grand"><span>الإجمالي:</span><span>${reservation.total_amount.toFixed(2)} ج.م</span></div>`}
         </div>
-        ${reservation.notes ? `<div style="margin-bottom:10px;padding:6px;background:#f9f9f9;border-radius:4px;font-size:11px;"><strong>ملاحظات:</strong> ${reservation.notes}</div>` : ''}
+        ${reservation.notes ? `<div style="margin-bottom:10px;padding:6px;background:#f9f9f9;border-radius:4px;font-size:11px;"><strong>ملاحظات:</strong> ${escapeHtml(reservation.notes)}</div>` : ''}
         <div class="footer">
           <p>تم إنشاء الحجز: ${new Date(reservation.created_at).toLocaleDateString('ar-EG')}</p>
           <p>شكراً لثقتكم بنا</p>
