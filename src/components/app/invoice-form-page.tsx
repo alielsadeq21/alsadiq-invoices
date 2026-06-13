@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { supabase } from '@/lib/supabase';
-import type { Branch, Customer, Invoice, InvoiceItem, InvoiceFormItem, Product } from '@/lib/types';
+import type { Branch, Customer, Invoice, InvoiceItem, InvoiceFormItem, PaymentMethod, Product } from '@/lib/types';
 import { formatCurrency, generateInvoiceNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,7 @@ export default function InvoiceFormPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
@@ -66,6 +67,7 @@ export default function InvoiceFormPage() {
   const [receiverName, setReceiverName] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState<string>('');
   const [items, setItems] = useState<InvoiceFormItem[]>([
     { item_name: '', quantity: 1, unit_count: 1, unit_price: 0, total_price: 0 },
   ]);
@@ -94,6 +96,7 @@ export default function InvoiceFormPage() {
   const setReceiverNameChanged = (v: string) => { setReceiverName(v); markChanged(); };
   const setDriverNameChanged = (v: string) => { setDriverName(v); markChanged(); };
   const setDriverPhoneChanged = (v: string) => { setDriverPhone(v); markChanged(); };
+  const setPaymentMethodIdChanged = (v: string) => { setPaymentMethodId(v); markChanged(); };
   const setNotesChanged = (v: string) => { setNotes(v); markChanged(); };
 
   // beforeunload warning
@@ -112,6 +115,7 @@ export default function InvoiceFormPage() {
     loadBranches();
     loadCustomers();
     loadProducts();
+    loadPaymentMethods();
     // Auto-select branch for non-admin users
     if (!isAdmin && user?.branch_id) {
       setBranchId(user.branch_id);
@@ -160,6 +164,14 @@ export default function InvoiceFormPage() {
       .eq('is_active', true)
       .order('name');
     if (data) setCustomers(data as Customer[]);
+  };
+
+  const loadPaymentMethods = async () => {
+    const { data } = await supabase
+      .from('payment_methods')
+      .select('*')
+      .order('sort_order');
+    if (data) setPaymentMethods(data as PaymentMethod[]);
   };
 
   const generateNewInvoiceNumber = async () => {
@@ -212,6 +224,7 @@ export default function InvoiceFormPage() {
       setReceiverName(invoice.receiver_name || '');
       setDriverName(invoice.driver_name || '');
       setDriverPhone(invoice.driver_phone || '');
+      setPaymentMethodId((invoice as any).payment_method_id || '');
       setApplyTax(invoice.tax_rate > 0);
       setTaxRate(invoice.tax_rate);
       setNotes(invoice.notes || '');
@@ -267,6 +280,7 @@ export default function InvoiceFormPage() {
       setReceiverName(source.receiver_name || '');
       setDriverName(source.driver_name || '');
       setDriverPhone(source.driver_phone || '');
+      setPaymentMethodId((source as any).payment_method_id || '');
       setApplyTax(source.tax_rate > 0);
       setTaxRate(source.tax_rate);
       setNotes(source.notes || '');
@@ -412,6 +426,7 @@ export default function InvoiceFormPage() {
             receiver_name: receiverName || null,
             driver_name: driverName || null,
             driver_phone: driverPhone || null,
+            payment_method_id: paymentMethodId || null,
             subtotal,
             tax_rate: applyTax ? taxRate : 0,
             tax_amount: taxAmount,
@@ -557,6 +572,7 @@ export default function InvoiceFormPage() {
             receiver_name: receiverName || null,
             driver_name: driverName || null,
             driver_phone: driverPhone || null,
+            payment_method_id: paymentMethodId || null,
             subtotal,
             tax_rate: applyTax ? taxRate : 0,
             tax_amount: taxAmount,
@@ -730,7 +746,7 @@ export default function InvoiceFormPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saving, items, branchId, invoiceDate, invoiceTime, receiverName, driverName, driverPhone, applyTax, taxRate, notes, isEdit, id, invoiceNumber]);
+  }, [saving, items, branchId, invoiceDate, invoiceTime, receiverName, driverName, driverPhone, paymentMethodId, applyTax, taxRate, notes, isEdit, id, invoiceNumber]);
 
   if (loading) {
     return (
@@ -794,7 +810,7 @@ export default function InvoiceFormPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <Label>رقم الفاتورة</Label>
                 <Input value={invoiceNumber} disabled className="bg-muted" />
@@ -851,6 +867,20 @@ export default function InvoiceFormPage() {
                   value={invoiceTime}
                   onChange={(e) => setInvoiceTimeChanged(e.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>طريقة الدفع</Label>
+                <Select value={paymentMethodId || 'none'} onValueChange={(v) => setPaymentMethodIdChanged(v === 'none' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر طريقة الدفع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">بدون تحديد</SelectItem>
+                    {paymentMethods.map((pm) => (
+                      <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>

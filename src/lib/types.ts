@@ -115,6 +115,7 @@ export interface Invoice {
   total: number;
   status: 'active' | 'cancelled' | 'partially_returned' | 'fully_returned';
   cancel_reason: string | null;
+  payment_method_id: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
