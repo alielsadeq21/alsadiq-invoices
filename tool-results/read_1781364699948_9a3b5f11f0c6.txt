@@ -1,0 +1,771 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { Branch } from '@/lib/types';
+     7→     7→import { Card, CardContent } from '@/components/ui/card';
+     8→     8→import { Button } from '@/components/ui/button';
+     9→     9→import { Input } from '@/components/ui/input';
+    10→    10→import { Label } from '@/components/ui/label';
+    11→    11→import { Badge } from '@/components/ui/badge';
+    12→    12→import { Switch } from '@/components/ui/switch';
+    13→    13→import { Separator } from '@/components/ui/separator';
+    14→    14→import {
+    15→    15→  Dialog,
+    16→    16→  DialogContent,
+    17→    17→  DialogHeader,
+    18→    18→  DialogTitle,
+    19→    19→  DialogFooter,
+    20→    20→} from '@/components/ui/dialog';
+    21→    21→import {
+    22→    22→  AlertDialog,
+    23→    23→  AlertDialogAction,
+    24→    24→  AlertDialogCancel,
+    25→    25→  AlertDialogContent,
+    26→    26→  AlertDialogDescription,
+    27→    27→  AlertDialogFooter,
+    28→    28→  AlertDialogHeader,
+    29→    29→  AlertDialogTitle,
+    30→    30→} from '@/components/ui/alert-dialog';
+    31→    31→import {
+    32→    32→  Table,
+    33→    33→  TableBody,
+    34→    34→  TableCell,
+    35→    35→  TableHead,
+    36→    36→  TableHeader,
+    37→    37→  TableRow,
+    38→    38→} from '@/components/ui/table';
+    39→    39→import {
+    40→    40→  Building2, Plus, Search, Edit, Trash2, Phone, MapPin, CheckCircle2, XCircle,
+    41→    41→  Mail, FileText, Hash, Image, User, MessageSquare,
+    42→    42→} from 'lucide-react';
+    43→    43→import { toast } from 'sonner';
+    44→    44→
+    45→    45→export default function BranchesPage() {
+    46→    46→  const { isAdmin } = useAppStore();
+    47→    47→  const [branches, setBranches] = useState<Branch[]>([]);
+    48→    48→  const [search, setSearch] = useState('');
+    49→    49→  const [loading, setLoading] = useState(true);
+    50→    50→  const [dialogOpen, setDialogOpen] = useState(false);
+    51→    51→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    52→    52→  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+    53→    53→  const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null);
+    54→    54→
+    55→    55→  const [form, setForm] = useState({
+    56→    56→    name: '',
+    57→    57→    address: '',
+    58→    58→    phone: '',
+    59→    59→    email: '',
+    60→    60→    tax_number: '',
+    61→    61→    commercial_register: '',
+    62→    62→    logo_url: '',
+    63→    63→    manager_name: '',
+    64→    64→    invoice_footer: '',
+    65→    65→    is_active: true,
+    66→    66→  });
+    67→    67→
+    68→    68→  useEffect(() => {
+    69→    69→    loadBranches();
+    70→    70→  }, []);
+    71→    71→
+    72→    72→  const loadBranches = async () => {
+    73→    73→    setLoading(true);
+    74→    74→    try {
+    75→    75→      const { data, error } = await supabase
+    76→    76→        .from('branches')
+    77→    77→        .select('*')
+    78→    78→        .order('created_at', { ascending: false });
+    79→    79→
+    80→    80→      if (!error && data) {
+    81→    81→        setBranches(data as Branch[]);
+    82→    82→      }
+    83→    83→    } catch (err) {
+    84→    84→      console.error(err);
+    85→    85→    } finally {
+    86→    86→      setLoading(false);
+    87→    87→    }
+    88→    88→  };
+    89→    89→
+    90→    90→  const openAddDialog = () => {
+    91→    91→    setEditingBranch(null);
+    92→    92→    setForm({
+    93→    93→      name: '',
+    94→    94→      address: '',
+    95→    95→      phone: '',
+    96→    96→      email: '',
+    97→    97→      tax_number: '',
+    98→    98→      commercial_register: '',
+    99→    99→      logo_url: '',
+   100→   100→      manager_name: '',
+   101→   101→      invoice_footer: '',
+   102→   102→      is_active: true,
+   103→   103→    });
+   104→   104→    setDialogOpen(true);
+   105→   105→  };
+   106→   106→
+   107→   107→  const openEditDialog = (branch: Branch) => {
+   108→   108→    setEditingBranch(branch);
+   109→   109→    setForm({
+   110→   110→      name: branch.name,
+   111→   111→      address: branch.address || '',
+   112→   112→      phone: branch.phone || '',
+   113→   113→      email: branch.email || '',
+   114→   114→      tax_number: branch.tax_number || '',
+   115→   115→      commercial_register: branch.commercial_register || '',
+   116→   116→      logo_url: branch.logo_url || '',
+   117→   117→      manager_name: branch.manager_name || '',
+   118→   118→      invoice_footer: branch.invoice_footer || '',
+   119→   119→      is_active: branch.is_active,
+   120→   120→    });
+   121→   121→    setDialogOpen(true);
+   122→   122→  };
+   123→   123→
+   124→   124→  const handleSave = async () => {
+   125→   125→    if (!form.name.trim()) {
+   126→   126→      toast.error('يرجى إدخال اسم الفرع');
+   127→   127→      return;
+   128→   128→    }
+   129→   129→
+   130→   130→    try {
+   131→   131→      const branchData = {
+   132→   132→        name: form.name,
+   133→   133→        address: form.address || null,
+   134→   134→        phone: form.phone || null,
+   135→   135→        email: form.email || null,
+   136→   136→        tax_number: form.tax_number || null,
+   137→   137→        commercial_register: form.commercial_register || null,
+   138→   138→        logo_url: form.logo_url || null,
+   139→   139→        manager_name: form.manager_name || null,
+   140→   140→        invoice_footer: form.invoice_footer || null,
+   141→   141→        is_active: form.is_active,
+   142→   142→        updated_at: new Date().toISOString(),
+   143→   143→      };
+   144→   144→
+   145→   145→      if (editingBranch) {
+   146→   146→        const { error } = await supabase
+   147→   147→          .from('branches')
+   148→   148→          .update(branchData)
+   149→   149→          .eq('id', editingBranch.id);
+   150→   150→
+   151→   151→        if (error) throw error;
+   152→   152→        toast.success('تم تحديث الفرع بنجاح');
+   153→   153→      } else {
+   154→   154→        const { error } = await supabase.from('branches').insert(branchData);
+   155→   155→
+   156→   156→        if (error) throw error;
+   157→   157→        await supabase.from('audit_log').insert({
+   158→   158→          action: 'create_branch',
+   159→   159→          details: { branch_name: form.name },
+   160→   160→        });
+   161→   161→        toast.success('تم إضافة الفرع بنجاح');
+   162→   162→      }
+   163→   163→
+   164→   164→      setDialogOpen(false);
+   165→   165→      loadBranches();
+   166→   166→    } catch (err) {
+   167→   167→      console.error(err);
+   168→   168→      toast.error('حدث خطأ أثناء الحفظ');
+   169→   169→    }
+   170→   170→  };
+   171→   171→
+   172→   172→  const handleDelete = async () => {
+   173→   173→    if (!deletingBranch) return;
+   174→   174→    try {
+   175→   175→      const { error } = await supabase
+   176→   176→        .from('branches')
+   177→   177→        .delete()
+   178→   178→        .eq('id', deletingBranch.id);
+   179→   179→
+   180→   180→      if (error) throw error;
+   181→   181→      toast.success('تم حذف الفرع بنجاح');
+   182→   182→      setDeleteDialogOpen(false);
+   183→   183→      setDeletingBranch(null);
+   184→   184→      loadBranches();
+   185→   185→    } catch (err) {
+   186→   186→      console.error(err);
+   187→   187→      toast.error('حدث خطأ أثناء الحذف. قد يكون الفرع مرتبطاً بفواتير');
+   188→   188→    }
+   189→   189→  };
+   190→   190→
+   191→   191→  const toggleBranchStatus = async (branch: Branch) => {
+   192→   192→    try {
+   193→   193→      const { error } = await supabase
+   194→   194→        .from('branches')
+   195→   195→        .update({
+   196→   196→          is_active: !branch.is_active,
+   197→   197→          updated_at: new Date().toISOString(),
+   198→   198→        })
+   199→   199→        .eq('id', branch.id);
+   200→   200→
+   201→   201→      if (error) throw error;
+   202→   202→      toast.success(branch.is_active ? 'تم تعطيل الفرع' : 'تم تفعيل الفرع');
+   203→   203→      loadBranches();
+   204→   204→    } catch (err) {
+   205→   205→      toast.error('حدث خطأ');
+   206→   206→    }
+   207→   207→  };
+   208→   208→
+   209→   209→  const filteredBranches = branches.filter(
+   210→   210→    (b) =>
+   211→   211→      b.name.includes(search) ||
+   212→   212→      (b.address && b.address.includes(search)) ||
+   213→   213→      (b.phone && b.phone.includes(search))
+   214→   214→  );
+   215→   215→
+   216→   216→  const activeCount = branches.filter((b) => b.is_active).length;
+   217→   217→  const inactiveCount = branches.length - activeCount;
+   218→   218→
+   219→   219→  if (!isAdmin) {
+   220→   220→    return (
+   221→   221→      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+   222→   222→        <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))' }}>
+   223→   223→          <Building2 className="w-12 h-12 text-red-500/70" />
+   224→   224→        </div>
+   225→   225→        <h2 className="text-xl font-bold">غير مسموح</h2>
+   226→   226→        <p className="text-muted-foreground text-sm text-center max-w-xs">
+   227→   227→          فقط المدير يمكنه إدارة الفروع
+   228→   228→        </p>
+   229→   229→      </div>
+   230→   230→    );
+   231→   231→  }
+   232→   232→
+   233→   233→  return (
+   234→   234→    <div className="space-y-4 sm:space-y-6">
+   235→   235→      {/* Header */}
+   236→   236→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   237→   237→        <div className="flex items-center gap-3">
+   238→   238→          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   239→   239→            <Building2 className="w-6 h-6 text-white" />
+   240→   240→          </div>
+   241→   241→          <div>
+   242→   242→            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">إدارة الفروع</h1>
+   243→   243→            <div className="flex items-center gap-3 mt-1">
+   244→   244→              <div className="flex items-center gap-1 text-xs">
+   245→   245→                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+   246→   246→                <span className="text-muted-foreground">نشطة: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{activeCount}</span></span>
+   247→   247→              </div>
+   248→   248→              <div className="w-px h-3 bg-border" />
+   249→   249→              <div className="flex items-center gap-1 text-xs">
+   250→   250→                <div className="w-2 h-2 rounded-full bg-red-500" />
+   251→   251→                <span className="text-muted-foreground">معطلة: <span className="font-semibold text-red-600 dark:text-red-400">{inactiveCount}</span></span>
+   252→   252→              </div>
+   253→   253→              <div className="w-px h-3 bg-border" />
+   254→   254→              <div className="flex items-center gap-1 text-xs">
+   255→   255→                <Building2 className="w-3 h-3 text-muted-foreground" />
+   256→   256→                <span className="text-muted-foreground">الإجمالي: <span className="font-semibold">{branches.length}</span></span>
+   257→   257→              </div>
+   258→   258→            </div>
+   259→   259→          </div>
+   260→   260→        </div>
+   261→   261→        <Button
+   262→   262→          onClick={openAddDialog}
+   263→   263→          className="gap-2 shadow-lg w-full sm:w-auto text-white font-medium"
+   264→   264→          style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+   265→   265→        >
+   266→   266→          <Plus className="w-4 h-4" />
+   267→   267→          إضافة فرع
+   268→   268→        </Button>
+   269→   269→      </div>
+   270→   270→
+   271→   271→      {/* Search */}
+   272→   272→      <Card className="border-0 shadow-md overflow-hidden">
+   273→   273→        <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #10b981)' }} />
+   274→   274→        <CardContent className="p-3 sm:p-4">
+   275→   275→          <div className="relative">
+   276→   276→            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   277→   277→            <Input
+   278→   278→              placeholder="بحث في الفروع..."
+   279→   279→              value={search}
+   280→   280→              onChange={(e) => setSearch(e.target.value)}
+   281→   281→              className="pr-10"
+   282→   282→            />
+   283→   283→          </div>
+   284→   284→        </CardContent>
+   285→   285→      </Card>
+   286→   286→
+   287→   287→      {/* Branches List */}
+   288→   288→      {loading ? (
+   289→   289→        <Card className="border-0 shadow-md">
+   290→   290→          <CardContent className="p-0">
+   291→   291→            <div className="flex items-center justify-center py-12">
+   292→   292→              <div className="animate-pulse text-muted-foreground">جاري التحميل...</div>
+   293→   293→            </div>
+   294→   294→          </CardContent>
+   295→   295→        </Card>
+   296→   296→      ) : filteredBranches.length === 0 ? (
+   297→   297→        <Card className="border-0 shadow-md">
+   298→   298→          <CardContent className="p-0">
+   299→   299→            <div className="flex flex-col items-center justify-center py-20 px-4">
+   300→   300→              <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))' }}>
+   301→   301→                <Building2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
+   302→   302→              </div>
+   303→   303→              <h3 className="text-xl font-bold mb-2 tracking-tight">لا توجد فروع</h3>
+   304→   304→              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
+   305→   305→                لم يتم إضافة أي فروع بعد. أضف فرعاً لبدء إدارة الفواتير وتتبع الصرف لكل فرع.
+   306→   306→              </p>
+   307→   307→              <Button
+   308→   308→                onClick={openAddDialog}
+   309→   309→                className="gap-2 shadow-lg text-white font-medium"
+   310→   310→                size="lg"
+   311→   311→                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+   312→   312→              >
+   313→   313→                <Plus className="w-5 h-5" />
+   314→   314→                إضافة فرع جديد
+   315→   315→              </Button>
+   316→   316→            </div>
+   317→   317→          </CardContent>
+   318→   318→        </Card>
+   319→   319→      ) : (
+   320→   320→        <>
+   321→   321→          {/* Mobile Card Layout */}
+   322→   322→          <div className="flex flex-col gap-3 sm:hidden">
+   323→   323→            {filteredBranches.map((branch) => (
+   324→   324→              <Card
+   325→   325→                key={branch.id}
+   326→   326→                className="border-0 shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden"
+   327→   327→              >
+   328→   328→                <div className="flex" style={{ display: 'flex' }}>
+   329→   329→                  {/* Right accent border */}
+   330→   330→                  <div
+   331→   331→                    className="w-1 flex-shrink-0"
+   332→   332→                    style={{ background: branch.is_active ? 'linear-gradient(180deg, #10b981, #059669)' : 'linear-gradient(180deg, #ef4444, #dc2626)' }}
+   333→   333→                  />
+   334→   334→                  <CardContent className="p-4 flex-1 min-w-0">
+   335→   335→                    <div className="flex items-start justify-between mb-3">
+   336→   336→                      <div className="flex items-center gap-2.5">
+   337→   337→                        <div
+   338→   338→                          className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+   339→   339→                          style={{ background: branch.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+   340→   340→                        >
+   341→   341→                          {branch.logo_url ? (
+   342→   342→                            <img src={branch.logo_url} alt={branch.name} className="w-6 h-6 object-contain rounded" />
+   343→   343→                          ) : (
+   344→   344→                            <Building2 className="w-5 h-5 text-white" />
+   345→   345→                          )}
+   346→   346→                        </div>
+   347→   347→                        <div>
+   348→   348→                          <h3 className="font-bold text-sm leading-tight">{branch.name}</h3>
+   349→   349→                          <div className="mt-1">
+   350→   350→                            <Badge
+   351→   351→                              variant="secondary"
+   352→   352→                              className="border-0 font-medium text-[10px] px-2 py-0"
+   353→   353→                              style={
+   354→   354→                                branch.is_active
+   355→   355→                                  ? { background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1))', color: '#059669' }
+   356→   356→                                  : { background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.1))', color: '#dc2626' }
+   357→   357→                              }
+   358→   358→                            >
+   359→   359→                              {branch.is_active ? (
+   360→   360→                                <span className="flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5" /> نشط</span>
+   361→   361→                              ) : (
+   362→   362→                                <span className="flex items-center gap-1"><XCircle className="w-2.5 h-2.5" /> معطل</span>
+   363→   363→                              )}
+   364→   364→                            </Badge>
+   365→   365→                          </div>
+   366→   366→                        </div>
+   367→   367→                      </div>
+   368→   368→                      <Switch
+   369→   369→                        checked={branch.is_active}
+   370→   370→                        onCheckedChange={() => toggleBranchStatus(branch)}
+   371→   371→                      />
+   372→   372→                    </div>
+   373→   373→                    {branch.address && (
+   374→   374→                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5 mr-1">
+   375→   375→                        <MapPin className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+   376→   376→                        <span className="truncate">{branch.address}</span>
+   377→   377→                      </div>
+   378→   378→                    )}
+   379→   379→                    {branch.phone && (
+   380→   380→                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5 mr-1">
+   381→   381→                        <Phone className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+   382→   382→                        <span dir="ltr">{branch.phone}</span>
+   383→   383→                      </div>
+   384→   384→                    )}
+   385→   385→                    {branch.tax_number && (
+   386→   386→                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1.5 mr-1">
+   387→   387→                        <Hash className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+   388→   388→                        <span>ضريبي: {branch.tax_number}</span>
+   389→   389→                      </div>
+   390→   390→                    )}
+   391→   391→                    {branch.commercial_register && (
+   392→   392→                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-3 mr-1">
+   393→   393→                        <FileText className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+   394→   394→                        <span>سجل: {branch.commercial_register}</span>
+   395→   395→                      </div>
+   396→   396→                    )}
+   397→   397→                    <div className="flex items-center gap-2 border-t pt-3 mt-1">
+   398→   398→                      <Button
+   399→   399→                        variant="outline"
+   400→   400→                        size="sm"
+   401→   401→                        onClick={() => openEditDialog(branch)}
+   402→   402→                        className="flex-1 gap-1.5 h-9 text-xs font-medium border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 hover:border-emerald-300"
+   403→   403→                        style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.06), rgba(5,150,105,0.03))' }}
+   404→   404→                      >
+   405→   405→                        <Edit className="w-3.5 h-3.5" />
+   406→   406→                        تعديل
+   407→   407→                      </Button>
+   408→   408→                      <Button
+   409→   409→                        variant="outline"
+   410→   410→                        size="sm"
+   411→   411→                        onClick={() => {
+   412→   412→                          setDeletingBranch(branch);
+   413→   413→                          setDeleteDialogOpen(true);
+   414→   414→                        }}
+   415→   415→                        className="flex-1 gap-1.5 h-9 text-xs font-medium border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 hover:text-red-700 hover:border-red-300"
+   416→   416→                        style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(220,38,38,0.03))' }}
+   417→   417→                      >
+   418→   418→                        <Trash2 className="w-3.5 h-3.5" />
+   419→   419→                        حذف
+   420→   420→                      </Button>
+   421→   421→                    </div>
+   422→   422→                  </CardContent>
+   423→   423→                </div>
+   424→   424→              </Card>
+   425→   425→            ))}
+   426→   426→          </div>
+   427→   427→
+   428→   428→          {/* Desktop Table Layout */}
+   429→   429→          <Card className="border-0 shadow-md overflow-hidden hidden sm:block">
+   430→   430→            {/* Gradient accent bar */}
+   431→   431→            <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #10b981)' }} />
+   432→   432→            <CardContent className="p-0">
+   433→   433→              <div className="overflow-x-auto">
+   434→   434→                <Table>
+   435→   435→                  <TableHeader>
+   436→   436→                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+   437→   437→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3">الفرع</TableHead>
+   438→   438→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden lg:table-cell">العنوان</TableHead>
+   439→   439→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden md:table-cell">الهاتف</TableHead>
+   440→   440→                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden xl:table-cell">الرقم الضريبي</TableHead>
+   441→   441→                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الحالة</TableHead>
+   442→   442→                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">تفعيل</TableHead>
+   443→   443→                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الإجراءات</TableHead>
+   444→   444→                    </TableRow>
+   445→   445→                  </TableHeader>
+   446→   446→                  <TableBody>
+   447→   447→                    {filteredBranches.map((branch) => (
+   448→   448→                      <TableRow key={branch.id} className="transition-colors hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10">
+   449→   449→                        <TableCell>
+   450→   450→                          <div className="flex items-center gap-2.5">
+   451→   451→                            <div
+   452→   452→                              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm overflow-hidden"
+   453→   453→                              style={{ background: branch.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+   454→   454→                            >
+   455→   455→                              {branch.logo_url ? (
+   456→   456→                                <img src={branch.logo_url} alt={branch.name} className="w-6 h-6 object-contain" />
+   457→   457→                              ) : (
+   458→   458→                                <Building2 className="w-4 h-4 text-white" />
+   459→   459→                              )}
+   460→   460→                            </div>
+   461→   461→                            <div>
+   462→   462→                              <span className="font-semibold text-sm">{branch.name}</span>
+   463→   463→                              {branch.manager_name && (
+   464→   464→                                <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+   465→   465→                                  <User className="w-2.5 h-2.5" />
+   466→   466→                                  {branch.manager_name}
+   467→   467→                                </div>
+   468→   468→                              )}
+   469→   469→                            </div>
+   470→   470→                          </div>
+   471→   471→                        </TableCell>
+   472→   472→                        <TableCell className="hidden lg:table-cell">
+   473→   473→                          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+   474→   474→                            {branch.address ? (
+   475→   475→                              <>
+   476→   476→                                <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+   477→   477→                                <span className="max-w-[150px] truncate">{branch.address}</span>
+   478→   478→                              </>
+   479→   479→                            ) : (
+   480→   480→                              <span className="text-muted-foreground/50">—</span>
+   481→   481→                            )}
+   482→   482→                          </div>
+   483→   483→                        </TableCell>
+   484→   484→                        <TableCell className="hidden md:table-cell">
+   485→   485→                          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+   486→   486→                            {branch.phone ? (
+   487→   487→                              <>
+   488→   488→                                <Phone className="w-3.5 h-3.5 text-emerald-500" />
+   489→   489→                                <span dir="ltr">{branch.phone}</span>
+   490→   490→                              </>
+   491→   491→                            ) : (
+   492→   492→                              <span className="text-muted-foreground/50">—</span>
+   493→   493→                            )}
+   494→   494→                          </div>
+   495→   495→                        </TableCell>
+   496→   496→                        <TableCell className="hidden xl:table-cell">
+   497→   497→                          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+   498→   498→                            {branch.tax_number ? (
+   499→   499→                              <>
+   500→   500→                                <Hash className="w-3.5 h-3.5 text-emerald-500" />
+   501→   501→                                <span>{branch.tax_number}</span>
+   502→   502→                              </>
+   503→   503→                            ) : (
+   504→   504→                              <span className="text-muted-foreground/50">—</span>
+   505→   505→                            )}
+   506→   506→                          </div>
+   507→   507→                        </TableCell>
+   508→   508→                        <TableCell className="text-center">
+   509→   509→                          <Badge
+   510→   510→                            variant="secondary"
+   511→   511→                            className="border-0 font-medium px-3"
+   512→   512→                            style={
+   513→   513→                              branch.is_active
+   514→   514→                                ? { background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1))', color: '#059669' }
+   515→   515→                                : { background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.1))', color: '#dc2626' }
+   516→   516→                            }
+   517→   517→                          >
+   518→   518→                            {branch.is_active ? (
+   519→   519→                              <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> نشط</span>
+   520→   520→                            ) : (
+   521→   521→                              <span className="flex items-center gap-1"><XCircle className="w-3 h-3" /> معطل</span>
+   522→   522→                            )}
+   523→   523→                          </Badge>
+   524→   524→                        </TableCell>
+   525→   525→                        <TableCell className="text-center">
+   526→   526→                          <Switch
+   527→   527→                            checked={branch.is_active}
+   528→   528→                            onCheckedChange={() => toggleBranchStatus(branch)}
+   529→   529→                          />
+   530→   530→                        </TableCell>
+   531→   531→                        <TableCell>
+   532→   532→                          <div className="flex items-center justify-center gap-1">
+   533→   533→                            <Button
+   534→   534→                              variant="ghost"
+   535→   535→                              size="icon"
+   536→   536→                              onClick={() => openEditDialog(branch)}
+   537→   537→                              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+   538→   538→                            >
+   539→   539→                              <Edit className="w-4 h-4" />
+   540→   540→                            </Button>
+   541→   541→                            <Button
+   542→   542→                              variant="ghost"
+   543→   543→                              size="icon"
+   544→   544→                              onClick={() => {
+   545→   545→                                setDeletingBranch(branch);
+   546→   546→                                setDeleteDialogOpen(true);
+   547→   547→                              }}
+   548→   548→                              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+   549→   549→                            >
+   550→   550→                              <Trash2 className="w-4 h-4" />
+   551→   551→                            </Button>
+   552→   552→                          </div>
+   553→   553→                        </TableCell>
+   554→   554→                      </TableRow>
+   555→   555→                    ))}
+   556→   556→                  </TableBody>
+   557→   557→                </Table>
+   558→   558→              </div>
+   559→   559→            </CardContent>
+   560→   560→          </Card>
+   561→   561→        </>
+   562→   562→      )}
+   563→   563→
+   564→   564→      {/* Add/Edit Dialog */}
+   565→   565→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   566→   566→        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto">
+   567→   567→          <DialogHeader>
+   568→   568→            <DialogTitle className="flex items-center gap-2">
+   569→   569→              <div
+   570→   570→                className="w-8 h-8 rounded-lg flex items-center justify-center"
+   571→   571→                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+   572→   572→              >
+   573→   573→                {editingBranch ? <Edit className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+   574→   574→              </div>
+   575→   575→              {editingBranch ? 'تعديل الفرع' : 'إضافة فرع جديد'}
+   576→   576→            </DialogTitle>
+   577→   577→          </DialogHeader>
+   578→   578→          <div className="space-y-5 py-4">
+   579→   579→            {/* Basic Info Section */}
+   580→   580→            <div>
+   581→   581→              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+   582→   582→                <Building2 className="w-4 h-4" />
+   583→   583→                البيانات الأساسية
+   584→   584→              </h4>
+   585→   585→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   586→   586→                <div className="space-y-2">
+   587→   587→                  <Label htmlFor="branch-name">اسم الفرع *</Label>
+   588→   588→                  <Input
+   589→   589→                    id="branch-name"
+   590→   590→                    value={form.name}
+   591→   591→                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+   592→   592→                    placeholder="مثال: فرع المعادي"
+   593→   593→                  />
+   594→   594→                </div>
+   595→   595→                <div className="space-y-2">
+   596→   596→                  <Label htmlFor="branch-manager">مدير الفرع</Label>
+   597→   597→                  <Input
+   598→   598→                    id="branch-manager"
+   599→   599→                    value={form.manager_name}
+   600→   600→                    onChange={(e) => setForm({ ...form, manager_name: e.target.value })}
+   601→   601→                    placeholder="مثال: أحمد محمد"
+   602→   602→                  />
+   603→   603→                </div>
+   604→   604→              </div>
+   605→   605→            </div>
+   606→   606→
+   607→   607→            <Separator />
+   608→   608→
+   609→   609→            {/* Contact Info Section */}
+   610→   610→            <div>
+   611→   611→              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+   612→   612→                <Phone className="w-4 h-4" />
+   613→   613→                بيانات الاتصال
+   614→   614→              </h4>
+   615→   615→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   616→   616→                <div className="space-y-2">
+   617→   617→                  <Label htmlFor="branch-address">العنوان</Label>
+   618→   618→                  <Input
+   619→   619→                    id="branch-address"
+   620→   620→                    value={form.address}
+   621→   621→                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+   622→   622→                    placeholder="مثال: 15 شارع 9 المعادي"
+   623→   623→                  />
+   624→   624→                </div>
+   625→   625→                <div className="space-y-2">
+   626→   626→                  <Label htmlFor="branch-phone">الهاتف</Label>
+   627→   627→                  <Input
+   628→   628→                    id="branch-phone"
+   629→   629→                    value={form.phone}
+   630→   630→                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+   631→   631→                    placeholder="مثال: 01012345678"
+   632→   632→                  />
+   633→   633→                </div>
+   634→   634→                <div className="space-y-2">
+   635→   635→                  <Label htmlFor="branch-email">البريد الإلكتروني</Label>
+   636→   636→                  <Input
+   637→   637→                    id="branch-email"
+   638→   638→                    type="email"
+   639→   639→                    value={form.email}
+   640→   640→                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+   641→   641→                    placeholder="مثال: branch@example.com"
+   642→   642→                  />
+   643→   643→                </div>
+   644→   644→              </div>
+   645→   645→            </div>
+   646→   646→
+   647→   647→            <Separator />
+   648→   648→
+   649→   649→            {/* Invoice & Legal Section */}
+   650→   650→            <div>
+   651→   651→              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+   652→   652→                <FileText className="w-4 h-4" />
+   653→   653→                بيانات الفواتير والسجلات
+   654→   654→              </h4>
+   655→   655→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   656→   656→                <div className="space-y-2">
+   657→   657→                  <Label htmlFor="branch-tax">الرقم الضريبي</Label>
+   658→   658→                  <Input
+   659→   659→                    id="branch-tax"
+   660→   660→                    value={form.tax_number}
+   661→   661→                    onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
+   662→   662→                    placeholder="مثال: 300123456789"
+   663→   663→                  />
+   664→   664→                </div>
+   665→   665→                <div className="space-y-2">
+   666→   666→                  <Label htmlFor="branch-commercial">السجل التجاري</Label>
+   667→   667→                  <Input
+   668→   668→                    id="branch-commercial"
+   669→   669→                    value={form.commercial_register}
+   670→   670→                    onChange={(e) => setForm({ ...form, commercial_register: e.target.value })}
+   671→   671→                    placeholder="مثال: 12345"
+   672→   672→                  />
+   673→   673→                </div>
+   674→   674→              </div>
+   675→   675→              <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+   676→   676→                تظهر هذه البيانات على الفواتير المطبوعة لهذا الفرع. إذا لم يتم تحديدها، سيتم استخدام البيانات العامة من الإعدادات.
+   677→   677→              </p>
+   678→   678→            </div>
+   679→   679→
+   680→   680→            <Separator />
+   681→   681→
+   682→   682→            {/* Logo & Branding Section */}
+   683→   683→            <div>
+   684→   684→              <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+   685→   685→                <Image className="w-4 h-4" />
+   686→   686→                الشعار والتخصيص
+   687→   687→              </h4>
+   688→   688→              <div className="grid grid-cols-1 gap-3">
+   689→   689→                <div className="space-y-2">
+   690→   690→                  <Label htmlFor="branch-logo">رابط شعار الفرع</Label>
+   691→   691→                  <Input
+   692→   692→                    id="branch-logo"
+   693→   693→                    value={form.logo_url}
+   694→   694→                    onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
+   695→   695→                    placeholder="https://example.com/logo.png"
+   696→   696→                  />
+   697→   697→                  <p className="text-[10px] text-muted-foreground">إذا لم يتم تحديد شعار للفرع، سيتم استخدام الشعار العام من الإعدادات</p>
+   698→   698→                </div>
+   699→   699→                <div className="space-y-2">
+   700→   700→                  <Label htmlFor="branch-footer">نص تذييل الفاتورة</Label>
+   701→   701→                  <Input
+   702→   702→                    id="branch-footer"
+   703→   703→                    value={form.invoice_footer}
+   704→   704→                    onChange={(e) => setForm({ ...form, invoice_footer: e.target.value })}
+   705→   705→                    placeholder="مثال: شكراً لتعاملكم معنا - فرع المعادي"
+   706→   706→                  />
+   707→   707→                  <p className="text-[10px] text-muted-foreground">نص يظهر في أسفل الفاتورة المطبوعة لهذا الفرع</p>
+   708→   708→                </div>
+   709→   709→              </div>
+   710→   710→            </div>
+   711→   711→
+   712→   712→            <Separator />
+   713→   713→
+   714→   714→            {/* Status */}
+   715→   715→            <div className="flex items-center gap-2">
+   716→   716→              <Switch
+   717→   717→                id="branch-active"
+   718→   718→                checked={form.is_active}
+   719→   719→                onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
+   720→   720→              />
+   721→   721→              <Label htmlFor="branch-active">فرع نشط</Label>
+   722→   722→            </div>
+   723→   723→          </div>
+   724→   724→          <DialogFooter className="gap-2 sm:gap-0">
+   725→   725→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+   726→   726→              إلغاء
+   727→   727→            </Button>
+   728→   728→            <Button
+   729→   729→              onClick={handleSave}
+   730→   730→              className="text-white font-medium"
+   731→   731→              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+   732→   732→            >
+   733→   733→              {editingBranch ? 'تحديث' : 'إضافة'}
+   734→   734→            </Button>
+   735→   735→          </DialogFooter>
+   736→   736→        </DialogContent>
+   737→   737→      </Dialog>
+   738→   738→
+   739→   739→      {/* Delete Confirmation Dialog */}
+   740→   740→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+   741→   741→        <AlertDialogContent className="w-[95vw] sm:w-auto">
+   742→   742→          <AlertDialogHeader>
+   743→   743→            <AlertDialogTitle className="flex items-center gap-2">
+   744→   744→              <div
+   745→   745→                className="w-8 h-8 rounded-lg flex items-center justify-center"
+   746→   746→                style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+   747→   747→              >
+   748→   748→                <Trash2 className="w-4 h-4 text-white" />
+   749→   749→              </div>
+   750→   750→              حذف الفرع
+   751→   751→            </AlertDialogTitle>
+   752→   752→            <AlertDialogDescription>
+   753→   753→              هل أنت متأكد من حذف فرع &quot;{deletingBranch?.name}&quot;؟ لا يمكن التراجع عن هذا الإجراء.
+   754→   754→            </AlertDialogDescription>
+   755→   755→          </AlertDialogHeader>
+   756→   756→          <AlertDialogFooter>
+   757→   757→            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+   758→   758→            <AlertDialogAction
+   759→   759→              onClick={handleDelete}
+   760→   760→              className="text-white font-medium"
+   761→   761→              style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+   762→   762→            >
+   763→   763→              حذف
+   764→   764→            </AlertDialogAction>
+   765→   765→          </AlertDialogFooter>
+   766→   766→        </AlertDialogContent>
+   767→   767→      </AlertDialog>
+   768→   768→    </div>
+   769→   769→  );
+   770→   770→}
+   771→   771→

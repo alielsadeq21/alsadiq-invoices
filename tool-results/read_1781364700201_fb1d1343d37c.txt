@@ -1,0 +1,955 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState, useCallback } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { Role, Permissions, PagePermissions } from '@/lib/types';
+     7→     7→import { DEFAULT_ADMIN_PERMISSIONS } from '@/lib/types';
+     8→     8→import { Card, CardContent } from '@/components/ui/card';
+     9→     9→import { Button } from '@/components/ui/button';
+    10→    10→import { Input } from '@/components/ui/input';
+    11→    11→import { Label } from '@/components/ui/label';
+    12→    12→import { Badge } from '@/components/ui/badge';
+    13→    13→import { Switch } from '@/components/ui/switch';
+    14→    14→import { ScrollArea } from '@/components/ui/scroll-area';
+    15→    15→import { Separator } from '@/components/ui/separator';
+    16→    16→import {
+    17→    17→  Dialog,
+    18→    18→  DialogContent,
+    19→    19→  DialogHeader,
+    20→    20→  DialogTitle,
+    21→    21→  DialogFooter,
+    22→    22→} from '@/components/ui/dialog';
+    23→    23→import {
+    24→    24→  AlertDialog,
+    25→    25→  AlertDialogAction,
+    26→    26→  AlertDialogCancel,
+    27→    27→  AlertDialogContent,
+    28→    28→  AlertDialogDescription,
+    29→    29→  AlertDialogFooter,
+    30→    30→  AlertDialogHeader,
+    31→    31→  AlertDialogTitle,
+    32→    32→} from '@/components/ui/alert-dialog';
+    33→    33→import {
+    34→    34→  Table,
+    35→    35→  TableBody,
+    36→    36→  TableCell,
+    37→    37→  TableHead,
+    38→    38→  TableHeader,
+    39→    39→  TableRow,
+    40→    40→} from '@/components/ui/table';
+    41→    41→import {
+    42→    42→  Shield,
+    43→    43→  Plus,
+    44→    44→  Edit,
+    45→    45→  Trash2,
+    46→    46→  Users,
+    47→    47→  Lock,
+    48→    48→  Loader2,
+    49→    49→  CheckCircle2,
+    50→    50→  ChevronDown,
+    51→    51→  ChevronUp,
+    52→    52→} from 'lucide-react';
+    53→    53→import { toast } from 'sonner';
+    54→    54→import { motion } from 'framer-motion';
+    55→    55→
+    56→    56→// Permissions matrix definition
+    57→    57→interface PermissionPage {
+    58→    58→  key: keyof Permissions;
+    59→    59→  label: string;
+    60→    60→  actions: (keyof PagePermissions)[];
+    61→    61→}
+    62→    62→
+    63→    63→const PERMISSION_PAGES: PermissionPage[] = [
+    64→    64→  { key: 'dashboard', label: 'لوحة التحكم', actions: ['view'] },
+    65→    65→  { key: 'pos', label: 'نقطة البيع', actions: ['view', 'create', 'print'] },
+    66→    66→  { key: 'reservations', label: 'الحجوزات والمناسبات', actions: ['view', 'create', 'edit', 'delete', 'print'] },
+    67→    67→  { key: 'sales', label: 'المبيعات', actions: ['view', 'export'] },
+    68→    68→  { key: 'branches', label: 'الفروع', actions: ['view', 'create', 'edit', 'delete'] },
+    69→    69→  { key: 'products', label: 'المنتجات', actions: ['view', 'create', 'edit', 'delete'] },
+    70→    70→  { key: 'customers', label: 'العملاء', actions: ['view', 'create', 'edit', 'delete'] },
+    71→    71→  { key: 'invoices', label: 'الفواتير', actions: ['view', 'create', 'edit', 'delete', 'print', 'export'] },
+    72→    72→  { key: 'returns', label: 'المرتجعات', actions: ['view', 'create', 'edit', 'delete', 'print', 'export'] },
+    73→    73→  { key: 'payments', label: 'القبض', actions: ['view', 'create', 'edit', 'delete', 'print', 'export'] },
+    74→    74→  { key: 'expenses', label: 'المصروفات', actions: ['view', 'create', 'edit', 'delete', 'print', 'export'] },
+    75→    75→  { key: 'branch_accounts', label: 'كشف الحسابات', actions: ['view', 'export'] },
+    76→    76→  { key: 'account_statement', label: 'كشف حساب مفصل', actions: ['view', 'print', 'export'] },
+    77→    77→  { key: 'inventory', label: 'المخزون', actions: ['view', 'create', 'edit', 'adjust', 'transfer'] },
+    78→    78→  { key: 'inventory_transfers', label: 'التصبين والتحويلات', actions: ['view', 'create', 'edit'] },
+    79→    79→  { key: 'inventory_counts', label: 'جرد المخزون', actions: ['view', 'create', 'edit'] },
+    80→    80→  { key: 'chart_of_accounts', label: 'شجرة الحسابات', actions: ['view', 'create', 'edit', 'delete'] },
+    81→    81→  { key: 'accounting', label: 'القيود المحاسبية', actions: ['view', 'create', 'edit', 'export'] },
+    82→    82→  { key: 'accounting_reports', label: 'التقارير المحاسبية', actions: ['view', 'export'] },
+    83→    83→  { key: 'reports', label: 'التقارير', actions: ['view', 'export'] },
+    84→    84→  { key: 'users', label: 'المستخدمين', actions: ['view', 'create', 'edit', 'delete'] },
+    85→    85→  { key: 'roles', label: 'الأدوار', actions: ['view', 'create', 'edit', 'delete'] },
+    86→    86→  { key: 'settings', label: 'الإعدادات', actions: ['view', 'edit'] },
+    87→    87→  { key: 'activity_log', label: 'سجل النشاط', actions: ['view'] },
+    88→    88→  { key: 'payment_methods', label: 'طرق الدفع', actions: ['view', 'create', 'edit', 'delete'] },
+    89→    89→  { key: 'expense_categories', label: 'تصنيفات المصروفات', actions: ['view', 'create', 'edit', 'delete'] },
+    90→    90→];
+    91→    91→
+    92→    92→const ACTION_LABELS: Record<string, string> = {
+    93→    93→  view: 'عرض',
+    94→    94→  create: 'إضافة',
+    95→    95→  edit: 'تعديل',
+    96→    96→  delete: 'حذف',
+    97→    97→  print: 'طباعة',
+    98→    98→  export: 'تصدير',
+    99→    99→  adjust: 'تسوية',
+   100→   100→  transfer: 'تحويل',
+   101→   101→};
+   102→   102→
+   103→   103→// All possible action keys for the grid header
+   104→   104→const ALL_ACTIONS: (keyof PagePermissions)[] = ['view', 'create', 'edit', 'delete', 'print', 'export', 'adjust', 'transfer'];
+   105→   105→
+   106→   106→interface RoleWithCount extends Role {
+   107→   107→  user_count?: number;
+   108→   108→}
+   109→   109→
+   110→   110→// Clean permissions object - remove undefined values and ensure proper structure for Supabase JSONB
+   111→   111→function cleanPermissionsForSave(perms: Permissions): Record<string, Record<string, boolean>> {
+   112→   112→  const cleaned: Record<string, Record<string, boolean>> = {};
+   113→   113→  for (const [pageKey, pagePerms] of Object.entries(perms)) {
+   114→   114→    if (!pagePerms || typeof pagePerms !== 'object') continue;
+   115→   115→    const cleanPage: Record<string, boolean> = {};
+   116→   116→    for (const [actionKey, value] of Object.entries(pagePerms)) {
+   117→   117→      if (typeof value === 'boolean') {
+   118→   118→        cleanPage[actionKey] = value;
+   119→   119→      }
+   120→   120→    }
+   121→   121→    // Only include pages that have at least one permission set
+   122→   122→    if (Object.keys(cleanPage).length > 0) {
+   123→   123→      cleaned[pageKey] = cleanPage;
+   124→   124→    }
+   125→   125→  }
+   126→   126→  return cleaned;
+   127→   127→}
+   128→   128→
+   129→   129→export default function RolesPage() {
+   130→   130→  const { user: currentUser, isAdmin } = useAppStore();
+   131→   131→
+   132→   132→  const [roles, setRoles] = useState<RoleWithCount[]>([]);
+   133→   133→  const [loading, setLoading] = useState(true);
+   134→   134→  const [saving, setSaving] = useState(false);
+   135→   135→
+   136→   136→  // Add/Edit dialog
+   137→   137→  const [dialogOpen, setDialogOpen] = useState(false);
+   138→   138→  const [editingRole, setEditingRole] = useState<RoleWithCount | null>(null);
+   139→   139→  const [form, setForm] = useState({
+   140→   140→    display_name: '',
+   141→   141→    description: '',
+   142→   142→  });
+   143→   143→  const [editPermissions, setEditPermissions] = useState<Permissions>({});
+   144→   144→
+   145→   145→  // Delete dialog
+   146→   146→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   147→   147→  const [deletingRole, setDeletingRole] = useState<RoleWithCount | null>(null);
+   148→   148→
+   149→   149→  // Mobile: track expanded permission sections
+   150→   150→  const [expandedMobilePages, setExpandedMobilePages] = useState<Set<string>>(new Set());
+   151→   151→
+   152→   152→  const toggleMobilePage = (pageKey: string) => {
+   153→   153→    setExpandedMobilePages((prev) => {
+   154→   154→      const next = new Set(prev);
+   155→   155→      if (next.has(pageKey)) {
+   156→   156→        next.delete(pageKey);
+   157→   157→      } else {
+   158→   158→        next.add(pageKey);
+   159→   159→      }
+   160→   160→      return next;
+   161→   161→    });
+   162→   162→  };
+   163→   163→
+   164→   164→  useEffect(() => {
+   165→   165→    if (!isAdmin) return;
+   166→   166→    loadRoles();
+   167→   167→  }, [isAdmin]);
+   168→   168→
+   169→   169→  const loadRoles = useCallback(async () => {
+   170→   170→    setLoading(true);
+   171→   171→    try {
+   172→   172→      const { data, error } = await supabase
+   173→   173→        .from('roles')
+   174→   174→        .select('*')
+   175→   175→        .order('is_system', { ascending: false });
+   176→   176→
+   177→   177→      if (error) {
+   178→   178→        console.error('Load roles error:', error);
+   179→   179→        throw error;
+   180→   180→      }
+   181→   181→
+   182→   182→      // Get user counts per role
+   183→   183→      const rolesWithCounts: RoleWithCount[] = [];
+   184→   184→      if (data) {
+   185→   185→        for (const role of data) {
+   186→   186→          try {
+   187→   187→            const { count } = await supabase
+   188→   188→              .from('users')
+   189→   189→              .select('*', { count: 'exact', head: true })
+   190→   190→              .eq('role_id', role.id);
+   191→   191→
+   192→   192→            rolesWithCounts.push({
+   193→   193→              ...role,
+   194→   194→              user_count: count || 0,
+   195→   195→            });
+   196→   196→          } catch {
+   197→   197→            rolesWithCounts.push({
+   198→   198→              ...role,
+   199→   199→              user_count: 0,
+   200→   200→            });
+   201→   201→          }
+   202→   202→        }
+   203→   203→      }
+   204→   204→
+   205→   205→      setRoles(rolesWithCounts);
+   206→   206→    } catch (err) {
+   207→   207→      console.error('Failed to load roles:', err);
+   208→   208→      toast.error('حدث خطأ أثناء تحميل البيانات');
+   209→   209→    } finally {
+   210→   210→      setLoading(false);
+   211→   211→    }
+   212→   212→  }, []);
+   213→   213→
+   214→   214→  const logAction = async (action: string, details: Record<string, unknown>) => {
+   215→   215→    try {
+   216→   216→      await supabase.from('audit_log').insert({ action, details });
+   217→   217→    } catch {
+   218→   218→      // Silent fail for audit logging
+   219→   219→    }
+   220→   220→  };
+   221→   221→
+   222→   222→  const openAddDialog = () => {
+   223→   223→    setEditingRole(null);
+   224→   224→    setForm({ display_name: '', description: '' });
+   225→   225→    // Initialize permissions with all pages having all actions set to false
+   226→   226→    const perms: Permissions = {};
+   227→   227→    PERMISSION_PAGES.forEach((page) => {
+   228→   228→      const pagePerms: PagePermissions = {};
+   229→   229→      page.actions.forEach((action) => {
+   230→   230→        pagePerms[action] = false;
+   231→   231→      });
+   232→   232→      perms[page.key] = pagePerms;
+   233→   233→    });
+   234→   234→    setEditPermissions(perms);
+   235→   235→    setExpandedMobilePages(new Set());
+   236→   236→    setDialogOpen(true);
+   237→   237→  };
+   238→   238→
+   239→   239→  const openEditDialog = (role: RoleWithCount) => {
+   240→   240→    setEditingRole(role);
+   241→   241→    setForm({
+   242→   242→      display_name: role.display_name,
+   243→   243→      description: role.description || '',
+   244→   244→    });
+   245→   245→    // Initialize permissions from role data, merging with all defined pages
+   246→   246→    const perms: Permissions = {};
+   247→   247→    PERMISSION_PAGES.forEach((page) => {
+   248→   248→      const existingPerms = role.permissions?.[page.key] as PagePermissions | undefined;
+   249→   249→      const pagePerms: PagePermissions = {};
+   250→   250→      page.actions.forEach((action) => {
+   251→   251→        pagePerms[action] = existingPerms?.[action] === true;
+   252→   252→      });
+   253→   253→      perms[page.key] = pagePerms;
+   254→   254→    });
+   255→   255→    setEditPermissions(perms);
+   256→   256→    setExpandedMobilePages(new Set());
+   257→   257→    setDialogOpen(true);
+   258→   258→  };
+   259→   259→
+   260→   260→  const togglePermission = (pageKey: keyof Permissions, action: keyof PagePermissions) => {
+   261→   261→    setEditPermissions((prev) => {
+   262→   262→      const currentPerms = prev[pageKey] as PagePermissions | undefined;
+   263→   263→      const pagePerms = { ...(currentPerms || {}) };
+   264→   264→      const newVal = !pagePerms[action];
+   265→   265→      pagePerms[action] = newVal;
+   266→   266→
+   267→   267→      // If turning off view, turn off all others
+   268→   268→      if (action === 'view' && !newVal) {
+   269→   269→        Object.keys(pagePerms).forEach((key) => {
+   270→   270→          pagePerms[key as keyof PagePermissions] = false;
+   271→   271→        });
+   272→   272→      } else if (action !== 'view' && newVal) {
+   273→   273→        // Turning on a non-view action -> ensure view is on
+   274→   274→        pagePerms.view = true;
+   275→   275→      }
+   276→   276→
+   277→   277→      return { ...prev, [pageKey]: pagePerms };
+   278→   278→    });
+   279→   279→  };
+   280→   280→
+   281→   281→  const toggleAllForPage = (pageKey: keyof Permissions, pageDef: PermissionPage, value: boolean) => {
+   282→   282→    setEditPermissions((prev) => {
+   283→   283→      const pagePerms: PagePermissions = {};
+   284→   284→      pageDef.actions.forEach((action) => {
+   285→   285→        pagePerms[action] = value;
+   286→   286→      });
+   287→   287→      return { ...prev, [pageKey]: pagePerms };
+   288→   288→    });
+   289→   289→  };
+   290→   290→
+   291→   291→  const handleSave = async () => {
+   292→   292→    if (!form.display_name.trim()) {
+   293→   293→      toast.error('يرجى إدخال اسم الدور');
+   294→   294→      return;
+   295→   295→    }
+   296→   296→
+   297→   297→    const isAdminRole = editingRole?.name === 'admin';
+   298→   298→
+   299→   299→    setSaving(true);
+   300→   300→    try {
+   301→   301→      // For admin role, always use full permissions
+   302→   302→      const rawPermissions = isAdminRole ? DEFAULT_ADMIN_PERMISSIONS : editPermissions;
+   303→   303→      // Clean permissions to remove undefined/null values that cause Supabase JSONB issues
+   304→   304→      const finalPermissions = cleanPermissionsForSave(rawPermissions);
+   305→   305→
+   306→   306→      if (editingRole) {
+   307→   307→        // UPDATE existing role
+   308→   308→        const updateData: Record<string, unknown> = {
+   309→   309→          display_name: form.display_name.trim(),
+   310→   310→          description: form.description.trim() || null,
+   311→   311→          permissions: finalPermissions,
+   312→   312→        };
+   313→   313→
+   314→   314→        // Also update updated_at if the column exists
+   315→   315→        updateData.updated_at = new Date().toISOString();
+   316→   316→
+   317→   317→        console.log('Updating role:', editingRole.id, 'with data:', JSON.stringify(updateData, null, 2));
+   318→   318→
+   319→   319→        const { data: updateResult, error } = await supabase
+   320→   320→          .from('roles')
+   321→   321→          .update(updateData)
+   322→   322→          .eq('id', editingRole.id)
+   323→   323→          .select();
+   324→   324→
+   325→   325→        if (error) {
+   326→   326→          console.error('Role update Supabase error:', JSON.stringify(error, null, 2));
+   327→   327→          throw error;
+   328→   328→        }
+   329→   329→
+   330→   330→        console.log('Role updated successfully:', updateResult);
+   331→   331→
+   332→   332→        await logAction('update_role', {
+   333→   333→          role_id: editingRole.id,
+   334→   334→          role_name: form.display_name.trim(),
+   335→   335→          updated_by: currentUser?.id,
+   336→   336→        });
+   337→   337→
+   338→   338→        toast.success('تم تحديث الدور بنجاح');
+   339→   339→      } else {
+   340→   340→        // ADD new role
+   341→   341→
+   342→   342→        // Check for duplicate display name
+   343→   343→        const { data: existing, error: dupCheckError } = await supabase
+   344→   344→          .from('roles')
+   345→   345→          .select('id')
+   346→   346→          .eq('display_name', form.display_name.trim())
+   347→   347→          .maybeSingle();
+   348→   348→
+   349→   349→        if (dupCheckError) {
+   350→   350→          console.error('Duplicate check error:', dupCheckError);
+   351→   351→        }
+   352→   352→
+   353→   353→        if (existing) {
+   354→   354→          toast.error('اسم الدور موجود بالفعل');
+   355→   355→          setSaving(false);
+   356→   356→          return;
+   357→   357→        }
+   358→   358→
+   359→   359→        // Generate a unique name key - use timestamp + random to avoid collisions
+   360→   360→        // The 'name' column must be unique, so we generate a URL-safe identifier
+   361→   361→        const nameKey = 'custom_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+   362→   362→
+   363→   363→        const insertData = {
+   364→   364→          name: nameKey,
+   365→   365→          display_name: form.display_name.trim(),
+   366→   366→          description: form.description.trim() || null,
+   367→   367→          permissions: finalPermissions,
+   368→   368→          is_system: false,
+   369→   369→        };
+   370→   370→
+   371→   371→        console.log('Inserting new role:', JSON.stringify(insertData, null, 2));
+   372→   372→
+   373→   373→        const { data: insertResult, error } = await supabase
+   374→   374→          .from('roles')
+   375→   375→          .insert(insertData)
+   376→   376→          .select();
+   377→   377→
+   378→   378→        if (error) {
+   379→   379→          console.error('Role insert Supabase error:', JSON.stringify(error, null, 2));
+   380→   380→          throw error;
+   381→   381→        }
+   382→   382→
+   383→   383→        console.log('Role inserted successfully:', insertResult);
+   384→   384→
+   385→   385→        await logAction('create_role', {
+   386→   386→          role_name: form.display_name.trim(),
+   387→   387→          created_by: currentUser?.id,
+   388→   388→        });
+   389→   389→
+   390→   390→        toast.success('تم إضافة الدور بنجاح');
+   391→   391→      }
+   392→   392→
+   393→   393→      setDialogOpen(false);
+   394→   394→      loadRoles();
+   395→   395→    } catch (err: unknown) {
+   396→   396→      console.error('Role save full error:', err);
+   397→   397→      let message = 'حدث خطأ أثناء الحفظ';
+   398→   398→
+   399→   399→      if (err && typeof err === 'object') {
+   400→   400→        const supabaseErr = err as { message?: string; code?: string; details?: string };
+   401→   401→        if (supabaseErr.message) {
+   402→   402→          message = supabaseErr.message;
+   403→   403→        }
+   404→   404→        if (supabaseErr.code === '23505') {
+   405→   405→          message = 'اسم الدور أو المعرف موجود بالفعل';
+   406→   406→        }
+   407→   407→        if (supabaseErr.message?.includes('row-level security') || supabaseErr.message?.includes('RLS') || supabaseErr.message?.includes('policy')) {
+   408→   408→          message = 'ليس لديك صلاحية تعديل الأدوار. تأكد من صلاحيات المدير.';
+   409→   409→        }
+   410→   410→      } else if (err instanceof Error) {
+   411→   411→        message = err.message;
+   412→   412→      }
+   413→   413→
+   414→   414→      toast.error(message);
+   415→   415→    } finally {
+   416→   416→      setSaving(false);
+   417→   417→    }
+   418→   418→  };
+   419→   419→
+   420→   420→  const handleDelete = async () => {
+   421→   421→    if (!deletingRole) return;
+   422→   422→
+   423→   423→    if (deletingRole.is_system) {
+   424→   424→      toast.error('لا يمكن حذف أدوار النظام');
+   425→   425→      setDeleteDialogOpen(false);
+   426→   426→      return;
+   427→   427→    }
+   428→   428→
+   429→   429→    if ((deletingRole.user_count || 0) > 0) {
+   430→   430→      toast.error(`لا يمكن حذف هذا الدور لأنه مرتبط بـ ${deletingRole.user_count} مستخدم`);
+   431→   431→      setDeleteDialogOpen(false);
+   432→   432→      return;
+   433→   433→    }
+   434→   434→
+   435→   435→    try {
+   436→   436→      const { error } = await supabase
+   437→   437→        .from('roles')
+   438→   438→        .delete()
+   439→   439→        .eq('id', deletingRole.id);
+   440→   440→
+   441→   441→      if (error) throw error;
+   442→   442→
+   443→   443→      await logAction('delete_role', {
+   444→   444→        role_id: deletingRole.id,
+   445→   445→        role_name: deletingRole.display_name,
+   446→   446→        deleted_by: currentUser?.id,
+   447→   447→      });
+   448→   448→
+   449→   449→      toast.success('تم حذف الدور بنجاح');
+   450→   450→      setDeleteDialogOpen(false);
+   451→   451→      setDeletingRole(null);
+   452→   452→      loadRoles();
+   453→   453→    } catch (err) {
+   454→   454→      console.error('Delete role error:', err);
+   455→   455→      toast.error('حدث خطأ أثناء الحذف');
+   456→   456→    }
+   457→   457→  };
+   458→   458→
+   459→   459→  const getEnabledCount = (role: Role): number => {
+   460→   460→    if (!role.permissions) return 0;
+   461→   461→    let count = 0;
+   462→   462→    Object.values(role.permissions).forEach((pagePerms) => {
+   463→   463→      if (pagePerms && typeof pagePerms === 'object') {
+   464→   464→        Object.values(pagePerms).forEach((val) => {
+   465→   465→          if (val === true) count++;
+   466→   466→        });
+   467→   467→      }
+   468→   468→    });
+   469→   469→    return count;
+   470→   470→  };
+   471→   471→
+   472→   472→  if (!isAdmin) {
+   473→   473→    return (
+   474→   474→      <div className="flex flex-col items-center justify-center py-20 px-4">
+   475→   475→        <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   476→   476→          <Shield className="w-10 h-10 text-white" />
+   477→   477→        </div>
+   478→   478→        <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
+   479→   479→        <p className="text-muted-foreground text-sm text-center">
+   480→   480→          هذه الصفحة متاحة للمدير فقط
+   481→   481→        </p>
+   482→   482→      </div>
+   483→   483→    );
+   484→   484→  }
+   485→   485→
+   486→   486→  return (
+   487→   487→    <div className="space-y-4 sm:space-y-6">
+   488→   488→      {/* Header */}
+   489→   489→      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   490→   490→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+   491→   491→          <div className="flex items-center gap-3">
+   492→   492→            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   493→   493→              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+   494→   494→            </div>
+   495→   495→            <div>
+   496→   496→              <h1 className="text-lg sm:text-2xl font-bold">إدارة الأدوار والصلاحيات</h1>
+   497→   497→              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
+   498→   498→                إجمالي الأدوار: <span className="font-semibold text-foreground">{roles.length}</span>
+   499→   499→              </p>
+   500→   500→            </div>
+   501→   501→          </div>
+   502→   502→          <Button onClick={openAddDialog} className="gap-2 shadow-lg w-full sm:w-auto" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   503→   503→            <Plus className="w-4 h-4" />
+   504→   504→            إضافة دور
+   505→   505→          </Button>
+   506→   506→        </div>
+   507→   507→      </motion.div>
+   508→   508→
+   509→   509→      {/* Roles List */}
+   510→   510→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   511→   511→        <Card className="border-0 shadow-md overflow-hidden">
+   512→   512→          <CardContent className="p-0">
+   513→   513→            {loading ? (
+   514→   514→              <div className="flex flex-col items-center justify-center py-16">
+   515→   515→                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   516→   516→                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+   517→   517→                </div>
+   518→   518→                <p className="text-muted-foreground text-sm">جاري تحميل الأدوار...</p>
+   519→   519→              </div>
+   520→   520→            ) : roles.length === 0 ? (
+   521→   521→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   522→   522→                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+   523→   523→                  <Shield className="w-10 h-10 text-white" />
+   524→   524→                </div>
+   525→   525→                <h3 className="text-xl font-bold mb-2">لا توجد أدوار</h3>
+   526→   526→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   527→   527→                  لم يتم إضافة أي أدوار بعد. أضف دوراً لبدء إدارة الصلاحيات.
+   528→   528→                </p>
+   529→   529→                <Button onClick={openAddDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   530→   530→                  <Plus className="w-5 h-5" />
+   531→   531→                  إضافة دور جديد
+   532→   532→                </Button>
+   533→   533→              </div>
+   534→   534→            ) : (
+   535→   535→              <>
+   536→   536→                {/* Desktop Table */}
+   537→   537→                <div className="hidden sm:block">
+   538→   538→                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #ef4444, #dc2626, #b91c1c)' }} />
+   539→   539→                  <div className="overflow-x-auto">
+   540→   540→                    <Table>
+   541→   541→                      <TableHeader>
+   542→   542→                        <TableRow className="bg-muted/30">
+   543→   543→                          <TableHead className="text-right">الدور</TableHead>
+   544→   544→                          <TableHead className="text-right hidden md:table-cell">الوصف</TableHead>
+   545→   545→                          <TableHead className="text-center">النوع</TableHead>
+   546→   546→                          <TableHead className="text-center">عدد المستخدمين</TableHead>
+   547→   547→                          <TableHead className="text-center">الصلاحيات المفعلة</TableHead>
+   548→   548→                          <TableHead className="text-center">الإجراءات</TableHead>
+   549→   549→                        </TableRow>
+   550→   550→                      </TableHeader>
+   551→   551→                      <TableBody>
+   552→   552→                        {roles.map((role) => {
+   553→   553→                          const isAdminRole = role.name === 'admin';
+   554→   554→                          return (
+   555→   555→                            <TableRow key={role.id} className="hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors">
+   556→   556→                              <TableCell>
+   557→   557→                                <div className="flex items-center gap-2">
+   558→   558→                                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm`} style={isAdminRole ? { background: 'linear-gradient(135deg, #D4A843, #b8922e)' } : { background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+   559→   559→                                    <Shield className="w-4 h-4 text-white" />
+   560→   560→                                  </div>
+   561→   561→                                  <span className="font-medium">{role.display_name}</span>
+   562→   562→                                </div>
+   563→   563→                              </TableCell>
+   564→   564→                              <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+   565→   565→                                {role.description || '—'}
+   566→   566→                              </TableCell>
+   567→   567→                              <TableCell className="text-center">
+   568→   568→                                {role.is_system ? (
+   569→   569→                                  <Badge variant="secondary" className="text-[11px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
+   570→   570→                                    <Lock className="w-3 h-3 ml-1" />
+   571→   571→                                    نظام
+   572→   572→                                  </Badge>
+   573→   573→                                ) : (
+   574→   574→                                  <Badge variant="secondary" className="text-[11px] bg-muted text-muted-foreground">
+   575→   575→                                    مخصص
+   576→   576→                                  </Badge>
+   577→   577→                                )}
+   578→   578→                              </TableCell>
+   579→   579→                              <TableCell className="text-center">
+   580→   580→                                <div className="flex items-center justify-center gap-1">
+   581→   581→                                  <Users className="w-3 h-3 text-muted-foreground" />
+   582→   582→                                  <span className="text-sm">{role.user_count || 0}</span>
+   583→   583→                                </div>
+   584→   584→                              </TableCell>
+   585→   585→                              <TableCell className="text-center">
+   586→   586→                                <div className="flex items-center justify-center gap-1">
+   587→   587→                                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+   588→   588→                                  <span className="text-sm">{getEnabledCount(role)}</span>
+   589→   589→                                </div>
+   590→   590→                              </TableCell>
+   591→   591→                              <TableCell>
+   592→   592→                                <div className="flex items-center justify-center gap-1">
+   593→   593→                                  <Button
+   594→   594→                                    variant="ghost"
+   595→   595→                                    size="icon"
+   596→   596→                                    className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-900/20"
+   597→   597→                                    onClick={() => openEditDialog(role)}
+   598→   598→                                    title="تعديل"
+   599→   599→                                  >
+   600→   600→                                    <Edit className="w-4 h-4 text-red-600" />
+   601→   601→                                  </Button>
+   602→   602→                                  {!role.is_system && (
+   603→   603→                                    <Button
+   604→   604→                                      variant="ghost"
+   605→   605→                                      size="icon"
+   606→   606→                                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20"
+   607→   607→                                      onClick={() => {
+   608→   608→                                        setDeletingRole(role);
+   609→   609→                                        setDeleteDialogOpen(true);
+   610→   610→                                      }}
+   611→   611→                                      title="حذف"
+   612→   612→                                    >
+   613→   613→                                      <Trash2 className="w-4 h-4" />
+   614→   614→                                    </Button>
+   615→   615→                                  )}
+   616→   616→                                </div>
+   617→   617→                              </TableCell>
+   618→   618→                            </TableRow>
+   619→   619→                          );
+   620→   620→                        })}
+   621→   621→                      </TableBody>
+   622→   622→                    </Table>
+   623→   623→                  </div>
+   624→   624→                </div>
+   625→   625→
+   626→   626→                {/* Mobile Card Layout */}
+   627→   627→                <div className="sm:hidden">
+   628→   628→                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #ef4444, #dc2626, #b91c1c)' }} />
+   629→   629→                  <div className="divide-y">
+   630→   630→                    {roles.map((role) => {
+   631→   631→                      const isAdminRole = role.name === 'admin';
+   632→   632→                      return (
+   633→   633→                        <motion.div
+   634→   634→                          key={role.id}
+   635→   635→                          initial={{ opacity: 0, x: -10 }}
+   636→   636→                          animate={{ opacity: 1, x: 0 }}
+   637→   637→                          className="p-4 border-r-4 hover:bg-muted/30 transition-all"
+   638→   638→                          style={{ borderRightColor: isAdminRole ? '#D4A843' : '#ef4444' }}
+   639→   639→                        >
+   640→   640→                          <div className="flex items-start justify-between gap-2">
+   641→   641→                            <div className="flex items-center gap-2.5">
+   642→   642→                              <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-sm shrink-0" style={isAdminRole ? { background: 'linear-gradient(135deg, #D4A843, #b8922e)' } : { background: 'linear-gradient(135deg, #fca5a5, #ef4444)' }}>
+   643→   643→                                <Shield className="w-5 h-5 text-white" />
+   644→   644→                              </div>
+   645→   645→                              <div>
+   646→   646→                                <p className="font-semibold text-sm">{role.display_name}</p>
+   647→   647→                                {role.description && (
+   648→   648→                                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{role.description}</p>
+   649→   649→                                )}
+   650→   650→                              </div>
+   651→   651→                            </div>
+   652→   652→                            {role.is_system ? (
+   653→   653→                              <Badge variant="secondary" className="text-[10px] bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 shrink-0">
+   654→   654→                                <Lock className="w-3 h-3 ml-0.5" />
+   655→   655→                                نظام
+   656→   656→                              </Badge>
+   657→   657→                            ) : (
+   658→   658→                              <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground shrink-0">
+   659→   659→                                مخصص
+   660→   660→                              </Badge>
+   661→   661→                            )}
+   662→   662→                          </div>
+   663→   663→                          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+   664→   664→                            <span className="flex items-center gap-1">
+   665→   665→                              <Users className="w-3.5 h-3.5" />
+   666→   666→                              {role.user_count || 0} مستخدم
+   667→   667→                            </span>
+   668→   668→                            <span className="flex items-center gap-1">
+   669→   669→                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+   670→   670→                              {getEnabledCount(role)} صلاحية
+   671→   671→                            </span>
+   672→   672→                          </div>
+   673→   673→                          <div className="mt-3 flex items-center justify-end gap-2">
+   674→   674→                            <Button
+   675→   675→                              variant="outline"
+   676→   676→                              size="sm"
+   677→   677→                              className="h-8 gap-1.5 text-xs"
+   678→   678→                              onClick={() => openEditDialog(role)}
+   679→   679→                            >
+   680→   680→                              <Edit className="w-3.5 h-3.5" />
+   681→   681→                              تعديل
+   682→   682→                            </Button>
+   683→   683→                            {!role.is_system && (
+   684→   684→                              <Button
+   685→   685→                                variant="outline"
+   686→   686→                                size="sm"
+   687→   687→                                className="h-8 gap-1.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+   688→   688→                                onClick={() => {
+   689→   689→                                  setDeletingRole(role);
+   690→   690→                                  setDeleteDialogOpen(true);
+   691→   691→                                }}
+   692→   692→                              >
+   693→   693→                                <Trash2 className="w-3.5 h-3.5" />
+   694→   694→                                حذف
+   695→   695→                              </Button>
+   696→   696→                            )}
+   697→   697→                          </div>
+   698→   698→                        </motion.div>
+   699→   699→                      );
+   700→   700→                    })}
+   701→   701→                  </div>
+   702→   702→                </div>
+   703→   703→              </>
+   704→   704→            )}
+   705→   705→          </CardContent>
+   706→   706→        </Card>
+   707→   707→      </motion.div>
+   708→   708→
+   709→   709→      {/* Add/Edit Role Dialog */}
+   710→   710→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   711→   711→        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh]">
+   712→   712→          <DialogHeader>
+   713→   713→            <DialogTitle className="flex items-center gap-2">
+   714→   714→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   715→   715→                <Shield className="w-4 h-4 text-white" />
+   716→   716→              </div>
+   717→   717→              {editingRole ? 'تعديل الدور' : 'إضافة دور جديد'}
+   718→   718→            </DialogTitle>
+   719→   719→          </DialogHeader>
+   720→   720→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+   721→   721→            <div className="space-y-6 py-4 px-1">
+   722→   722→              {/* Basic Info */}
+   723→   723→              <div className="space-y-4">
+   724→   724→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   725→   725→                  <div className="space-y-2">
+   726→   726→                    <Label htmlFor="role-name">اسم الدور *</Label>
+   727→   727→                    <Input
+   728→   728→                      id="role-name"
+   729→   729→                      value={form.display_name}
+   730→   730→                      onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+   731→   731→                      placeholder="مثال: محاسب"
+   732→   732→                    />
+   733→   733→                  </div>
+   734→   734→                  <div className="space-y-2">
+   735→   735→                    <Label htmlFor="role-description">الوصف</Label>
+   736→   736→                    <Input
+   737→   737→                      id="role-description"
+   738→   738→                      value={form.description}
+   739→   739→                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+   740→   740→                      placeholder="وصف مختصر للدور"
+   741→   741→                    />
+   742→   742→                  </div>
+   743→   743→                </div>
+   744→   744→              </div>
+   745→   745→
+   746→   746→              <Separator />
+   747→   747→
+   748→   748→              {/* Permissions Matrix */}
+   749→   749→              <div className="space-y-3">
+   750→   750→                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+   751→   751→                  <h3 className="text-lg font-semibold flex items-center gap-2">
+   752→   752→                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   753→   753→                      <Lock className="w-3.5 h-3.5 text-white" />
+   754→   754→                    </div>
+   755→   755→                    مصفوفة الصلاحيات
+   756→   756→                  </h3>
+   757→   757→                  {editingRole?.name === 'admin' && (
+   758→   758→                    <Badge className="bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
+   759→   759→                      <Lock className="w-3 h-3 ml-1" />
+   760→   760→                      المدير لديه جميع الصلاحيات دائماً
+   761→   761→                    </Badge>
+   762→   762→                  )}
+   763→   763→                </div>
+   764→   764→
+   765→   765→                {editingRole?.name === 'admin' ? (
+   766→   766→                  <div className="rounded-xl border bg-muted/30 p-4">
+   767→   767→                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+   768→   768→                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+   769→   769→                      <span className="font-medium">جميع الصلاحيات مفعلة</span>
+   770→   770→                    </div>
+   771→   771→                    <p className="text-sm text-muted-foreground">
+   772→   772→                      دور المدير يحصل تلقائياً على جميع الصلاحيات ولا يمكن تعديلها.
+   773→   773→                    </p>
+   774→   774→                  </div>
+   775→   775→                ) : (
+   776→   776→                  <>
+   777→   777→                    {/* Desktop: Table Grid Layout */}
+   778→   778→                    <div className="hidden sm:block rounded-xl border overflow-hidden">
+   779→   779→                      {/* Table Header */}
+   780→   780→                      <div className="bg-muted/50">
+   781→   781→                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) repeat(8, minmax(50px, 60px))', gap: 0 }} className="text-xs font-medium p-3">
+   782→   782→                          <div className="text-right">الصفحة</div>
+   783→   783→                          {ALL_ACTIONS.map((action) => {
+   784→   784→                            const isUsed = PERMISSION_PAGES.some((p) => p.actions.includes(action));
+   785→   785→                            if (!isUsed) return <div key={action} />;
+   786→   786→                            return (
+   787→   787→                              <div key={action} className="text-center">
+   788→   788→                                {ACTION_LABELS[action]}
+   789→   789→                              </div>
+   790→   790→                            );
+   791→   791→                          })}
+   792→   792→                        </div>
+   793→   793→                      </div>
+   794→   794→
+   795→   795→                      {/* Table Body */}
+   796→   796→                      <div className="divide-y">
+   797→   797→                        {PERMISSION_PAGES.map((page) => {
+   798→   798→                          const pagePerms = editPermissions[page.key] as PagePermissions | undefined;
+   799→   799→                          const allEnabled = page.actions.every((a) => pagePerms?.[a] === true);
+   800→   800→                          const someEnabled = page.actions.some((a) => pagePerms?.[a] === true);
+   801→   801→
+   802→   802→                          return (
+   803→   803→                            <div key={page.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) repeat(8, minmax(50px, 60px))', gap: 0 }} className="p-2 items-center hover:bg-red-50/50 dark:hover:bg-red-900/5 transition-colors">
+   804→   804→                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingRight: '0.5rem' }}>
+   805→   805→                                <input
+   806→   806→                                  type="checkbox"
+   807→   807→                                  checked={allEnabled}
+   808→   808→                                  ref={(el) => {
+   809→   809→                                    if (el) el.indeterminate = someEnabled && !allEnabled;
+   810→   810→                                  }}
+   811→   811→                                  onChange={(e) => toggleAllForPage(page.key, page, e.target.checked)}
+   812→   812→                                  className="rounded border-muted-foreground/30"
+   813→   813→                                />
+   814→   814→                                <span className="text-sm font-medium truncate">{page.label}</span>
+   815→   815→                              </div>
+   816→   816→                              {ALL_ACTIONS.map((action) => {
+   817→   817→                                if (!page.actions.includes(action)) {
+   818→   818→                                  return <div key={action} />;
+   819→   819→                                }
+   820→   820→                                const isChecked = pagePerms?.[action] === true;
+   821→   821→                                return (
+   822→   822→                                  <div key={action} style={{ display: 'flex', justifyContent: 'center' }}>
+   823→   823→                                    <Switch
+   824→   824→                                      checked={isChecked}
+   825→   825→                                      onCheckedChange={() => togglePermission(page.key, action)}
+   826→   826→                                      className="scale-75"
+   827→   827→                                    />
+   828→   828→                                  </div>
+   829→   829→                                );
+   830→   830→                              })}
+   831→   831→                            </div>
+   832→   832→                          );
+   833→   833→                        })}
+   834→   834→                      </div>
+   835→   835→                    </div>
+   836→   836→
+   837→   837→                    {/* Mobile: Card Layout for Permissions */}
+   838→   838→                    <div className="sm:hidden space-y-2">
+   839→   839→                      {PERMISSION_PAGES.map((page) => {
+   840→   840→                        const pagePerms = editPermissions[page.key] as PagePermissions | undefined;
+   841→   841→                        const allEnabled = page.actions.every((a) => pagePerms?.[a] === true);
+   842→   842→                        const someEnabled = page.actions.some((a) => pagePerms?.[a] === true);
+   843→   843→                        const enabledCount = page.actions.filter((a) => pagePerms?.[a] === true).length;
+   844→   844→                        const isExpanded = expandedMobilePages.has(page.key);
+   845→   845→
+   846→   846→                        return (
+   847→   847→                          <div key={page.key} className="rounded-lg border bg-card overflow-hidden">
+   848→   848→                            <button
+   849→   849→                              type="button"
+   850→   850→                              className="w-full p-3 text-right"
+   851→   851→                              onClick={() => toggleMobilePage(page.key)}
+   852→   852→                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+   853→   853→                            >
+   854→   854→                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+   855→   855→                                <input
+   856→   856→                                  type="checkbox"
+   857→   857→                                  checked={allEnabled}
+   858→   858→                                  ref={(el) => {
+   859→   859→                                    if (el) el.indeterminate = someEnabled && !allEnabled;
+   860→   860→                                  }}
+   861→   861→                                  onChange={(e) => {
+   862→   862→                                    e.stopPropagation();
+   863→   863→                                    toggleAllForPage(page.key, page, e.target.checked);
+   864→   864→                                  }}
+   865→   865→                                  onClick={(e) => e.stopPropagation()}
+   866→   866→                                  className="rounded border-muted-foreground/30 w-4 h-4"
+   867→   867→                                />
+   868→   868→                                <span className="text-sm font-semibold">{page.label}</span>
+   869→   869→                              </div>
+   870→   870→                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+   871→   871→                                <span className="text-[10px] text-muted-foreground">
+   872→   872→                                  {enabledCount}/{page.actions.length}
+   873→   873→                                </span>
+   874→   874→                                {isExpanded ? (
+   875→   875→                                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+   876→   876→                                ) : (
+   877→   877→                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+   878→   878→                                )}
+   879→   879→                              </div>
+   880→   880→                            </button>
+   881→   881→                            {isExpanded && (
+   882→   882→                              <div className="px-3 pb-3 border-t" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.5rem' }}>
+   883→   883→                                {page.actions.map((action) => {
+   884→   884→                                  const isChecked = pagePerms?.[action] === true;
+   885→   885→                                  return (
+   886→   886→                                    <div
+   887→   887→                                      key={action}
+   888→   888→                                      style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+   889→   889→                                      className="cursor-pointer select-none"
+   890→   890→                                      onClick={() => togglePermission(page.key, action)}
+   891→   891→                                    >
+   892→   892→                                      <Switch
+   893→   893→                                        checked={isChecked}
+   894→   894→                                        onCheckedChange={() => togglePermission(page.key, action)}
+   895→   895→                                        className="scale-[0.7]"
+   896→   896→                                      />
+   897→   897→                                      <span className={`text-[12px] ${isChecked ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+   898→   898→                                        {ACTION_LABELS[action]}
+   899→   899→                                      </span>
+   900→   900→                                    </div>
+   901→   901→                                  );
+   902→   902→                                })}
+   903→   903→                              </div>
+   904→   904→                            )}
+   905→   905→                          </div>
+   906→   906→                        );
+   907→   907→                      })}
+   908→   908→                    </div>
+   909→   909→                  </>
+   910→   910→                )}
+   911→   911→              </div>
+   912→   912→            </div>
+   913→   913→          </ScrollArea>
+   914→   914→          <DialogFooter className="flex-row gap-2 sm:justify-end">
+   915→   915→            <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-none">
+   916→   916→              إلغاء
+   917→   917→            </Button>
+   918→   918→            <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none gap-1" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   919→   919→              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+   920→   920→              {editingRole ? 'تحديث' : 'إضافة'}
+   921→   921→            </Button>
+   922→   922→          </DialogFooter>
+   923→   923→        </DialogContent>
+   924→   924→      </Dialog>
+   925→   925→
+   926→   926→      {/* Delete Confirmation Dialog */}
+   927→   927→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+   928→   928→        <AlertDialogContent>
+   929→   929→          <AlertDialogHeader>
+   930→   930→            <AlertDialogTitle className="flex items-center gap-2">
+   931→   931→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   932→   932→                <Trash2 className="w-4 h-4 text-white" />
+   933→   933→              </div>
+   934→   934→              حذف الدور
+   935→   935→            </AlertDialogTitle>
+   936→   936→            <AlertDialogDescription>
+   937→   937→              {(deletingRole?.user_count || 0) > 0
+   938→   938→                ? `لا يمكن حذف دور "${deletingRole?.display_name}" لأنه مرتبط بـ ${deletingRole?.user_count} مستخدم. قم بتغيير أدوار المستخدمين أولاً.`
+   939→   939→                : `هل أنت متأكد من حذف دور "${deletingRole?.display_name}"؟ لا يمكن التراجع عن هذا الإجراء.`}
+   940→   940→            </AlertDialogDescription>
+   941→   941→          </AlertDialogHeader>
+   942→   942→          <AlertDialogFooter>
+   943→   943→            <AlertDialogCancel onClick={() => setDeletingRole(null)}>إلغاء</AlertDialogCancel>
+   944→   944→            {(deletingRole?.user_count || 0) === 0 && (
+   945→   945→              <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+   946→   946→                حذف
+   947→   947→              </AlertDialogAction>
+   948→   948→            )}
+   949→   949→          </AlertDialogFooter>
+   950→   950→        </AlertDialogContent>
+   951→   951→      </AlertDialog>
+   952→   952→    </div>
+   953→   953→  );
+   954→   954→}
+   955→   955→

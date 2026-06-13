@@ -1,0 +1,903 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
+     7→     7→import type { Customer } from '@/lib/types';
+     8→     8→import { Card, CardContent } from '@/components/ui/card';
+     9→     9→import { Button } from '@/components/ui/button';
+    10→    10→import { Input } from '@/components/ui/input';
+    11→    11→import { Label } from '@/components/ui/label';
+    12→    12→import { Badge } from '@/components/ui/badge';
+    13→    13→import { Switch } from '@/components/ui/switch';
+    14→    14→import { Textarea } from '@/components/ui/textarea';
+    15→    15→import { ScrollArea } from '@/components/ui/scroll-area';
+    16→    16→import DataTablePagination from '@/components/ui/data-table-pagination';
+    17→    17→import {
+    18→    18→  Dialog,
+    19→    19→  DialogContent,
+    20→    20→  DialogHeader,
+    21→    21→  DialogTitle,
+    22→    22→  DialogFooter,
+    23→    23→} from '@/components/ui/dialog';
+    24→    24→import {
+    25→    25→  AlertDialog,
+    26→    26→  AlertDialogAction,
+    27→    27→  AlertDialogCancel,
+    28→    28→  AlertDialogContent,
+    29→    29→  AlertDialogDescription,
+    30→    30→  AlertDialogFooter,
+    31→    31→  AlertDialogHeader,
+    32→    32→  AlertDialogTitle,
+    33→    33→} from '@/components/ui/alert-dialog';
+    34→    34→import {
+    35→    35→  Select,
+    36→    36→  SelectContent,
+    37→    37→  SelectItem,
+    38→    38→  SelectTrigger,
+    39→    39→  SelectValue,
+    40→    40→} from '@/components/ui/select';
+    41→    41→import {
+    42→    42→  Table,
+    43→    43→  TableBody,
+    44→    44→  TableCell,
+    45→    45→  TableHead,
+    46→    46→  TableHeader,
+    47→    47→  TableRow,
+    48→    48→} from '@/components/ui/table';
+    49→    49→import {
+    50→    50→  Users,
+    51→    51→  Plus,
+    52→    52→  Search,
+    53→    53→  Edit,
+    54→    54→  Shield,
+    55→    55→  UserCheck,
+    56→    56→  UserX,
+    57→    57→  Filter,
+    58→    58→  Loader2,
+    59→    59→  Phone,
+    60→    60→  MapPin,
+    61→    61→  FileText,
+    62→    62→} from 'lucide-react';
+    63→    63→import { toast } from 'sonner';
+    64→    64→import { motion } from 'framer-motion';
+    65→    65→
+    66→    66→export default function CustomersPage() {
+    67→    67→  const { user: currentUser, isAdmin, hasPermission } = useAppStore();
+    68→    68→
+    69→    69→  const [customers, setCustomers] = useState<Customer[]>([]);
+    70→    70→  const [search, setSearch] = useState('');
+    71→    71→  const [statusFilter, setStatusFilter] = useState('all');
+    72→    72→  const [loading, setLoading] = useState(true);
+    73→    73→  const [saving, setSaving] = useState(false);
+    74→    74→  const [page, setPage] = useState(1);
+    75→    75→  const [pageSize, setPageSize] = useState(25);
+    76→    76→  const [totalCount, setTotalCount] = useState(0);
+    77→    77→
+    78→    78→  // Add/Edit dialog
+    79→    79→  const [dialogOpen, setDialogOpen] = useState(false);
+    80→    80→  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+    81→    81→  const [form, setForm] = useState({
+    82→    82→    name: '',
+    83→    83→    phone: '',
+    84→    84→    address: '',
+    85→    85→    tax_number: '',
+    86→    86→    is_active: true,
+    87→    87→    notes: '',
+    88→    88→  });
+    89→    89→
+    90→    90→  // Toggle active confirmation
+    91→    91→  const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
+    92→    92→  const [togglingCustomer, setTogglingCustomer] = useState<Customer | null>(null);
+    93→    93→
+    94→    94→  // Customer account statement
+    95→    95→  const [statementDialogOpen, setStatementDialogOpen] = useState(false);
+    96→    96→  const [statementCustomer, setStatementCustomer] = useState<Customer | null>(null);
+    97→    97→  const [statementData, setStatementData] = useState<{
+    98→    98→    invoices: any[];
+    99→    99→    payments: any[];
+   100→   100→    returns: any[];
+   101→   101→    totalInvoiced: number;
+   102→   102→    totalPaid: number;
+   103→   103→    totalReturned: number;
+   104→   104→    balance: number;
+   105→   105→  }>({ invoices: [], payments: [], returns: [], totalInvoiced: 0, totalPaid: 0, totalReturned: 0, balance: 0 });
+   106→   106→  const [loadingStatement, setLoadingStatement] = useState(false);
+   107→   107→
+   108→   108→  const openStatement = async (customer: Customer) => {
+   109→   109→    setStatementCustomer(customer);
+   110→   110→    setStatementDialogOpen(true);
+   111→   111→    setLoadingStatement(true);
+   112→   112→    try {
+   113→   113→      // Load invoices for this customer
+   114→   114→      const { data: invoices } = await supabase
+   115→   115→        .from('invoices')
+   116→   116→        .select('id, invoice_number, invoice_date, total, status, branches(name)')
+   117→   117→        .eq('customer_id', customer.id)
+   118→   118→        .order('invoice_date', { ascending: false });
+   119→   119→
+   120→   120→      // Load payments related to this customer's invoices
+   121→   121→      // Since payments table doesn't have customer_id, we need to get invoice IDs first
+   122→   122→      const invoiceIds = (invoices || []).map((inv: any) => inv.id);
+   123→   123→
+   124→   124→      let payments: any[] = [];
+   125→   125→      if (invoiceIds.length > 0) {
+   126→   126→        const { data: payData } = await supabase
+   127→   127→          .from('payments')
+   128→   128→          .select('id, payment_number, payment_date, amount, payment_method, branch_id, branches(name)')
+   129→   129→          .in('branch_id', (invoices || []).map((inv: any) => inv.branch_id))
+   130→   130→          .order('payment_date', { ascending: false });
+   131→   131→        payments = payData || [];
+   132→   132→      }
+   133→   133→
+   134→   134→      // Load returns for this customer's invoices
+   135→   135→      let returns: any[] = [];
+   136→   136→      if (invoiceIds.length > 0) {
+   137→   137→        const { data: retData } = await supabase
+   138→   138→          .from('returns')
+   139→   139→          .select('id, return_number, return_date, total, branches(name)')
+   140→   140→          .in('original_invoice_id', invoiceIds)
+   141→   141→          .order('return_date', { ascending: false });
+   142→   142→        returns = retData || [];
+   143→   143→      }
+   144→   144→
+   145→   145→      const totalInvoiced = (invoices || []).filter((inv: any) => inv.status === 'active' || inv.status === 'partially_returned').reduce((s: number, inv: any) => s + Number(inv.total), 0);
+   146→   146→      const totalReturned = (returns || []).reduce((s: number, r: any) => s + Number(r.total), 0);
+   147→   147→      const totalPaid = payments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+   148→   148→
+   149→   149→      setStatementData({
+   150→   150→        invoices: invoices || [],
+   151→   151→        payments,
+   152→   152→        returns,
+   153→   153→        totalInvoiced,
+   154→   154→        totalPaid,
+   155→   155→        totalReturned,
+   156→   156→        balance: totalInvoiced - totalPaid - totalReturned,
+   157→   157→      });
+   158→   158→    } catch (err) {
+   159→   159→      console.error(err);
+   160→   160→      toast.error('حدث خطأ أثناء تحميل كشف الحساب');
+   161→   161→    } finally {
+   162→   162→      setLoadingStatement(false);
+   163→   163→    }
+   164→   164→  };
+   165→   165→
+   166→   166→  const canView = isAdmin || hasPermission('customers', 'view');
+   167→   167→  const canCreate = isAdmin || hasPermission('customers', 'create');
+   168→   168→  const canEdit = isAdmin || hasPermission('customers', 'edit');
+   169→   169→  const canDelete = isAdmin || hasPermission('customers', 'delete');
+   170→   170→
+   171→   171→  useEffect(() => {
+   172→   172→    if (!canView) return;
+   173→   173→    loadData();
+   174→   174→  }, [canView, page, pageSize, search, statusFilter]);
+   175→   175→
+   176→   176→  const loadData = async () => {
+   177→   177→    setLoading(true);
+   178→   178→    try {
+   179→   179→      let query = supabase
+   180→   180→        .from('customers')
+   181→   181→        .select('*', { count: 'exact' })
+   182→   182→        .order('created_at', { ascending: false });
+   183→   183→
+   184→   184→      if (search.trim()) {
+   185→   185→        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+   186→   186→      }
+   187→   187→      if (statusFilter === 'active') {
+   188→   188→        query = query.eq('is_active', true);
+   189→   189→      } else if (statusFilter === 'inactive') {
+   190→   190→        query = query.eq('is_active', false);
+   191→   191→      }
+   192→   192→
+   193→   193→      const from = (page - 1) * pageSize;
+   194→   194→      const to = from + pageSize - 1;
+   195→   195→      query = query.range(from, to);
+   196→   196→
+   197→   197→      const { data, count, error } = await query;
+   198→   198→
+   199→   199→      if (error) throw error;
+   200→   200→      if (data) setCustomers(data as Customer[]);
+   201→   201→      setTotalCount(count || 0);
+   202→   202→    } catch (err) {
+   203→   203→      console.error(err);
+   204→   204→      toast.error('حدث خطأ أثناء تحميل البيانات');
+   205→   205→    } finally {
+   206→   206→      setLoading(false);
+   207→   207→    }
+   208→   208→  };
+   209→   209→
+   210→   210→  const logAction = async (action: string, details: Record<string, unknown>) => {
+   211→   211→    try {
+   212→   212→      await supabase.from('audit_log').insert({ action, details });
+   213→   213→    } catch {
+   214→   214→      // Silent fail for audit logging
+   215→   215→    }
+   216→   216→  };
+   217→   217→
+   218→   218→  const openAddDialog = () => {
+   219→   219→    setEditingCustomer(null);
+   220→   220→    setForm({
+   221→   221→      name: '',
+   222→   222→      phone: '',
+   223→   223→      address: '',
+   224→   224→      tax_number: '',
+   225→   225→      is_active: true,
+   226→   226→      notes: '',
+   227→   227→    });
+   228→   228→    setDialogOpen(true);
+   229→   229→  };
+   230→   230→
+   231→   231→  const openEditDialog = (customer: Customer) => {
+   232→   232→    setEditingCustomer(customer);
+   233→   233→    setForm({
+   234→   234→      name: customer.name,
+   235→   235→      phone: customer.phone || '',
+   236→   236→      address: customer.address || '',
+   237→   237→      tax_number: customer.tax_number || '',
+   238→   238→      is_active: customer.is_active,
+   239→   239→      notes: customer.notes || '',
+   240→   240→    });
+   241→   241→    setDialogOpen(true);
+   242→   242→  };
+   243→   243→
+   244→   244→  const handleSave = async () => {
+   245→   245→    if (!form.name.trim()) {
+   246→   246→      toast.error('يرجى إدخال اسم العميل');
+   247→   247→      return;
+   248→   248→    }
+   249→   249→
+   250→   250→    setSaving(true);
+   251→   251→    try {
+   252→   252→      if (editingCustomer) {
+   253→   253→        // Update customer
+   254→   254→        const { error } = await supabase
+   255→   255→          .from('customers')
+   256→   256→          .update({
+   257→   257→            name: form.name.trim(),
+   258→   258→            phone: form.phone.trim() || null,
+   259→   259→            address: form.address.trim() || null,
+   260→   260→            tax_number: form.tax_number.trim() || null,
+   261→   261→            is_active: form.is_active,
+   262→   262→            notes: form.notes.trim() || null,
+   263→   263→            updated_at: new Date().toISOString(),
+   264→   264→          })
+   265→   265→          .eq('id', editingCustomer.id);
+   266→   266→
+   267→   267→        if (error) throw error;
+   268→   268→
+   269→   269→        await logAction('update_customer', {
+   270→   270→          customer_id: editingCustomer.id,
+   271→   271→          customer_name: form.name.trim(),
+   272→   272→          updated_by: currentUser?.id,
+   273→   273→        });
+   274→   274→
+   275→   275→        toast.success('تم تحديث العميل بنجاح');
+   276→   276→      } else {
+   277→   277→        // Insert new customer
+   278→   278→        const { error } = await supabase.from('customers').insert({
+   279→   279→          name: form.name.trim(),
+   280→   280→          phone: form.phone.trim() || null,
+   281→   281→          address: form.address.trim() || null,
+   282→   282→          tax_number: form.tax_number.trim() || null,
+   283→   283→          is_active: form.is_active,
+   284→   284→          notes: form.notes.trim() || null,
+   285→   285→        });
+   286→   286→
+   287→   287→        if (error) throw error;
+   288→   288→
+   289→   289→        await logAction('create_customer', {
+   290→   290→          customer_name: form.name.trim(),
+   291→   291→          phone: form.phone.trim() || null,
+   292→   292→          created_by: currentUser?.id,
+   293→   293→        });
+   294→   294→
+   295→   295→        toast.success('تم إضافة العميل بنجاح');
+   296→   296→      }
+   297→   297→
+   298→   298→      setDialogOpen(false);
+   299→   299→      loadData();
+   300→   300→    } catch (err) {
+   301→   301→      console.error(err);
+   302→   302→      toast.error('حدث خطأ أثناء الحفظ');
+   303→   303→    } finally {
+   304→   304→      setSaving(false);
+   305→   305→    }
+   306→   306→  };
+   307→   307→
+   308→   308→  const handleToggleActive = async () => {
+   309→   309→    if (!togglingCustomer) return;
+   310→   310→
+   311→   311→    try {
+   312→   312→      const newStatus = !togglingCustomer.is_active;
+   313→   313→      const { error } = await supabase
+   314→   314→        .from('customers')
+   315→   315→        .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+   316→   316→        .eq('id', togglingCustomer.id);
+   317→   317→
+   318→   318→      if (error) throw error;
+   319→   319→
+   320→   320→      await logAction(newStatus ? 'activate_customer' : 'deactivate_customer', {
+   321→   321→        customer_id: togglingCustomer.id,
+   322→   322→        customer_name: togglingCustomer.name,
+   323→   323→        action_by: currentUser?.id,
+   324→   324→      });
+   325→   325→
+   326→   326→      toast.success(newStatus ? 'تم تفعيل العميل' : 'تم تعطيل العميل');
+   327→   327→      setToggleDialogOpen(false);
+   328→   328→      setTogglingCustomer(null);
+   329→   329→      loadData();
+   330→   330→    } catch (err) {
+   331→   331→      console.error(err);
+   332→   332→      toast.error('حدث خطأ أثناء تغيير الحالة');
+   333→   333→    }
+   334→   334→  };
+   335→   335→
+   336→   336→  const totalPages = Math.ceil(totalCount / pageSize);
+   337→   337→
+   338→   338→  if (!canView) {
+   339→   339→    return (
+   340→   340→      <div className="flex flex-col items-center justify-center py-20 px-4">
+   341→   341→        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   342→   342→          <Shield className="w-12 h-12 text-white" />
+   343→   343→        </div>
+   344→   344→        <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
+   345→   345→        <p className="text-muted-foreground text-sm text-center">
+   346→   346→          ليس لديك صلاحية لعرض هذه الصفحة
+   347→   347→        </p>
+   348→   348→      </div>
+   349→   349→    );
+   350→   350→  }
+   351→   351→
+   352→   352→  return (
+   353→   353→    <div className="space-y-6">
+   354→   354→      {/* Header */}
+   355→   355→      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   356→   356→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   357→   357→          <div className="flex items-center gap-3">
+   358→   358→            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   359→   359→              <Users className="w-6 h-6 text-white" />
+   360→   360→            </div>
+   361→   361→            <div>
+   362→   362→              <h1 className="text-2xl font-bold">إدارة العملاء</h1>
+   363→   363→              <div className="flex items-center gap-3 mt-1">
+   364→   364→                <span className="text-sm text-muted-foreground">
+   365→   365→                  إجمالي العملاء: <span className="font-bold text-foreground">{totalCount}</span>
+   366→   366→                </span>
+   367→   367→                {totalCount > 0 && (
+   368→   368→                  <>
+   369→   369→                    <span className="text-muted-foreground/40">|</span>
+   370→   370→                    <span className="text-sm text-emerald-600 dark:text-emerald-400">
+   371→   371→                      نشط: <span className="font-bold">{customers.filter(c => c.is_active).length}</span>
+   372→   372→                    </span>
+   373→   373→                  </>
+   374→   374→                )}
+   375→   375→              </div>
+   376→   376→            </div>
+   377→   377→          </div>
+   378→   378→          {canCreate && (
+   379→   379→            <Button onClick={openAddDialog} className="gap-2 shadow-lg shadow-emerald-500/20" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   380→   380→              <Plus className="w-4 h-4" />
+   381→   381→              إضافة عميل
+   382→   382→            </Button>
+   383→   383→          )}
+   384→   384→        </div>
+   385→   385→      </motion.div>
+   386→   386→
+   387→   387→      {/* Search & Filters */}
+   388→   388→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   389→   389→        <Card className="border-0 shadow-md overflow-hidden">
+   390→   390→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #047857)' }} />
+   391→   391→          <CardContent className="p-4">
+   392→   392→            <div className="flex flex-col sm:flex-row gap-3">
+   393→   393→              <div className="relative flex-1">
+   394→   394→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   395→   395→                <Input
+   396→   396→                  placeholder="بحث بالاسم أو رقم الهاتف..."
+   397→   397→                  value={search}
+   398→   398→                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   399→   399→                  className="pr-10"
+   400→   400→                />
+   401→   401→              </div>
+   402→   402→              <div className="flex gap-2">
+   403→   403→                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+   404→   404→                  <SelectTrigger className="w-[130px]">
+   405→   405→                    <Filter className="w-4 h-4 ml-1" />
+   406→   406→                    <SelectValue placeholder="الحالة" />
+   407→   407→                  </SelectTrigger>
+   408→   408→                  <SelectContent>
+   409→   409→                    <SelectItem value="all">كل الحالات</SelectItem>
+   410→   410→                    <SelectItem value="active">نشط</SelectItem>
+   411→   411→                    <SelectItem value="inactive">معطل</SelectItem>
+   412→   412→                  </SelectContent>
+   413→   413→                </Select>
+   414→   414→              </div>
+   415→   415→            </div>
+   416→   416→          </CardContent>
+   417→   417→        </Card>
+   418→   418→      </motion.div>
+   419→   419→
+   420→   420→      {/* Customers Content */}
+   421→   421→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
+   422→   422→        <Card className="border-0 shadow-md">
+   423→   423→          <CardContent className="p-0">
+   424→   424→            {loading ? (
+   425→   425→              <div className="flex flex-col items-center justify-center py-16">
+   426→   426→                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   427→   427→                  <Loader2 className="w-8 h-8 animate-spin text-white" />
+   428→   428→                </div>
+   429→   429→                <p className="text-muted-foreground text-sm">جارٍ تحميل البيانات...</p>
+   430→   430→              </div>
+   431→   431→            ) : customers.length === 0 ? (
+   432→   432→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   433→   433→                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   434→   434→                  <Users className="w-12 h-12 text-white" />
+   435→   435→                </div>
+   436→   436→                <h3 className="text-xl font-bold mb-2">لا يوجد عملاء</h3>
+   437→   437→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   438→   438→                  لم يتم إضافة أي عملاء بعد. أضف عميلاً لبدء إدارة بيانات العملاء.
+   439→   439→                </p>
+   440→   440→                {canCreate && (
+   441→   441→                  <Button onClick={openAddDialog} className="gap-2 shadow-lg shadow-emerald-500/20" size="lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   442→   442→                    <Plus className="w-5 h-5" />
+   443→   443→                    إضافة عميل جديد
+   444→   444→                  </Button>
+   445→   445→                )}
+   446→   446→              </div>
+   447→   447→            ) : (
+   448→   448→              <>
+   449→   449→                {/* Mobile Card Layout */}
+   450→   450→                <div className="sm:hidden p-3 space-y-3">
+   451→   451→                  {customers.map((c, index) => (
+   452→   452→                    <motion.div
+   453→   453→                      key={c.id}
+   454→   454→                      initial={{ opacity: 0, y: 10 }}
+   455→   455→                      animate={{ opacity: 1, y: 0 }}
+   456→   456→                      transition={{ duration: 0.2, delay: index * 0.03 }}
+   457→   457→                      className="rounded-xl border shadow-sm overflow-hidden transition-all hover:shadow-md"
+   458→   458→                      style={{
+   459→   459→                        borderRightWidth: '4px',
+   460→   460→                        borderRightStyle: 'solid',
+   461→   461→                        borderRightColor: c.is_active ? '#10b981' : '#ef4444',
+   462→   462→                      }}
+   463→   463→                    >
+   464→   464→                      <div className="p-3 sm:p-4">
+   465→   465→                        {/* Top row: Avatar + Name + Status */}
+   466→   466→                        <div className="flex items-start justify-between gap-2 mb-3">
+   467→   467→                          <div className="flex items-center gap-3 min-w-0">
+   468→   468→                            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-sm" style={{ background: c.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+   469→   469→                              <span className="text-sm font-bold text-white">{c.name.charAt(0)}</span>
+   470→   470→                            </div>
+   471→   471→                            <div className="min-w-0">
+   472→   472→                              <h3 className="font-bold text-sm truncate">{c.name}</h3>
+   473→   473→                              {c.phone && (
+   474→   474→                                <div className="flex items-center gap-1 mt-0.5">
+   475→   475→                                  <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+   476→   476→                                  <span className="text-xs text-muted-foreground" dir="ltr">{c.phone}</span>
+   477→   477→                                </div>
+   478→   478→                              )}
+   479→   479→                            </div>
+   480→   480→                          </div>
+   481→   481→                          <Badge
+   482→   482→                            variant="secondary"
+   483→   483→                            className={`shrink-0 text-[11px] font-semibold px-2.5 py-0.5 ${
+   484→   484→                              c.is_active
+   485→   485→                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+   486→   486→                                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+   487→   487→                            }`}
+   488→   488→                          >
+   489→   489→                            {c.is_active ? 'نشط' : 'معطل'}
+   490→   490→                          </Badge>
+   491→   491→                        </div>
+   492→   492→
+   493→   493→                        {/* Address */}
+   494→   494→                        {c.address && (
+   495→   495→                          <div className="flex items-center gap-1.5 mb-3">
+   496→   496→                            <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+   497→   497→                            <span className="text-xs text-muted-foreground truncate">{c.address}</span>
+   498→   498→                          </div>
+   499→   499→                        )}
+   500→   500→
+   501→   501→                        {/* Action Buttons */}
+   502→   502→                        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+   503→   503→                          {canEdit && (
+   504→   504→                            <Button
+   505→   505→                              variant="outline"
+   506→   506→                              size="sm"
+   507→   507→                              className="h-8 text-xs gap-1.5 flex-1"
+   508→   508→                              onClick={() => openEditDialog(c)}
+   509→   509→                            >
+   510→   510→                              <Edit className="w-3.5 h-3.5" />
+   511→   511→                              تعديل
+   512→   512→                            </Button>
+   513→   513→                          )}
+   514→   514→                          {canDelete && (
+   515→   515→                            <Button
+   516→   516→                              variant="outline"
+   517→   517→                              size="sm"
+   518→   518→                              className={`h-8 text-xs gap-1.5 flex-1 ${c.is_active ? 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'}`}
+   519→   519→                              onClick={() => {
+   520→   520→                                setTogglingCustomer(c);
+   521→   521→                                setToggleDialogOpen(true);
+   522→   522→                              }}
+   523→   523→                            >
+   524→   524→                              {c.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+   525→   525→                              {c.is_active ? 'تعطيل' : 'تفعيل'}
+   526→   526→                            </Button>
+   527→   527→                          )}
+   528→   528→                          <Button
+   529→   529→                            variant="outline"
+   530→   530→                            size="sm"
+   531→   531→                            className="h-8 text-xs gap-1.5 flex-1"
+   532→   532→                            onClick={() => openStatement(c)}
+   533→   533→                          >
+   534→   534→                            <FileText className="w-3.5 h-3.5" />
+   535→   535→                            كشف حساب
+   536→   536→                          </Button>
+   537→   537→                        </div>
+   538→   538→                      </div>
+   539→   539→                    </motion.div>
+   540→   540→                  ))}
+   541→   541→                </div>
+   542→   542→
+   543→   543→                {/* Desktop Table */}
+   544→   544→                <div className="hidden sm:block">
+   545→   545→                  <div className="overflow-x-auto">
+   546→   546→                    <Table>
+   547→   547→                      <TableHeader>
+   548→   548→                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+   549→   549→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الاسم</TableHead>
+   550→   550→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">الهاتف</TableHead>
+   551→   551→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">العنوان</TableHead>
+   552→   552→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">الرقم الضريبي</TableHead>
+   553→   553→                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+   554→   554→                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
+   555→   555→                        </TableRow>
+   556→   556→                      </TableHeader>
+   557→   557→                      <TableBody>
+   558→   558→                        {customers.map((c) => (
+   559→   559→                          <TableRow key={c.id} className="transition-colors">
+   560→   560→                            <TableCell>
+   561→   561→                              <div className="flex items-center gap-2.5">
+   562→   562→                                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-sm" style={{ background: c.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+   563→   563→                                  <span className="text-sm font-bold text-white">{c.name.charAt(0)}</span>
+   564→   564→                                </div>
+   565→   565→                                <div>
+   566→   566→                                  <span className="font-semibold text-sm">{c.name}</span>
+   567→   567→                                  <span className="block text-xs text-muted-foreground sm:hidden">
+   568→   568→                                    {c.phone || '—'}
+   569→   569→                                  </span>
+   570→   570→                                </div>
+   571→   571→                              </div>
+   572→   572→                            </TableCell>
+   573→   573→                            <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+   574→   574→                              <div className="flex items-center gap-1.5">
+   575→   575→                                <Phone className="w-3.5 h-3.5 shrink-0" />
+   576→   576→                                <span dir="ltr">{c.phone || '—'}</span>
+   577→   577→                              </div>
+   578→   578→                            </TableCell>
+   579→   579→                            <TableCell className="hidden md:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
+   580→   580→                              <div className="flex items-center gap-1.5">
+   581→   581→                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+   582→   582→                                <span className="truncate">{c.address || '—'}</span>
+   583→   583→                              </div>
+   584→   584→                            </TableCell>
+   585→   585→                            <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+   586→   586→                              {c.tax_number || '—'}
+   587→   587→                            </TableCell>
+   588→   588→                            <TableCell className="text-center">
+   589→   589→                              <Badge
+   590→   590→                                variant="secondary"
+   591→   591→                                className={`text-[11px] font-semibold px-2.5 py-0.5 ${
+   592→   592→                                  c.is_active
+   593→   593→                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+   594→   594→                                    : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+   595→   595→                                }`}
+   596→   596→                              >
+   597→   597→                                {c.is_active ? 'نشط' : 'معطل'}
+   598→   598→                              </Badge>
+   599→   599→                            </TableCell>
+   600→   600→                            <TableCell>
+   601→   601→                              <div className="flex items-center justify-center gap-1">
+   602→   602→                                {canEdit && (
+   603→   603→                                  <Button
+   604→   604→                                    variant="ghost"
+   605→   605→                                    size="icon"
+   606→   606→                                    className="h-8 w-8 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+   607→   607→                                    onClick={() => openEditDialog(c)}
+   608→   608→                                    title="تعديل"
+   609→   609→                                  >
+   610→   610→                                    <Edit className="w-4 h-4 text-emerald-600" />
+   611→   611→                                  </Button>
+   612→   612→                                )}
+   613→   613→                                {canDelete && (
+   614→   614→                                  <Button
+   615→   615→                                    variant="ghost"
+   616→   616→                                    size="icon"
+   617→   617→                                    className={`h-8 w-8 ${c.is_active ? 'text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'}`}
+   618→   618→                                    onClick={() => {
+   619→   619→                                      setTogglingCustomer(c);
+   620→   620→                                      setToggleDialogOpen(true);
+   621→   621→                                    }}
+   622→   622→                                    title={c.is_active ? 'تعطيل' : 'تفعيل'}
+   623→   623→                                  >
+   624→   624→                                    {c.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+   625→   625→                                  </Button>
+   626→   626→                                )}
+   627→   627→                                <Button
+   628→   628→                                  variant="ghost"
+   629→   629→                                  size="icon"
+   630→   630→                                  className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+   631→   631→                                  onClick={() => openStatement(c)}
+   632→   632→                                  title="كشف حساب"
+   633→   633→                                >
+   634→   634→                                  <FileText className="w-4 h-4 text-amber-600" />
+   635→   635→                                </Button>
+   636→   636→                              </div>
+   637→   637→                            </TableCell>
+   638→   638→                          </TableRow>
+   639→   639→                        ))}
+   640→   640→                      </TableBody>
+   641→   641→                    </Table>
+   642→   642→                  </div>
+   643→   643→                </div>
+   644→   644→
+   645→   645→                <DataTablePagination
+   646→   646→                  page={page}
+   647→   647→                  totalPages={totalPages}
+   648→   648→                  totalCount={totalCount}
+   649→   649→                  pageSize={pageSize}
+   650→   650→                  onPageChange={setPage}
+   651→   651→                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+   652→   652→                  label="عميل"
+   653→   653→                />
+   654→   654→              </>
+   655→   655→            )}
+   656→   656→          </CardContent>
+   657→   657→        </Card>
+   658→   658→      </motion.div>
+   659→   659→
+   660→   660→      {/* Add/Edit Customer Dialog */}
+   661→   661→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   662→   662→        <DialogContent className="w-[95vw] sm:max-w-lg">
+   663→   663→          <DialogHeader>
+   664→   664→            <DialogTitle className="flex items-center gap-2">
+   665→   665→              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   666→   666→                {editingCustomer ? <Edit className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+   667→   667→              </div>
+   668→   668→              {editingCustomer ? 'تعديل العميل' : 'إضافة عميل جديد'}
+   669→   669→            </DialogTitle>
+   670→   670→          </DialogHeader>
+   671→   671→          <div className="space-y-4 py-4">
+   672→   672→            <div className="space-y-2">
+   673→   673→              <Label htmlFor="customer-name">اسم العميل *</Label>
+   674→   674→              <Input
+   675→   675→                id="customer-name"
+   676→   676→                value={form.name}
+   677→   677→                onChange={(e) => setForm({ ...form, name: e.target.value })}
+   678→   678→                placeholder="مثال: شركة النور للتجارة"
+   679→   679→              />
+   680→   680→            </div>
+   681→   681→            <div className="space-y-2">
+   682→   682→              <Label htmlFor="customer-phone" className="flex items-center gap-1">
+   683→   683→                <Phone className="w-3.5 h-3.5" />
+   684→   684→                رقم الهاتف
+   685→   685→              </Label>
+   686→   686→              <Input
+   687→   687→                id="customer-phone"
+   688→   688→                value={form.phone}
+   689→   689→                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+   690→   690→                placeholder="مثال: 01012345678"
+   691→   691→                dir="ltr"
+   692→   692→              />
+   693→   693→            </div>
+   694→   694→            <div className="space-y-2">
+   695→   695→              <Label htmlFor="customer-address" className="flex items-center gap-1">
+   696→   696→                <MapPin className="w-3.5 h-3.5" />
+   697→   697→                العنوان
+   698→   698→              </Label>
+   699→   699→              <Input
+   700→   700→                id="customer-address"
+   701→   701→                value={form.address}
+   702→   702→                onChange={(e) => setForm({ ...form, address: e.target.value })}
+   703→   703→                placeholder="مثال: القاهرة - المعادي"
+   704→   704→              />
+   705→   705→            </div>
+   706→   706→            <div className="space-y-2">
+   707→   707→              <Label htmlFor="customer-tax" className="flex items-center gap-1">
+   708→   708→                <FileText className="w-3.5 h-3.5" />
+   709→   709→                الرقم الضريبي
+   710→   710→              </Label>
+   711→   711→              <Input
+   712→   712→                id="customer-tax"
+   713→   713→                value={form.tax_number}
+   714→   714→                onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
+   715→   715→                placeholder="مثال: 300-123-456789"
+   716→   716→                dir="ltr"
+   717→   717→              />
+   718→   718→            </div>
+   719→   719→            <div className="flex items-center gap-2">
+   720→   720→              <Switch
+   721→   721→                id="customer-active"
+   722→   722→                checked={form.is_active}
+   723→   723→                onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
+   724→   724→              />
+   725→   725→              <Label htmlFor="customer-active">عميل نشط</Label>
+   726→   726→            </div>
+   727→   727→            <div className="space-y-2">
+   728→   728→              <Label htmlFor="customer-notes">ملاحظات</Label>
+   729→   729→              <Textarea
+   730→   730→                id="customer-notes"
+   731→   731→                value={form.notes}
+   732→   732→                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+   733→   733→                placeholder="أي ملاحظات إضافية..."
+   734→   734→                rows={3}
+   735→   735→              />
+   736→   736→            </div>
+   737→   737→          </div>
+   738→   738→          <DialogFooter>
+   739→   739→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+   740→   740→              إلغاء
+   741→   741→            </Button>
+   742→   742→            <Button onClick={handleSave} disabled={saving} className="shadow-md" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   743→   743→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+   744→   744→              {editingCustomer ? 'تحديث' : 'إضافة'}
+   745→   745→            </Button>
+   746→   746→          </DialogFooter>
+   747→   747→        </DialogContent>
+   748→   748→      </Dialog>
+   749→   749→
+   750→   750→      {/* Toggle Active Confirmation */}
+   751→   751→      <AlertDialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
+   752→   752→        <AlertDialogContent>
+   753→   753→          <AlertDialogHeader>
+   754→   754→            <AlertDialogTitle className="flex items-center gap-2">
+   755→   755→              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${togglingCustomer?.is_active ? 'bg-red-100 dark:bg-red-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
+   756→   756→                {togglingCustomer?.is_active ? <UserX className="w-4 h-4 text-red-600" /> : <UserCheck className="w-4 h-4 text-emerald-600" />}
+   757→   757→              </div>
+   758→   758→              {togglingCustomer?.is_active ? 'تعطيل العميل' : 'تفعيل العميل'}
+   759→   759→            </AlertDialogTitle>
+   760→   760→            <AlertDialogDescription>
+   761→   761→              {togglingCustomer?.is_active
+   762→   762→                ? `هل أنت متأكد من تعطيل العميل "${togglingCustomer?.name}"؟ لن يكون متاحاً للاستخدام في الفواتير.`
+   763→   763→                : `هل أنت متأكد من تفعيل العميل "${togglingCustomer?.name}"؟`}
+   764→   764→            </AlertDialogDescription>
+   765→   765→          </AlertDialogHeader>
+   766→   766→          <AlertDialogFooter>
+   767→   767→            <AlertDialogCancel onClick={() => setTogglingCustomer(null)}>إلغاء</AlertDialogCancel>
+   768→   768→            <AlertDialogAction
+   769→   769→              onClick={handleToggleActive}
+   770→   770→              className={togglingCustomer?.is_active ? 'bg-destructive hover:bg-destructive/90' : ''}
+   771→   771→            >
+   772→   772→              {togglingCustomer?.is_active ? 'تعطيل' : 'تفعيل'}
+   773→   773→            </AlertDialogAction>
+   774→   774→          </AlertDialogFooter>
+   775→   775→        </AlertDialogContent>
+   776→   776→      </AlertDialog>
+   777→   777→
+   778→   778→      {/* Customer Account Statement Dialog */}
+   779→   779→      <Dialog open={statementDialogOpen} onOpenChange={setStatementDialogOpen}>
+   780→   780→        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh]">
+   781→   781→          <DialogHeader>
+   782→   782→            <DialogTitle className="flex items-center gap-2">
+   783→   783→              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   784→   784→                <FileText className="w-4 h-4 text-white" />
+   785→   785→              </div>
+   786→   786→              كشف حساب: {statementCustomer?.name}
+   787→   787→            </DialogTitle>
+   788→   788→          </DialogHeader>
+   789→   789→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+   790→   790→            {loadingStatement ? (
+   791→   791→              <div className="flex flex-col items-center justify-center py-12">
+   792→   792→                <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   793→   793→                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+   794→   794→                </div>
+   795→   795→                <p className="text-muted-foreground text-sm">جارٍ تحميل كشف الحساب...</p>
+   796→   796→              </div>
+   797→   797→            ) : (
+   798→   798→              <div className="space-y-6 py-4">
+   799→   799→                {/* Summary Cards */}
+   800→   800→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   801→   801→                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+   802→   802→                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">إجمالي الفواتير</p>
+   803→   803→                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(statementData.totalInvoiced)}</p>
+   804→   804→                  </div>
+   805→   805→                  <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
+   806→   806→                    <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">إجمالي المدفوعات</p>
+   807→   807→                    <p className="text-lg font-bold text-sky-700 dark:text-sky-300">{formatCurrency(statementData.totalPaid)}</p>
+   808→   808→                  </div>
+   809→   809→                  <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+   810→   810→                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">إجمالي المرتجعات</p>
+   811→   811→                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{formatCurrency(statementData.totalReturned)}</p>
+   812→   812→                  </div>
+   813→   813→                  <div className={`p-3 rounded-xl border ${statementData.balance > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'}`}>
+   814→   814→                    <p className={`text-xs font-medium ${statementData.balance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>الرصيد المتبقي</p>
+   815→   815→                    <p className={`text-lg font-bold ${statementData.balance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>{formatCurrency(statementData.balance)}</p>
+   816→   816→                  </div>
+   817→   817→                </div>
+   818→   818→
+   819→   819→                {/* Invoices */}
+   820→   820→                {statementData.invoices.length > 0 && (
+   821→   821→                  <div>
+   822→   822→                    <h3 className="text-sm font-semibold mb-2">الفواتير ({statementData.invoices.length})</h3>
+   823→   823→                    <div className="border rounded-lg overflow-hidden">
+   824→   824→                      <Table>
+   825→   825→                        <TableHeader>
+   826→   826→                          <TableRow>
+   827→   827→                            <TableHead className="text-right text-xs">رقم الفاتورة</TableHead>
+   828→   828→                            <TableHead className="text-right text-xs">الفرع</TableHead>
+   829→   829→                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+   830→   830→                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+   831→   831→                            <TableHead className="text-center text-xs">الحالة</TableHead>
+   832→   832→                          </TableRow>
+   833→   833→                        </TableHeader>
+   834→   834→                        <TableBody>
+   835→   835→                          {statementData.invoices.map((inv: any) => (
+   836→   836→                            <TableRow key={inv.id}>
+   837→   837→                              <TableCell className="font-medium text-xs">{inv.invoice_number}</TableCell>
+   838→   838→                              <TableCell className="text-xs">{inv.branches?.name || '—'}</TableCell>
+   839→   839→                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(inv.invoice_date)}</TableCell>
+   840→   840→                              <TableCell className="font-semibold text-xs">{formatCurrency(Number(inv.total))}</TableCell>
+   841→   841→                              <TableCell className="text-center">
+   842→   842→                                <Badge variant="secondary" className={`text-[9px] ${
+   843→   843→                                  inv.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+   844→   844→                                  inv.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+   845→   845→                                  inv.status === 'fully_returned' ? 'bg-gray-100 text-gray-800' :
+   846→   846→                                  'bg-amber-100 text-amber-800'
+   847→   847→                                }`}>
+   848→   848→                                  {inv.status === 'active' ? 'نشطة' :
+   849→   849→                                   inv.status === 'cancelled' ? 'ملغاة' :
+   850→   850→                                   inv.status === 'fully_returned' ? 'مرتجعة' : 'مرتجع جزئياً'}
+   851→   851→                                </Badge>
+   852→   852→                              </TableCell>
+   853→   853→                            </TableRow>
+   854→   854→                          ))}
+   855→   855→                        </TableBody>
+   856→   856→                      </Table>
+   857→   857→                    </div>
+   858→   858→                  </div>
+   859→   859→                )}
+   860→   860→
+   861→   861→                {/* Returns */}
+   862→   862→                {statementData.returns.length > 0 && (
+   863→   863→                  <div>
+   864→   864→                    <h3 className="text-sm font-semibold mb-2">المرتجعات ({statementData.returns.length})</h3>
+   865→   865→                    <div className="border rounded-lg overflow-hidden">
+   866→   866→                      <Table>
+   867→   867→                        <TableHeader>
+   868→   868→                          <TableRow>
+   869→   869→                            <TableHead className="text-right text-xs">رقم المرتجع</TableHead>
+   870→   870→                            <TableHead className="text-right text-xs hidden sm:table-cell">الفرع</TableHead>
+   871→   871→                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+   872→   872→                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+   873→   873→                          </TableRow>
+   874→   874→                        </TableHeader>
+   875→   875→                        <TableBody>
+   876→   876→                          {statementData.returns.map((ret: any) => (
+   877→   877→                            <TableRow key={ret.id}>
+   878→   878→                              <TableCell className="font-medium text-xs">{ret.return_number}</TableCell>
+   879→   879→                              <TableCell className="text-xs hidden sm:table-cell">{ret.branches?.name || '—'}</TableCell>
+   880→   880→                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(ret.return_date)}</TableCell>
+   881→   881→                              <TableCell className="font-semibold text-xs text-red-600">{formatCurrency(Number(ret.total))}</TableCell>
+   882→   882→                            </TableRow>
+   883→   883→                          ))}
+   884→   884→                        </TableBody>
+   885→   885→                      </Table>
+   886→   886→                    </div>
+   887→   887→                  </div>
+   888→   888→                )}
+   889→   889→
+   890→   890→                {statementData.invoices.length === 0 && statementData.returns.length === 0 && (
+   891→   891→                  <div className="text-center py-8 text-muted-foreground text-sm">
+   892→   892→                    لا توجد حركات لهذا العميل
+   893→   893→                  </div>
+   894→   894→                )}
+   895→   895→              </div>
+   896→   896→            )}
+   897→   897→          </ScrollArea>
+   898→   898→        </DialogContent>
+   899→   899→      </Dialog>
+   900→   900→    </div>
+   901→   901→  );
+   902→   902→}
+   903→   903→

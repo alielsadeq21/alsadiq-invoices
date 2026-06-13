@@ -1,0 +1,703 @@
+     1→   201→      setTotalCount(count || 0);
+     2→   202→    } catch (err) {
+     3→   203→      console.error(err);
+     4→   204→      toast.error('حدث خطأ أثناء تحميل البيانات');
+     5→   205→    } finally {
+     6→   206→      setLoading(false);
+     7→   207→    }
+     8→   208→  };
+     9→   209→
+    10→   210→  const logAction = async (action: string, details: Record<string, unknown>) => {
+    11→   211→    try {
+    12→   212→      await supabase.from('audit_log').insert({ action, details });
+    13→   213→    } catch {
+    14→   214→      // Silent fail for audit logging
+    15→   215→    }
+    16→   216→  };
+    17→   217→
+    18→   218→  const openAddDialog = () => {
+    19→   219→    setEditingCustomer(null);
+    20→   220→    setForm({
+    21→   221→      name: '',
+    22→   222→      phone: '',
+    23→   223→      address: '',
+    24→   224→      tax_number: '',
+    25→   225→      is_active: true,
+    26→   226→      notes: '',
+    27→   227→    });
+    28→   228→    setDialogOpen(true);
+    29→   229→  };
+    30→   230→
+    31→   231→  const openEditDialog = (customer: Customer) => {
+    32→   232→    setEditingCustomer(customer);
+    33→   233→    setForm({
+    34→   234→      name: customer.name,
+    35→   235→      phone: customer.phone || '',
+    36→   236→      address: customer.address || '',
+    37→   237→      tax_number: customer.tax_number || '',
+    38→   238→      is_active: customer.is_active,
+    39→   239→      notes: customer.notes || '',
+    40→   240→    });
+    41→   241→    setDialogOpen(true);
+    42→   242→  };
+    43→   243→
+    44→   244→  const handleSave = async () => {
+    45→   245→    if (!form.name.trim()) {
+    46→   246→      toast.error('يرجى إدخال اسم العميل');
+    47→   247→      return;
+    48→   248→    }
+    49→   249→
+    50→   250→    setSaving(true);
+    51→   251→    try {
+    52→   252→      if (editingCustomer) {
+    53→   253→        // Update customer
+    54→   254→        const { error } = await supabase
+    55→   255→          .from('customers')
+    56→   256→          .update({
+    57→   257→            name: form.name.trim(),
+    58→   258→            phone: form.phone.trim() || null,
+    59→   259→            address: form.address.trim() || null,
+    60→   260→            tax_number: form.tax_number.trim() || null,
+    61→   261→            is_active: form.is_active,
+    62→   262→            notes: form.notes.trim() || null,
+    63→   263→            updated_at: new Date().toISOString(),
+    64→   264→          })
+    65→   265→          .eq('id', editingCustomer.id);
+    66→   266→
+    67→   267→        if (error) throw error;
+    68→   268→
+    69→   269→        await logAction('update_customer', {
+    70→   270→          customer_id: editingCustomer.id,
+    71→   271→          customer_name: form.name.trim(),
+    72→   272→          updated_by: currentUser?.id,
+    73→   273→        });
+    74→   274→
+    75→   275→        toast.success('تم تحديث العميل بنجاح');
+    76→   276→      } else {
+    77→   277→        // Insert new customer
+    78→   278→        const { error } = await supabase.from('customers').insert({
+    79→   279→          name: form.name.trim(),
+    80→   280→          phone: form.phone.trim() || null,
+    81→   281→          address: form.address.trim() || null,
+    82→   282→          tax_number: form.tax_number.trim() || null,
+    83→   283→          is_active: form.is_active,
+    84→   284→          notes: form.notes.trim() || null,
+    85→   285→        });
+    86→   286→
+    87→   287→        if (error) throw error;
+    88→   288→
+    89→   289→        await logAction('create_customer', {
+    90→   290→          customer_name: form.name.trim(),
+    91→   291→          phone: form.phone.trim() || null,
+    92→   292→          created_by: currentUser?.id,
+    93→   293→        });
+    94→   294→
+    95→   295→        toast.success('تم إضافة العميل بنجاح');
+    96→   296→      }
+    97→   297→
+    98→   298→      setDialogOpen(false);
+    99→   299→      loadData();
+   100→   300→    } catch (err) {
+   101→   301→      console.error(err);
+   102→   302→      toast.error('حدث خطأ أثناء الحفظ');
+   103→   303→    } finally {
+   104→   304→      setSaving(false);
+   105→   305→    }
+   106→   306→  };
+   107→   307→
+   108→   308→  const handleToggleActive = async () => {
+   109→   309→    if (!togglingCustomer) return;
+   110→   310→
+   111→   311→    try {
+   112→   312→      const newStatus = !togglingCustomer.is_active;
+   113→   313→      const { error } = await supabase
+   114→   314→        .from('customers')
+   115→   315→        .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+   116→   316→        .eq('id', togglingCustomer.id);
+   117→   317→
+   118→   318→      if (error) throw error;
+   119→   319→
+   120→   320→      await logAction(newStatus ? 'activate_customer' : 'deactivate_customer', {
+   121→   321→        customer_id: togglingCustomer.id,
+   122→   322→        customer_name: togglingCustomer.name,
+   123→   323→        action_by: currentUser?.id,
+   124→   324→      });
+   125→   325→
+   126→   326→      toast.success(newStatus ? 'تم تفعيل العميل' : 'تم تعطيل العميل');
+   127→   327→      setToggleDialogOpen(false);
+   128→   328→      setTogglingCustomer(null);
+   129→   329→      loadData();
+   130→   330→    } catch (err) {
+   131→   331→      console.error(err);
+   132→   332→      toast.error('حدث خطأ أثناء تغيير الحالة');
+   133→   333→    }
+   134→   334→  };
+   135→   335→
+   136→   336→  const totalPages = Math.ceil(totalCount / pageSize);
+   137→   337→
+   138→   338→  if (!canView) {
+   139→   339→    return (
+   140→   340→      <div className="flex flex-col items-center justify-center py-20 px-4">
+   141→   341→        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   142→   342→          <Shield className="w-12 h-12 text-white" />
+   143→   343→        </div>
+   144→   344→        <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
+   145→   345→        <p className="text-muted-foreground text-sm text-center">
+   146→   346→          ليس لديك صلاحية لعرض هذه الصفحة
+   147→   347→        </p>
+   148→   348→      </div>
+   149→   349→    );
+   150→   350→  }
+   151→   351→
+   152→   352→  return (
+   153→   353→    <div className="space-y-6">
+   154→   354→      {/* Header */}
+   155→   355→      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   156→   356→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   157→   357→          <div className="flex items-center gap-3">
+   158→   358→            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   159→   359→              <Users className="w-6 h-6 text-white" />
+   160→   360→            </div>
+   161→   361→            <div>
+   162→   362→              <h1 className="text-2xl font-bold">إدارة العملاء</h1>
+   163→   363→              <div className="flex items-center gap-3 mt-1">
+   164→   364→                <span className="text-sm text-muted-foreground">
+   165→   365→                  إجمالي العملاء: <span className="font-bold text-foreground">{totalCount}</span>
+   166→   366→                </span>
+   167→   367→                {totalCount > 0 && (
+   168→   368→                  <>
+   169→   369→                    <span className="text-muted-foreground/40">|</span>
+   170→   370→                    <span className="text-sm text-emerald-600 dark:text-emerald-400">
+   171→   371→                      نشط: <span className="font-bold">{customers.filter(c => c.is_active).length}</span>
+   172→   372→                    </span>
+   173→   373→                  </>
+   174→   374→                )}
+   175→   375→              </div>
+   176→   376→            </div>
+   177→   377→          </div>
+   178→   378→          {canCreate && (
+   179→   379→            <Button onClick={openAddDialog} className="gap-2 shadow-lg shadow-emerald-500/20" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   180→   380→              <Plus className="w-4 h-4" />
+   181→   381→              إضافة عميل
+   182→   382→            </Button>
+   183→   383→          )}
+   184→   384→        </div>
+   185→   385→      </motion.div>
+   186→   386→
+   187→   387→      {/* Search & Filters */}
+   188→   388→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   189→   389→        <Card className="border-0 shadow-md overflow-hidden">
+   190→   390→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #047857)' }} />
+   191→   391→          <CardContent className="p-4">
+   192→   392→            <div className="flex flex-col sm:flex-row gap-3">
+   193→   393→              <div className="relative flex-1">
+   194→   394→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   195→   395→                <Input
+   196→   396→                  placeholder="بحث بالاسم أو رقم الهاتف..."
+   197→   397→                  value={search}
+   198→   398→                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   199→   399→                  className="pr-10"
+   200→   400→                />
+   201→   401→              </div>
+   202→   402→              <div className="flex gap-2">
+   203→   403→                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+   204→   404→                  <SelectTrigger className="w-[130px]">
+   205→   405→                    <Filter className="w-4 h-4 ml-1" />
+   206→   406→                    <SelectValue placeholder="الحالة" />
+   207→   407→                  </SelectTrigger>
+   208→   408→                  <SelectContent>
+   209→   409→                    <SelectItem value="all">كل الحالات</SelectItem>
+   210→   410→                    <SelectItem value="active">نشط</SelectItem>
+   211→   411→                    <SelectItem value="inactive">معطل</SelectItem>
+   212→   412→                  </SelectContent>
+   213→   413→                </Select>
+   214→   414→              </div>
+   215→   415→            </div>
+   216→   416→          </CardContent>
+   217→   417→        </Card>
+   218→   418→      </motion.div>
+   219→   419→
+   220→   420→      {/* Customers Content */}
+   221→   421→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
+   222→   422→        <Card className="border-0 shadow-md">
+   223→   423→          <CardContent className="p-0">
+   224→   424→            {loading ? (
+   225→   425→              <div className="flex flex-col items-center justify-center py-16">
+   226→   426→                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   227→   427→                  <Loader2 className="w-8 h-8 animate-spin text-white" />
+   228→   428→                </div>
+   229→   429→                <p className="text-muted-foreground text-sm">جارٍ تحميل البيانات...</p>
+   230→   430→              </div>
+   231→   431→            ) : customers.length === 0 ? (
+   232→   432→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   233→   433→                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   234→   434→                  <Users className="w-12 h-12 text-white" />
+   235→   435→                </div>
+   236→   436→                <h3 className="text-xl font-bold mb-2">لا يوجد عملاء</h3>
+   237→   437→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   238→   438→                  لم يتم إضافة أي عملاء بعد. أضف عميلاً لبدء إدارة بيانات العملاء.
+   239→   439→                </p>
+   240→   440→                {canCreate && (
+   241→   441→                  <Button onClick={openAddDialog} className="gap-2 shadow-lg shadow-emerald-500/20" size="lg" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   242→   442→                    <Plus className="w-5 h-5" />
+   243→   443→                    إضافة عميل جديد
+   244→   444→                  </Button>
+   245→   445→                )}
+   246→   446→              </div>
+   247→   447→            ) : (
+   248→   448→              <>
+   249→   449→                {/* Mobile Card Layout */}
+   250→   450→                <div className="sm:hidden p-3 space-y-3">
+   251→   451→                  {customers.map((c, index) => (
+   252→   452→                    <motion.div
+   253→   453→                      key={c.id}
+   254→   454→                      initial={{ opacity: 0, y: 10 }}
+   255→   455→                      animate={{ opacity: 1, y: 0 }}
+   256→   456→                      transition={{ duration: 0.2, delay: index * 0.03 }}
+   257→   457→                      className="rounded-xl border shadow-sm overflow-hidden transition-all hover:shadow-md"
+   258→   458→                      style={{
+   259→   459→                        borderRightWidth: '4px',
+   260→   460→                        borderRightStyle: 'solid',
+   261→   461→                        borderRightColor: c.is_active ? '#10b981' : '#ef4444',
+   262→   462→                      }}
+   263→   463→                    >
+   264→   464→                      <div className="p-3 sm:p-4">
+   265→   465→                        {/* Top row: Avatar + Name + Status */}
+   266→   466→                        <div className="flex items-start justify-between gap-2 mb-3">
+   267→   467→                          <div className="flex items-center gap-3 min-w-0">
+   268→   468→                            <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-sm" style={{ background: c.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+   269→   469→                              <span className="text-sm font-bold text-white">{c.name.charAt(0)}</span>
+   270→   470→                            </div>
+   271→   471→                            <div className="min-w-0">
+   272→   472→                              <h3 className="font-bold text-sm truncate">{c.name}</h3>
+   273→   473→                              {c.phone && (
+   274→   474→                                <div className="flex items-center gap-1 mt-0.5">
+   275→   475→                                  <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+   276→   476→                                  <span className="text-xs text-muted-foreground" dir="ltr">{c.phone}</span>
+   277→   477→                                </div>
+   278→   478→                              )}
+   279→   479→                            </div>
+   280→   480→                          </div>
+   281→   481→                          <Badge
+   282→   482→                            variant="secondary"
+   283→   483→                            className={`shrink-0 text-[11px] font-semibold px-2.5 py-0.5 ${
+   284→   484→                              c.is_active
+   285→   485→                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+   286→   486→                                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+   287→   487→                            }`}
+   288→   488→                          >
+   289→   489→                            {c.is_active ? 'نشط' : 'معطل'}
+   290→   490→                          </Badge>
+   291→   491→                        </div>
+   292→   492→
+   293→   493→                        {/* Address */}
+   294→   494→                        {c.address && (
+   295→   495→                          <div className="flex items-center gap-1.5 mb-3">
+   296→   496→                            <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+   297→   497→                            <span className="text-xs text-muted-foreground truncate">{c.address}</span>
+   298→   498→                          </div>
+   299→   499→                        )}
+   300→   500→
+   301→   501→                        {/* Action Buttons */}
+   302→   502→                        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+   303→   503→                          {canEdit && (
+   304→   504→                            <Button
+   305→   505→                              variant="outline"
+   306→   506→                              size="sm"
+   307→   507→                              className="h-8 text-xs gap-1.5 flex-1"
+   308→   508→                              onClick={() => openEditDialog(c)}
+   309→   509→                            >
+   310→   510→                              <Edit className="w-3.5 h-3.5" />
+   311→   511→                              تعديل
+   312→   512→                            </Button>
+   313→   513→                          )}
+   314→   514→                          {canDelete && (
+   315→   515→                            <Button
+   316→   516→                              variant="outline"
+   317→   517→                              size="sm"
+   318→   518→                              className={`h-8 text-xs gap-1.5 flex-1 ${c.is_active ? 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'}`}
+   319→   519→                              onClick={() => {
+   320→   520→                                setTogglingCustomer(c);
+   321→   521→                                setToggleDialogOpen(true);
+   322→   522→                              }}
+   323→   523→                            >
+   324→   524→                              {c.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+   325→   525→                              {c.is_active ? 'تعطيل' : 'تفعيل'}
+   326→   526→                            </Button>
+   327→   527→                          )}
+   328→   528→                          <Button
+   329→   529→                            variant="outline"
+   330→   530→                            size="sm"
+   331→   531→                            className="h-8 text-xs gap-1.5 flex-1"
+   332→   532→                            onClick={() => openStatement(c)}
+   333→   533→                          >
+   334→   534→                            <FileText className="w-3.5 h-3.5" />
+   335→   535→                            كشف حساب
+   336→   536→                          </Button>
+   337→   537→                        </div>
+   338→   538→                      </div>
+   339→   539→                    </motion.div>
+   340→   540→                  ))}
+   341→   541→                </div>
+   342→   542→
+   343→   543→                {/* Desktop Table */}
+   344→   544→                <div className="hidden sm:block">
+   345→   545→                  <div className="overflow-x-auto">
+   346→   546→                    <Table>
+   347→   547→                      <TableHeader>
+   348→   548→                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+   349→   549→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الاسم</TableHead>
+   350→   550→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">الهاتف</TableHead>
+   351→   551→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">العنوان</TableHead>
+   352→   552→                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">الرقم الضريبي</TableHead>
+   353→   553→                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+   354→   554→                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
+   355→   555→                        </TableRow>
+   356→   556→                      </TableHeader>
+   357→   557→                      <TableBody>
+   358→   558→                        {customers.map((c) => (
+   359→   559→                          <TableRow key={c.id} className="transition-colors">
+   360→   560→                            <TableCell>
+   361→   561→                              <div className="flex items-center gap-2.5">
+   362→   562→                                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-sm" style={{ background: c.is_active ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+   363→   563→                                  <span className="text-sm font-bold text-white">{c.name.charAt(0)}</span>
+   364→   564→                                </div>
+   365→   565→                                <div>
+   366→   566→                                  <span className="font-semibold text-sm">{c.name}</span>
+   367→   567→                                  <span className="block text-xs text-muted-foreground sm:hidden">
+   368→   568→                                    {c.phone || '—'}
+   369→   569→                                  </span>
+   370→   570→                                </div>
+   371→   571→                              </div>
+   372→   572→                            </TableCell>
+   373→   573→                            <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+   374→   574→                              <div className="flex items-center gap-1.5">
+   375→   575→                                <Phone className="w-3.5 h-3.5 shrink-0" />
+   376→   576→                                <span dir="ltr">{c.phone || '—'}</span>
+   377→   577→                              </div>
+   378→   578→                            </TableCell>
+   379→   579→                            <TableCell className="hidden md:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
+   380→   580→                              <div className="flex items-center gap-1.5">
+   381→   581→                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+   382→   582→                                <span className="truncate">{c.address || '—'}</span>
+   383→   583→                              </div>
+   384→   584→                            </TableCell>
+   385→   585→                            <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+   386→   586→                              {c.tax_number || '—'}
+   387→   587→                            </TableCell>
+   388→   588→                            <TableCell className="text-center">
+   389→   589→                              <Badge
+   390→   590→                                variant="secondary"
+   391→   591→                                className={`text-[11px] font-semibold px-2.5 py-0.5 ${
+   392→   592→                                  c.is_active
+   393→   593→                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+   394→   594→                                    : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+   395→   595→                                }`}
+   396→   596→                              >
+   397→   597→                                {c.is_active ? 'نشط' : 'معطل'}
+   398→   598→                              </Badge>
+   399→   599→                            </TableCell>
+   400→   600→                            <TableCell>
+   401→   601→                              <div className="flex items-center justify-center gap-1">
+   402→   602→                                {canEdit && (
+   403→   603→                                  <Button
+   404→   604→                                    variant="ghost"
+   405→   605→                                    size="icon"
+   406→   606→                                    className="h-8 w-8 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+   407→   607→                                    onClick={() => openEditDialog(c)}
+   408→   608→                                    title="تعديل"
+   409→   609→                                  >
+   410→   610→                                    <Edit className="w-4 h-4 text-emerald-600" />
+   411→   611→                                  </Button>
+   412→   612→                                )}
+   413→   613→                                {canDelete && (
+   414→   614→                                  <Button
+   415→   615→                                    variant="ghost"
+   416→   616→                                    size="icon"
+   417→   617→                                    className={`h-8 w-8 ${c.is_active ? 'text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'}`}
+   418→   618→                                    onClick={() => {
+   419→   619→                                      setTogglingCustomer(c);
+   420→   620→                                      setToggleDialogOpen(true);
+   421→   621→                                    }}
+   422→   622→                                    title={c.is_active ? 'تعطيل' : 'تفعيل'}
+   423→   623→                                  >
+   424→   624→                                    {c.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+   425→   625→                                  </Button>
+   426→   626→                                )}
+   427→   627→                                <Button
+   428→   628→                                  variant="ghost"
+   429→   629→                                  size="icon"
+   430→   630→                                  className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+   431→   631→                                  onClick={() => openStatement(c)}
+   432→   632→                                  title="كشف حساب"
+   433→   633→                                >
+   434→   634→                                  <FileText className="w-4 h-4 text-amber-600" />
+   435→   635→                                </Button>
+   436→   636→                              </div>
+   437→   637→                            </TableCell>
+   438→   638→                          </TableRow>
+   439→   639→                        ))}
+   440→   640→                      </TableBody>
+   441→   641→                    </Table>
+   442→   642→                  </div>
+   443→   643→                </div>
+   444→   644→
+   445→   645→                <DataTablePagination
+   446→   646→                  page={page}
+   447→   647→                  totalPages={totalPages}
+   448→   648→                  totalCount={totalCount}
+   449→   649→                  pageSize={pageSize}
+   450→   650→                  onPageChange={setPage}
+   451→   651→                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+   452→   652→                  label="عميل"
+   453→   653→                />
+   454→   654→              </>
+   455→   655→            )}
+   456→   656→          </CardContent>
+   457→   657→        </Card>
+   458→   658→      </motion.div>
+   459→   659→
+   460→   660→      {/* Add/Edit Customer Dialog */}
+   461→   661→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   462→   662→        <DialogContent className="w-[95vw] sm:max-w-lg">
+   463→   663→          <DialogHeader>
+   464→   664→            <DialogTitle className="flex items-center gap-2">
+   465→   665→              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   466→   666→                {editingCustomer ? <Edit className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
+   467→   667→              </div>
+   468→   668→              {editingCustomer ? 'تعديل العميل' : 'إضافة عميل جديد'}
+   469→   669→            </DialogTitle>
+   470→   670→          </DialogHeader>
+   471→   671→          <div className="space-y-4 py-4">
+   472→   672→            <div className="space-y-2">
+   473→   673→              <Label htmlFor="customer-name">اسم العميل *</Label>
+   474→   674→              <Input
+   475→   675→                id="customer-name"
+   476→   676→                value={form.name}
+   477→   677→                onChange={(e) => setForm({ ...form, name: e.target.value })}
+   478→   678→                placeholder="مثال: شركة النور للتجارة"
+   479→   679→              />
+   480→   680→            </div>
+   481→   681→            <div className="space-y-2">
+   482→   682→              <Label htmlFor="customer-phone" className="flex items-center gap-1">
+   483→   683→                <Phone className="w-3.5 h-3.5" />
+   484→   684→                رقم الهاتف
+   485→   685→              </Label>
+   486→   686→              <Input
+   487→   687→                id="customer-phone"
+   488→   688→                value={form.phone}
+   489→   689→                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+   490→   690→                placeholder="مثال: 01012345678"
+   491→   691→                dir="ltr"
+   492→   692→              />
+   493→   693→            </div>
+   494→   694→            <div className="space-y-2">
+   495→   695→              <Label htmlFor="customer-address" className="flex items-center gap-1">
+   496→   696→                <MapPin className="w-3.5 h-3.5" />
+   497→   697→                العنوان
+   498→   698→              </Label>
+   499→   699→              <Input
+   500→   700→                id="customer-address"
+   501→   701→                value={form.address}
+   502→   702→                onChange={(e) => setForm({ ...form, address: e.target.value })}
+   503→   703→                placeholder="مثال: القاهرة - المعادي"
+   504→   704→              />
+   505→   705→            </div>
+   506→   706→            <div className="space-y-2">
+   507→   707→              <Label htmlFor="customer-tax" className="flex items-center gap-1">
+   508→   708→                <FileText className="w-3.5 h-3.5" />
+   509→   709→                الرقم الضريبي
+   510→   710→              </Label>
+   511→   711→              <Input
+   512→   712→                id="customer-tax"
+   513→   713→                value={form.tax_number}
+   514→   714→                onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
+   515→   715→                placeholder="مثال: 300-123-456789"
+   516→   716→                dir="ltr"
+   517→   717→              />
+   518→   718→            </div>
+   519→   719→            <div className="flex items-center gap-2">
+   520→   720→              <Switch
+   521→   721→                id="customer-active"
+   522→   722→                checked={form.is_active}
+   523→   723→                onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
+   524→   724→              />
+   525→   725→              <Label htmlFor="customer-active">عميل نشط</Label>
+   526→   726→            </div>
+   527→   727→            <div className="space-y-2">
+   528→   728→              <Label htmlFor="customer-notes">ملاحظات</Label>
+   529→   729→              <Textarea
+   530→   730→                id="customer-notes"
+   531→   731→                value={form.notes}
+   532→   732→                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+   533→   733→                placeholder="أي ملاحظات إضافية..."
+   534→   734→                rows={3}
+   535→   735→              />
+   536→   736→            </div>
+   537→   737→          </div>
+   538→   738→          <DialogFooter>
+   539→   739→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+   540→   740→              إلغاء
+   541→   741→            </Button>
+   542→   742→            <Button onClick={handleSave} disabled={saving} className="shadow-md" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   543→   743→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+   544→   744→              {editingCustomer ? 'تحديث' : 'إضافة'}
+   545→   745→            </Button>
+   546→   746→          </DialogFooter>
+   547→   747→        </DialogContent>
+   548→   748→      </Dialog>
+   549→   749→
+   550→   750→      {/* Toggle Active Confirmation */}
+   551→   751→      <AlertDialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
+   552→   752→        <AlertDialogContent>
+   553→   753→          <AlertDialogHeader>
+   554→   754→            <AlertDialogTitle className="flex items-center gap-2">
+   555→   755→              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${togglingCustomer?.is_active ? 'bg-red-100 dark:bg-red-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
+   556→   756→                {togglingCustomer?.is_active ? <UserX className="w-4 h-4 text-red-600" /> : <UserCheck className="w-4 h-4 text-emerald-600" />}
+   557→   757→              </div>
+   558→   758→              {togglingCustomer?.is_active ? 'تعطيل العميل' : 'تفعيل العميل'}
+   559→   759→            </AlertDialogTitle>
+   560→   760→            <AlertDialogDescription>
+   561→   761→              {togglingCustomer?.is_active
+   562→   762→                ? `هل أنت متأكد من تعطيل العميل "${togglingCustomer?.name}"؟ لن يكون متاحاً للاستخدام في الفواتير.`
+   563→   763→                : `هل أنت متأكد من تفعيل العميل "${togglingCustomer?.name}"؟`}
+   564→   764→            </AlertDialogDescription>
+   565→   765→          </AlertDialogHeader>
+   566→   766→          <AlertDialogFooter>
+   567→   767→            <AlertDialogCancel onClick={() => setTogglingCustomer(null)}>إلغاء</AlertDialogCancel>
+   568→   768→            <AlertDialogAction
+   569→   769→              onClick={handleToggleActive}
+   570→   770→              className={togglingCustomer?.is_active ? 'bg-destructive hover:bg-destructive/90' : ''}
+   571→   771→            >
+   572→   772→              {togglingCustomer?.is_active ? 'تعطيل' : 'تفعيل'}
+   573→   773→            </AlertDialogAction>
+   574→   774→          </AlertDialogFooter>
+   575→   775→        </AlertDialogContent>
+   576→   776→      </AlertDialog>
+   577→   777→
+   578→   778→      {/* Customer Account Statement Dialog */}
+   579→   779→      <Dialog open={statementDialogOpen} onOpenChange={setStatementDialogOpen}>
+   580→   780→        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh]">
+   581→   781→          <DialogHeader>
+   582→   782→            <DialogTitle className="flex items-center gap-2">
+   583→   783→              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   584→   784→                <FileText className="w-4 h-4 text-white" />
+   585→   785→              </div>
+   586→   786→              كشف حساب: {statementCustomer?.name}
+   587→   787→            </DialogTitle>
+   588→   788→          </DialogHeader>
+   589→   789→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+   590→   790→            {loadingStatement ? (
+   591→   791→              <div className="flex flex-col items-center justify-center py-12">
+   592→   792→                <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   593→   793→                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+   594→   794→                </div>
+   595→   795→                <p className="text-muted-foreground text-sm">جارٍ تحميل كشف الحساب...</p>
+   596→   796→              </div>
+   597→   797→            ) : (
+   598→   798→              <div className="space-y-6 py-4">
+   599→   799→                {/* Summary Cards */}
+   600→   800→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   601→   801→                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+   602→   802→                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">إجمالي الفواتير</p>
+   603→   803→                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(statementData.totalInvoiced)}</p>
+   604→   804→                  </div>
+   605→   805→                  <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
+   606→   806→                    <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">إجمالي المدفوعات</p>
+   607→   807→                    <p className="text-lg font-bold text-sky-700 dark:text-sky-300">{formatCurrency(statementData.totalPaid)}</p>
+   608→   808→                  </div>
+   609→   809→                  <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+   610→   810→                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">إجمالي المرتجعات</p>
+   611→   811→                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{formatCurrency(statementData.totalReturned)}</p>
+   612→   812→                  </div>
+   613→   813→                  <div className={`p-3 rounded-xl border ${statementData.balance > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'}`}>
+   614→   814→                    <p className={`text-xs font-medium ${statementData.balance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>الرصيد المتبقي</p>
+   615→   815→                    <p className={`text-lg font-bold ${statementData.balance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>{formatCurrency(statementData.balance)}</p>
+   616→   816→                  </div>
+   617→   817→                </div>
+   618→   818→
+   619→   819→                {/* Invoices */}
+   620→   820→                {statementData.invoices.length > 0 && (
+   621→   821→                  <div>
+   622→   822→                    <h3 className="text-sm font-semibold mb-2">الفواتير ({statementData.invoices.length})</h3>
+   623→   823→                    <div className="border rounded-lg overflow-hidden">
+   624→   824→                      <Table>
+   625→   825→                        <TableHeader>
+   626→   826→                          <TableRow>
+   627→   827→                            <TableHead className="text-right text-xs">رقم الفاتورة</TableHead>
+   628→   828→                            <TableHead className="text-right text-xs">الفرع</TableHead>
+   629→   829→                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+   630→   830→                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+   631→   831→                            <TableHead className="text-center text-xs">الحالة</TableHead>
+   632→   832→                          </TableRow>
+   633→   833→                        </TableHeader>
+   634→   834→                        <TableBody>
+   635→   835→                          {statementData.invoices.map((inv: any) => (
+   636→   836→                            <TableRow key={inv.id}>
+   637→   837→                              <TableCell className="font-medium text-xs">{inv.invoice_number}</TableCell>
+   638→   838→                              <TableCell className="text-xs">{inv.branches?.name || '—'}</TableCell>
+   639→   839→                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(inv.invoice_date)}</TableCell>
+   640→   840→                              <TableCell className="font-semibold text-xs">{formatCurrency(Number(inv.total))}</TableCell>
+   641→   841→                              <TableCell className="text-center">
+   642→   842→                                <Badge variant="secondary" className={`text-[9px] ${
+   643→   843→                                  inv.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+   644→   844→                                  inv.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+   645→   845→                                  inv.status === 'fully_returned' ? 'bg-gray-100 text-gray-800' :
+   646→   846→                                  'bg-amber-100 text-amber-800'
+   647→   847→                                }`}>
+   648→   848→                                  {inv.status === 'active' ? 'نشطة' :
+   649→   849→                                   inv.status === 'cancelled' ? 'ملغاة' :
+   650→   850→                                   inv.status === 'fully_returned' ? 'مرتجعة' : 'مرتجع جزئياً'}
+   651→   851→                                </Badge>
+   652→   852→                              </TableCell>
+   653→   853→                            </TableRow>
+   654→   854→                          ))}
+   655→   855→                        </TableBody>
+   656→   856→                      </Table>
+   657→   857→                    </div>
+   658→   858→                  </div>
+   659→   859→                )}
+   660→   860→
+   661→   861→                {/* Returns */}
+   662→   862→                {statementData.returns.length > 0 && (
+   663→   863→                  <div>
+   664→   864→                    <h3 className="text-sm font-semibold mb-2">المرتجعات ({statementData.returns.length})</h3>
+   665→   865→                    <div className="border rounded-lg overflow-hidden">
+   666→   866→                      <Table>
+   667→   867→                        <TableHeader>
+   668→   868→                          <TableRow>
+   669→   869→                            <TableHead className="text-right text-xs">رقم المرتجع</TableHead>
+   670→   870→                            <TableHead className="text-right text-xs hidden sm:table-cell">الفرع</TableHead>
+   671→   871→                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+   672→   872→                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+   673→   873→                          </TableRow>
+   674→   874→                        </TableHeader>
+   675→   875→                        <TableBody>
+   676→   876→                          {statementData.returns.map((ret: any) => (
+   677→   877→                            <TableRow key={ret.id}>
+   678→   878→                              <TableCell className="font-medium text-xs">{ret.return_number}</TableCell>
+   679→   879→                              <TableCell className="text-xs hidden sm:table-cell">{ret.branches?.name || '—'}</TableCell>
+   680→   880→                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(ret.return_date)}</TableCell>
+   681→   881→                              <TableCell className="font-semibold text-xs text-red-600">{formatCurrency(Number(ret.total))}</TableCell>
+   682→   882→                            </TableRow>
+   683→   883→                          ))}
+   684→   884→                        </TableBody>
+   685→   885→                      </Table>
+   686→   886→                    </div>
+   687→   887→                  </div>
+   688→   888→                )}
+   689→   889→
+   690→   890→                {statementData.invoices.length === 0 && statementData.returns.length === 0 && (
+   691→   891→                  <div className="text-center py-8 text-muted-foreground text-sm">
+   692→   892→                    لا توجد حركات لهذا العميل
+   693→   893→                  </div>
+   694→   894→                )}
+   695→   895→              </div>
+   696→   896→            )}
+   697→   897→          </ScrollArea>
+   698→   898→        </DialogContent>
+   699→   899→      </Dialog>
+   700→   900→    </div>
+   701→   901→  );
+   702→   902→}
+   703→   903→

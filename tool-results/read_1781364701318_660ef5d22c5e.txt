@@ -1,0 +1,1242 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState, useCallback } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { JournalEntry, JournalEntryLine } from '@/lib/types';
+     7→     7→import {
+     8→     8→  formatCurrency,
+     9→     9→  formatDate,
+    10→    10→  formatDateTime,
+    11→    11→  generateJournalEntryNumber,
+    12→    12→  getCurrentYear,
+    13→    13→} from '@/lib/utils';
+    14→    14→import { Card, CardContent } from '@/components/ui/card';
+    15→    15→import { Button } from '@/components/ui/button';
+    16→    16→import { Input } from '@/components/ui/input';
+    17→    17→import { Label } from '@/components/ui/label';
+    18→    18→import { Textarea } from '@/components/ui/textarea';
+    19→    19→import { Badge } from '@/components/ui/badge';
+    20→    20→import { Separator } from '@/components/ui/separator';
+    21→    21→import { ScrollArea } from '@/components/ui/scroll-area';
+    22→    22→import {
+    23→    23→  Dialog,
+    24→    24→  DialogContent,
+    25→    25→  DialogHeader,
+    26→    26→  DialogTitle,
+    27→    27→  DialogFooter,
+    28→    28→} from '@/components/ui/dialog';
+    29→    29→import {
+    30→    30→  AlertDialog,
+    31→    31→  AlertDialogAction,
+    32→    32→  AlertDialogCancel,
+    33→    33→  AlertDialogContent,
+    34→    34→  AlertDialogDescription,
+    35→    35→  AlertDialogFooter,
+    36→    36→  AlertDialogHeader,
+    37→    37→  AlertDialogTitle,
+    38→    38→} from '@/components/ui/alert-dialog';
+    39→    39→import {
+    40→    40→  Select,
+    41→    41→  SelectContent,
+    42→    42→  SelectItem,
+    43→    43→  SelectTrigger,
+    44→    44→  SelectValue,
+    45→    45→} from '@/components/ui/select';
+    46→    46→import {
+    47→    47→  Table,
+    48→    48→  TableBody,
+    49→    49→  TableCell,
+    50→    50→  TableHead,
+    51→    51→  TableHeader,
+    52→    52→  TableRow,
+    53→    53→} from '@/components/ui/table';
+    54→    54→import {
+    55→    55→  BookOpen,
+    56→    56→  Plus,
+    57→    57→  Search,
+    58→    58→  ChevronRight,
+    59→    59→  ChevronLeft,
+    60→    60→  Eye,
+    61→    61→  Edit,
+    62→    62→  Trash2,
+    63→    63→  CheckCircle2,
+    64→    64→  Loader2,
+    65→    65→  ArrowUpDown,
+    66→    66→  X,
+    67→    67→  CircleDot,
+    68→    68→  FileText,
+    69→    69→  Calendar,
+    70→    70→  Hash,
+    71→    71→} from 'lucide-react';
+    72→    72→import { toast } from 'sonner';
+    73→    73→import { motion } from 'framer-motion';
+    74→    74→
+    75→    75→const PAGE_SIZE = 10;
+    76→    76→
+    77→    77→interface FormLine {
+    78→    78→  account_name: string;
+    79→    79→  debit: string;
+    80→    80→  credit: string;
+    81→    81→  description: string;
+    82→    82→}
+    83→    83→
+    84→    84→const emptyLine: FormLine = {
+    85→    85→  account_name: '',
+    86→    86→  debit: '',
+    87→    87→  credit: '',
+    88→    88→  description: '',
+    89→    89→};
+    90→    90→
+    91→    91→export default function AccountingPage() {
+    92→    92→  const { user, isAdmin, hasPermission } = useAppStore();
+    93→    93→
+    94→    94→  const [entries, setEntries] = useState<JournalEntry[]>([]);
+    95→    95→  const [loading, setLoading] = useState(true);
+    96→    96→  const [search, setSearch] = useState('');
+    97→    97→  const [statusFilter, setStatusFilter] = useState('all');
+    98→    98→  const [dateFrom, setDateFrom] = useState('');
+    99→    99→  const [dateTo, setDateTo] = useState('');
+   100→   100→  const [page, setPage] = useState(1);
+   101→   101→  const [totalCount, setTotalCount] = useState(0);
+   102→   102→
+   103→   103→  // Create/Edit dialog
+   104→   104→  const [dialogOpen, setDialogOpen] = useState(false);
+   105→   105→  const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+   106→   106→  const [saving, setSaving] = useState(false);
+   107→   107→  const [entryNumber, setEntryNumber] = useState('');
+   108→   108→  const [entryDate, setEntryDate] = useState('');
+   109→   109→  const [description, setDescription] = useState('');
+   110→   110→  const [notes, setNotes] = useState('');
+   111→   111→  const [lines, setLines] = useState<FormLine[]>([{ ...emptyLine }, { ...emptyLine }]);
+   112→   112→
+   113→   113→  // View detail dialog
+   114→   114→  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+   115→   115→  const [viewEntry, setViewEntry] = useState<JournalEntry | null>(null);
+   116→   116→  const [viewLines, setViewLines] = useState<JournalEntryLine[]>([]);
+   117→   117→  const [viewLoading, setViewLoading] = useState(false);
+   118→   118→
+   119→   119→  // Post confirmation
+   120→   120→  const [postDialogOpen, setPostDialogOpen] = useState(false);
+   121→   121→  const [postingEntry, setPostingEntry] = useState<JournalEntry | null>(null);
+   122→   122→
+   123→   123→  // Delete confirmation
+   124→   124→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   125→   125→  const [deletingEntry, setDeletingEntry] = useState<JournalEntry | null>(null);
+   126→   126→
+   127→   127→  const canView = hasPermission('accounting', 'view');
+   128→   128→  const canCreate = hasPermission('accounting', 'create');
+   129→   129→  const canEdit = hasPermission('accounting', 'edit');
+   130→   130→  const canExport = hasPermission('accounting', 'export');
+   131→   131→
+   132→   132→  useEffect(() => {
+   133→   133→    loadEntries();
+   134→   134→  }, [page, search, statusFilter, dateFrom, dateTo]);
+   135→   135→
+   136→   136→  const loadEntries = async () => {
+   137→   137→    setLoading(true);
+   138→   138→    try {
+   139→   139→      let query = supabase
+   140→   140→        .from('journal_entries')
+   141→   141→        .select('*', { count: 'exact' })
+   142→   142→        .order('created_at', { ascending: false });
+   143→   143→
+   144→   144→      if (search) {
+   145→   145→        query = query.or(`entry_number.ilike.%${search}%,description.ilike.%${search}%`);
+   146→   146→      }
+   147→   147→      if (statusFilter === 'posted') {
+   148→   148→        query = query.eq('is_posted', true);
+   149→   149→      } else if (statusFilter === 'draft') {
+   150→   150→        query = query.eq('is_posted', false);
+   151→   151→      }
+   152→   152→      if (dateFrom) {
+   153→   153→        query = query.gte('entry_date', dateFrom);
+   154→   154→      }
+   155→   155→      if (dateTo) {
+   156→   156→        query = query.lte('entry_date', dateTo);
+   157→   157→      }
+   158→   158→
+   159→   159→      const from = (page - 1) * PAGE_SIZE;
+   160→   160→      query = query.range(from, from + PAGE_SIZE - 1);
+   161→   161→
+   162→   162→      const { data, count, error } = await query;
+   163→   163→      if (!error && data) {
+   164→   164→        setEntries(data as JournalEntry[]);
+   165→   165→        setTotalCount(count || 0);
+   166→   166→      }
+   167→   167→    } catch (err) {
+   168→   168→      console.error(err);
+   169→   169→      toast.error('حدث خطأ أثناء تحميل البيانات');
+   170→   170→    } finally {
+   171→   171→      setLoading(false);
+   172→   172→    }
+   173→   173→  };
+   174→   174→
+   175→   175→  const logAction = async (action: string, details: Record<string, unknown>) => {
+   176→   176→    try {
+   177→   177→      await supabase.from('audit_log').insert({ action, details });
+   178→   178→    } catch {
+   179→   179→      // Silent fail for audit logging
+   180→   180→    }
+   181→   181→  };
+   182→   182→
+   183→   183→  const openCreateDialog = async () => {
+   184→   184→    const year = getCurrentYear();
+   185→   185→    const { data: lastEntry } = await supabase
+   186→   186→      .from('journal_entries')
+   187→   187→      .select('entry_number')
+   188→   188→      .like('entry_number', `JE-${year}-%`)
+   189→   189→      .order('entry_number', { ascending: false })
+   190→   190→      .limit(1);
+   191→   191→
+   192→   192→    let lastNum = 0;
+   193→   193→    if (lastEntry && lastEntry.length > 0) {
+   194→   194→      const parts = lastEntry[0].entry_number.split('-');
+   195→   195→      lastNum = parseInt(parts[parts.length - 1]) || 0;
+   196→   196→    }
+   197→   197→    setEntryNumber(generateJournalEntryNumber(lastNum, year));
+   198→   198→    setEntryDate(new Date().toISOString().split('T')[0]);
+   199→   199→    setDescription('');
+   200→   200→    setNotes('');
+   201→   201→    setLines([{ ...emptyLine }, { ...emptyLine }]);
+   202→   202→    setEditingEntry(null);
+   203→   203→    setDialogOpen(true);
+   204→   204→  };
+   205→   205→
+   206→   206→  const openEditDialog = async (entry: JournalEntry) => {
+   207→   207→    setEditingEntry(entry);
+   208→   208→    setEntryNumber(entry.entry_number);
+   209→   209→    setEntryDate(entry.entry_date);
+   210→   210→    setDescription(entry.description);
+   211→   211→    setNotes(entry.notes || '');
+   212→   212→    setSaving(false);
+   213→   213→
+   214→   214→    // Load lines for the entry
+   215→   215→    try {
+   216→   216→      const { data, error } = await supabase
+   217→   217→        .from('journal_entry_lines')
+   218→   218→        .select('*')
+   219→   219→        .eq('journal_entry_id', entry.id)
+   220→   220→        .order('created_at', { ascending: true });
+   221→   221→
+   222→   222→      if (!error && data && data.length > 0) {
+   223→   223→        setLines(
+   224→   224→          data.map((line) => ({
+   225→   225→            account_name: line.account_name,
+   226→   226→            debit: line.debit.toString(),
+   227→   227→            credit: line.credit.toString(),
+   228→   228→            description: line.description || '',
+   229→   229→          }))
+   230→   230→        );
+   231→   231→      } else {
+   232→   232→        setLines([{ ...emptyLine }, { ...emptyLine }]);
+   233→   233→      }
+   234→   234→    } catch {
+   235→   235→      setLines([{ ...emptyLine }, { ...emptyLine }]);
+   236→   236→    }
+   237→   237→
+   238→   238→    setDialogOpen(true);
+   239→   239→  };
+   240→   240→
+   241→   241→  const openViewDialog = async (entry: JournalEntry) => {
+   242→   242→    setViewEntry(entry);
+   243→   243→    setViewDialogOpen(true);
+   244→   244→    setViewLoading(true);
+   245→   245→    setViewLines([]);
+   246→   246→
+   247→   247→    try {
+   248→   248→      const { data, error } = await supabase
+   249→   249→        .from('journal_entry_lines')
+   250→   250→        .select('*')
+   251→   251→        .eq('journal_entry_id', entry.id)
+   252→   252→        .order('created_at', { ascending: true });
+   253→   253→
+   254→   254→      if (!error && data) {
+   255→   255→        setViewLines(data as JournalEntryLine[]);
+   256→   256→      }
+   257→   257→    } catch (err) {
+   258→   258→      console.error(err);
+   259→   259→    } finally {
+   260→   260→      setViewLoading(false);
+   261→   261→    }
+   262→   262→  };
+   263→   263→
+   264→   264→  const addLine = () => {
+   265→   265→    setLines([...lines, { ...emptyLine }]);
+   266→   266→  };
+   267→   267→
+   268→   268→  const removeLine = (index: number) => {
+   269→   269→    if (lines.length <= 2) {
+   270→   270→      toast.error('يجب أن يحتوي القيد على سطرين على الأقل');
+   271→   271→      return;
+   272→   272→    }
+   273→   273→    setLines(lines.filter((_, i) => i !== index));
+   274→   274→  };
+   275→   275→
+   276→   276→  const updateLine = (index: number, field: keyof FormLine, value: string) => {
+   277→   277→    const updated = [...lines];
+   278→   278→    updated[index] = { ...updated[index], [field]: value };
+   279→   279→    setLines(updated);
+   280→   280→  };
+   281→   281→
+   282→   282→  const getTotalDebit = useCallback((): number => {
+   283→   283→    return lines.reduce((sum, line) => sum + (parseFloat(line.debit) || 0), 0);
+   284→   284→  }, [lines]);
+   285→   285→
+   286→   286→  const getTotalCredit = useCallback((): number => {
+   287→   287→    return lines.reduce((sum, line) => sum + (parseFloat(line.credit) || 0), 0);
+   288→   288→  }, [lines]);
+   289→   289→
+   290→   290→  const handleSave = async () => {
+   291→   291→    if (!entryDate) {
+   292→   292→      toast.error('يرجى تحديد تاريخ القيد');
+   293→   293→      return;
+   294→   294→    }
+   295→   295→    if (!description.trim()) {
+   296→   296→      toast.error('يرجى إدخال وصف القيد');
+   297→   297→      return;
+   298→   298→    }
+   299→   299→
+   300→   300→    // Validate lines
+   301→   301→    const validLines = lines.filter(
+   302→   302→      (l) => l.account_name.trim() && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0)
+   303→   303→    );
+   304→   304→
+   305→   305→    if (validLines.length < 2) {
+   306→   306→      toast.error('يجب أن يحتوي القيد على سطرين صالحين على الأقل');
+   307→   307→      return;
+   308→   308→    }
+   309→   309→
+   310→   310→    // Check each line has either debit or credit but not both
+   311→   311→    for (const line of validLines) {
+   312→   312→      const d = parseFloat(line.debit) || 0;
+   313→   313→      const c = parseFloat(line.credit) || 0;
+   314→   314→      if (d > 0 && c > 0) {
+   315→   315→        toast.error('لا يمكن أن يحتوي السطر الواحد على مدين ودائن معاً');
+   316→   316→        return;
+   317→   317→      }
+   318→   318→      if (d === 0 && c === 0) {
+   319→   319→        toast.error('يجب إدخال قيمة مدينة أو دائنة في كل سطر');
+   320→   320→        return;
+   321→   321→      }
+   322→   322→    }
+   323→   323→
+   324→   324→    const totalDebit = validLines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+   325→   325→    const totalCredit = validLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+   326→   326→
+   327→   327→    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+   328→   328→      toast.error('إجمالي المدين يجب أن يساوي إجمالي الدائن');
+   329→   329→      return;
+   330→   330→    }
+   331→   331→
+   332→   332→    setSaving(true);
+   333→   333→    try {
+   334→   334→      if (editingEntry) {
+   335→   335→        // Update existing entry
+   336→   336→        const { error: updateError } = await supabase
+   337→   337→          .from('journal_entries')
+   338→   338→          .update({
+   339→   339→            entry_date: entryDate,
+   340→   340→            description: description.trim(),
+   341→   341→            total_debit: totalDebit,
+   342→   342→            total_credit: totalCredit,
+   343→   343→            notes: notes.trim() || null,
+   344→   344→            updated_at: new Date().toISOString(),
+   345→   345→          })
+   346→   346→          .eq('id', editingEntry.id);
+   347→   347→
+   348→   348→        if (updateError) throw updateError;
+   349→   349→
+   350→   350→        // Delete existing lines
+   351→   351→        const { error: deleteLinesError } = await supabase
+   352→   352→          .from('journal_entry_lines')
+   353→   353→          .delete()
+   354→   354→          .eq('journal_entry_id', editingEntry.id);
+   355→   355→
+   356→   356→        if (deleteLinesError) throw deleteLinesError;
+   357→   357→
+   358→   358→        // Insert new lines
+   359→   359→        const linesData = validLines.map((l) => ({
+   360→   360→          journal_entry_id: editingEntry.id,
+   361→   361→          account_name: l.account_name.trim(),
+   362→   362→          debit: parseFloat(l.debit) || 0,
+   363→   363→          credit: parseFloat(l.credit) || 0,
+   364→   364→          description: l.description.trim() || null,
+   365→   365→        }));
+   366→   366→
+   367→   367→        const { error: insertLinesError } = await supabase
+   368→   368→          .from('journal_entry_lines')
+   369→   369→          .insert(linesData);
+   370→   370→
+   371→   371→        if (insertLinesError) throw insertLinesError;
+   372→   372→
+   373→   373→        await logAction('update_journal_entry', {
+   374→   374→          entry_id: editingEntry.id,
+   375→   375→          entry_number: editingEntry.entry_number,
+   376→   376→          updated_by: user?.id,
+   377→   377→        });
+   378→   378→
+   379→   379→        toast.success('تم تحديث القيد بنجاح');
+   380→   380→      } else {
+   381→   381→        // Create new entry
+   382→   382→        const { data: newEntry, error: insertError } = await supabase
+   383→   383→          .from('journal_entries')
+   384→   384→          .insert({
+   385→   385→            entry_number: entryNumber,
+   386→   386→            entry_date: entryDate,
+   387→   387→            description: description.trim(),
+   388→   388→            total_debit: totalDebit,
+   389→   389→            total_credit: totalCredit,
+   390→   390→            is_posted: false,
+   391→   391→            notes: notes.trim() || null,
+   392→   392→            created_by: user?.id || null,
+   393→   393→          })
+   394→   394→          .select()
+   395→   395→          .single();
+   396→   396→
+   397→   397→        if (insertError) throw insertError;
+   398→   398→
+   399→   399→        // Insert lines
+   400→   400→        if (newEntry) {
+   401→   401→          const linesData = validLines.map((l) => ({
+   402→   402→            journal_entry_id: newEntry.id,
+   403→   403→            account_name: l.account_name.trim(),
+   404→   404→            debit: parseFloat(l.debit) || 0,
+   405→   405→            credit: parseFloat(l.credit) || 0,
+   406→   406→            description: l.description.trim() || null,
+   407→   407→          }));
+   408→   408→
+   409→   409→          const { error: insertLinesError } = await supabase
+   410→   410→            .from('journal_entry_lines')
+   411→   411→            .insert(linesData);
+   412→   412→
+   413→   413→          if (insertLinesError) throw insertLinesError;
+   414→   414→        }
+   415→   415→
+   416→   416→        await logAction('create_journal_entry', {
+   417→   417→          entry_number: entryNumber,
+   418→   418→          total_debit: totalDebit,
+   419→   419→          total_credit: totalCredit,
+   420→   420→          created_by: user?.id,
+   421→   421→        });
+   422→   422→
+   423→   423→        toast.success('تم إنشاء القيد بنجاح');
+   424→   424→      }
+   425→   425→
+   426→   426→      setDialogOpen(false);
+   427→   427→      loadEntries();
+   428→   428→    } catch (err) {
+   429→   429→      console.error(err);
+   430→   430→      toast.error('حدث خطأ أثناء الحفظ');
+   431→   431→    } finally {
+   432→   432→      setSaving(false);
+   433→   433→    }
+   434→   434→  };
+   435→   435→
+   436→   436→  const handlePost = async () => {
+   437→   437→    if (!postingEntry) return;
+   438→   438→
+   439→   439→    try {
+   440→   440→      const { error } = await supabase
+   441→   441→        .from('journal_entries')
+   442→   442→        .update({
+   443→   443→          is_posted: true,
+   444→   444→          updated_at: new Date().toISOString(),
+   445→   445→        })
+   446→   446→        .eq('id', postingEntry.id);
+   447→   447→
+   448→   448→      if (error) throw error;
+   449→   449→
+   450→   450→      await logAction('post_journal_entry', {
+   451→   451→        entry_id: postingEntry.id,
+   452→   452→        entry_number: postingEntry.entry_number,
+   453→   453→        posted_by: user?.id,
+   454→   454→      });
+   455→   455→
+   456→   456→      toast.success('تم ترحيل القيد بنجاح');
+   457→   457→      setPostDialogOpen(false);
+   458→   458→      setPostingEntry(null);
+   459→   459→      loadEntries();
+   460→   460→    } catch (err) {
+   461→   461→      console.error(err);
+   462→   462→      toast.error('حدث خطأ أثناء ترحيل القيد');
+   463→   463→    }
+   464→   464→  };
+   465→   465→
+   466→   466→  const handleDelete = async () => {
+   467→   467→    if (!deletingEntry) return;
+   468→   468→
+   469→   469→    try {
+   470→   470→      // Lines will be cascade deleted
+   471→   471→      const { error } = await supabase
+   472→   472→        .from('journal_entries')
+   473→   473→        .delete()
+   474→   474→        .eq('id', deletingEntry.id);
+   475→   475→
+   476→   476→      if (error) throw error;
+   477→   477→
+   478→   478→      await logAction('delete_journal_entry', {
+   479→   479→        entry_id: deletingEntry.id,
+   480→   480→        entry_number: deletingEntry.entry_number,
+   481→   481→        deleted_by: user?.id,
+   482→   482→      });
+   483→   483→
+   484→   484→      toast.success('تم حذف القيد بنجاح');
+   485→   485→      setDeleteDialogOpen(false);
+   486→   486→      setDeletingEntry(null);
+   487→   487→      loadEntries();
+   488→   488→    } catch (err) {
+   489→   489→      console.error(err);
+   490→   490→      toast.error('حدث خطأ أثناء الحذف');
+   491→   491→    }
+   492→   492→  };
+   493→   493→
+   494→   494→  const handleExport = () => {
+   495→   495→    if (entries.length === 0) {
+   496→   496→      toast.error('لا توجد بيانات للتصدير');
+   497→   497→      return;
+   498→   498→    }
+   499→   499→
+   500→   500→    const headers = ['رقم القيد', 'التاريخ', 'الوصف', 'إجمالي المدين', 'إجمالي الدائن', 'الحالة', 'ملاحظات'];
+   501→   501→    const csvRows = [headers.join(',')];
+   502→   502→
+   503→   503→    entries.forEach((entry) => {
+   504→   504→      const row = [
+   505→   505→        entry.entry_number,
+   506→   506→        entry.entry_date,
+   507→   507→        `"${entry.description.replace(/"/g, '""')}"`,
+   508→   508→        entry.total_debit.toFixed(2),
+   509→   509→        entry.total_credit.toFixed(2),
+   510→   510→        entry.is_posted ? 'مرحل' : 'مسودة',
+   511→   511→        `"${(entry.notes || '').replace(/"/g, '""')}"`,
+   512→   512→      ];
+   513→   513→      csvRows.push(row.join(','));
+   514→   514→    });
+   515→   515→
+   516→   516→    const BOM = '\uFEFF';
+   517→   517→    const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+   518→   518→    const url = URL.createObjectURL(blob);
+   519→   519→    const link = document.createElement('a');
+   520→   520→    link.href = url;
+   521→   521→    link.download = `journal_entries_${new Date().toISOString().split('T')[0]}.csv`;
+   522→   522→    link.click();
+   523→   523→    URL.revokeObjectURL(url);
+   524→   524→
+   525→   525→    toast.success('تم تصدير البيانات بنجاح');
+   526→   526→  };
+   527→   527→
+   528→   528→  const clearFilters = () => {
+   529→   529→    setSearch('');
+   530→   530→    setStatusFilter('all');
+   531→   531→    setDateFrom('');
+   532→   532→    setDateTo('');
+   533→   533→    setPage(1);
+   534→   534→  };
+   535→   535→
+   536→   536→  const hasActiveFilters = search || statusFilter !== 'all' || dateFrom || dateTo;
+   537→   537→
+   538→   538→  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+   539→   539→
+   540→   540→  if (!canView) {
+   541→   541→    return (
+   542→   542→      <div className="flex flex-col items-center justify-center py-20 px-4">
+   543→   543→        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   544→   544→          <BookOpen className="w-12 h-12 text-white" />
+   545→   545→        </div>
+   546→   546→        <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
+   547→   547→        <p className="text-muted-foreground text-sm text-center">
+   548→   548→          ليس لديك صلاحية لعرض هذه الصفحة
+   549→   549→        </p>
+   550→   550→      </div>
+   551→   551→    );
+   552→   552→  }
+   553→   553→
+   554→   554→  return (
+   555→   555→    <div className="space-y-6">
+   556→   556→      {/* Header */}
+   557→   557→      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   558→   558→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   559→   559→          <div className="flex items-center gap-3">
+   560→   560→            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   561→   561→              <BookOpen className="w-6 h-6 text-white" />
+   562→   562→            </div>
+   563→   563→            <div>
+   564→   564→              <h1 className="text-2xl font-bold">القيود المحاسبية</h1>
+   565→   565→              <p className="text-muted-foreground text-sm mt-0.5">
+   566→   566→                إجمالي القيود: {totalCount}
+   567→   567→              </p>
+   568→   568→            </div>
+   569→   569→          </div>
+   570→   570→          <div className="flex items-center gap-2">
+   571→   571→            {canExport && (
+   572→   572→              <Button variant="outline" onClick={handleExport} className="gap-2">
+   573→   573→                <ArrowUpDown className="w-4 h-4" />
+   574→   574→                تصدير
+   575→   575→              </Button>
+   576→   576→            )}
+   577→   577→            {canCreate && (
+   578→   578→              <Button onClick={openCreateDialog} className="gap-2 shadow-md" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   579→   579→                <Plus className="w-4 h-4" />
+   580→   580→                قيد جديد
+   581→   581→              </Button>
+   582→   582→            )}
+   583→   583→          </div>
+   584→   584→        </div>
+   585→   585→      </motion.div>
+   586→   586→
+   587→   587→      {/* Filters */}
+   588→   588→      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
+   589→   589→        <Card className="border-0 shadow-md overflow-hidden">
+   590→   590→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9, #4c1d95)' }} />
+   591→   591→          <CardContent className="p-4">
+   592→   592→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+   593→   593→              <div className="relative">
+   594→   594→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   595→   595→                <Input
+   596→   596→                  placeholder="بحث برقم القيد أو الوصف..."
+   597→   597→                  value={search}
+   598→   598→                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   599→   599→                  className="pr-10"
+   600→   600→                />
+   601→   601→              </div>
+   602→   602→              <div>
+   603→   603→                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+   604→   604→                  <SelectTrigger>
+   605→   605→                    <SelectValue placeholder="حالة القيد" />
+   606→   606→                  </SelectTrigger>
+   607→   607→                  <SelectContent>
+   608→   608→                    <SelectItem value="all">الكل</SelectItem>
+   609→   609→                    <SelectItem value="posted">مرحل</SelectItem>
+   610→   610→                    <SelectItem value="draft">مسودة</SelectItem>
+   611→   611→                  </SelectContent>
+   612→   612→                </Select>
+   613→   613→              </div>
+   614→   614→              <div>
+   615→   615→                <Input
+   616→   616→                  type="date"
+   617→   617→                  placeholder="من تاريخ"
+   618→   618→                  value={dateFrom}
+   619→   619→                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+   620→   620→                />
+   621→   621→              </div>
+   622→   622→              <div>
+   623→   623→                <Input
+   624→   624→                  type="date"
+   625→   625→                  placeholder="إلى تاريخ"
+   626→   626→                  value={dateTo}
+   627→   627→                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+   628→   628→                />
+   629→   629→              </div>
+   630→   630→            </div>
+   631→   631→            {hasActiveFilters && (
+   632→   632→              <div className="flex items-center justify-end mt-3">
+   633→   633→                <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-muted-foreground hover:text-foreground">
+   634→   634→                  <X className="w-3.5 h-3.5" />
+   635→   635→                  مسح الفلاتر
+   636→   636→                </Button>
+   637→   637→              </div>
+   638→   638→            )}
+   639→   639→          </CardContent>
+   640→   640→        </Card>
+   641→   641→      </motion.div>
+   642→   642→
+   643→   643→      {/* Entries Table */}
+   644→   644→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   645→   645→        <Card className="border-0 shadow-md overflow-hidden">
+   646→   646→          <CardContent className="p-0">
+   647→   647→            {loading ? (
+   648→   648→              <div className="flex items-center justify-center py-12">
+   649→   649→                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   650→   650→              </div>
+   651→   651→            ) : entries.length === 0 ? (
+   652→   652→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   653→   653→                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   654→   654→                  <BookOpen className="w-12 h-12 text-white/80" />
+   655→   655→                </div>
+   656→   656→                <h3 className="text-xl font-bold mb-2">لا توجد قيود</h3>
+   657→   657→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   658→   658→                  لم يتم إنشاء أي قيود محاسبية بعد. ابدأ بإنشاء أول قيد.
+   659→   659→                </p>
+   660→   660→                {canCreate && (
+   661→   661→                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   662→   662→                    <Plus className="w-5 h-5" />
+   663→   663→                    إنشاء قيد جديد
+   664→   664→                  </Button>
+   665→   665→                )}
+   666→   666→              </div>
+   667→   667→            ) : (
+   668→   668→              <>
+   669→   669→                {/* Mobile Card Layout */}
+   670→   670→                <div className="sm:hidden divide-y">
+   671→   671→                  {entries.map((entry) => (
+   672→   672→                    <div key={entry.id} className="p-4 space-y-3">
+   673→   673→                      <div className="flex items-center justify-between">
+   674→   674→                        <div className="flex items-center gap-2">
+   675→   675→                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   676→   676→                            <Hash className="w-4 h-4 text-white" />
+   677→   677→                          </div>
+   678→   678→                          <span className="font-semibold text-sm">{entry.entry_number}</span>
+   679→   679→                        </div>
+   680→   680→                        {entry.is_posted ? (
+   681→   681→                          <Badge
+   682→   682→                            variant="secondary"
+   683→   683→                            className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+   684→   684→                          >
+   685→   685→                            <CheckCircle2 className="w-3 h-3 ml-1" />
+   686→   686→                            مرحل
+   687→   687→                          </Badge>
+   688→   688→                        ) : (
+   689→   689→                          <Badge
+   690→   690→                            variant="secondary"
+   691→   691→                            className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+   692→   692→                          >
+   693→   693→                            <CircleDot className="w-3 h-3 ml-1" />
+   694→   694→                            مسودة
+   695→   695→                          </Badge>
+   696→   696→                        )}
+   697→   697→                      </div>
+   698→   698→                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   699→   699→                        <Calendar className="w-3.5 h-3.5" />
+   700→   700→                        {formatDate(entry.entry_date)}
+   701→   701→                      </div>
+   702→   702→                      {entry.description && (
+   703→   703→                        <p className="text-sm text-muted-foreground truncate">{entry.description}</p>
+   704→   704→                      )}
+   705→   705→                      <div className="flex items-center gap-4">
+   706→   706→                        <div>
+   707→   707→                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+   708→   708→                          <p className="text-sm font-bold text-primary">{formatCurrency(entry.total_debit)}</p>
+   709→   709→                        </div>
+   710→   710→                        <div>
+   711→   711→                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+   712→   712→                          <p className="text-sm font-bold">{formatCurrency(entry.total_credit)}</p>
+   713→   713→                        </div>
+   714→   714→                      </div>
+   715→   715→                      <div className="flex items-center gap-1 pt-1">
+   716→   716→                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openViewDialog(entry)}>
+   717→   717→                          <Eye className="w-3.5 h-3.5" />
+   718→   718→                          عرض
+   719→   719→                        </Button>
+   720→   720→                        {canEdit && !entry.is_posted && (
+   721→   721→                          <>
+   722→   722→                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openEditDialog(entry)}>
+   723→   723→                              <Edit className="w-3.5 h-3.5" />
+   724→   724→                              تعديل
+   725→   725→                            </Button>
+   726→   726→                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-emerald-600" onClick={() => { setPostingEntry(entry); setPostDialogOpen(true); }}>
+   727→   727→                              <CheckCircle2 className="w-3.5 h-3.5" />
+   728→   728→                              ترحيل
+   729→   729→                            </Button>
+   730→   730→                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-destructive" onClick={() => { setDeletingEntry(entry); setDeleteDialogOpen(true); }}>
+   731→   731→                              <Trash2 className="w-3.5 h-3.5" />
+   732→   732→                            </Button>
+   733→   733→                          </>
+   734→   734→                        )}
+   735→   735→                      </div>
+   736→   736→                    </div>
+   737→   737→                  ))}
+   738→   738→                </div>
+   739→   739→
+   740→   740→                {/* Desktop Table */}
+   741→   741→                <div className="hidden sm:block">
+   742→   742→                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9, #4c1d95)' }} />
+   743→   743→                  <div className="overflow-x-auto">
+   744→   744→                    <Table>
+   745→   745→                      <TableHeader>
+   746→   746→                        <TableRow className="bg-muted/30">
+   747→   747→                          <TableHead className="text-right font-bold">رقم القيد</TableHead>
+   748→   748→                          <TableHead className="text-right font-bold">التاريخ</TableHead>
+   749→   749→                          <TableHead className="text-right font-bold hidden md:table-cell">الوصف</TableHead>
+   750→   750→                          <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+   751→   751→                          <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+   752→   752→                          <TableHead className="text-center font-bold">الحالة</TableHead>
+   753→   753→                          <TableHead className="text-center font-bold">الإجراءات</TableHead>
+   754→   754→                        </TableRow>
+   755→   755→                      </TableHeader>
+   756→   756→                      <TableBody>
+   757→   757→                        {entries.map((entry) => (
+   758→   758→                          <TableRow key={entry.id} className="hover:bg-muted/30 transition-colors">
+   759→   759→                            <TableCell className="font-medium">
+   760→   760→                              <div className="flex items-center gap-2">
+   761→   761→                                <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   762→   762→                                  <FileText className="w-3 h-3 text-white" />
+   763→   763→                                </div>
+   764→   764→                                {entry.entry_number}
+   765→   765→                              </div>
+   766→   766→                            </TableCell>
+   767→   767→                            <TableCell>{formatDate(entry.entry_date)}</TableCell>
+   768→   768→                            <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+   769→   769→                              {entry.description}
+   770→   770→                            </TableCell>
+   771→   771→                            <TableCell className="font-semibold text-primary">
+   772→   772→                              {formatCurrency(entry.total_debit)}
+   773→   773→                            </TableCell>
+   774→   774→                            <TableCell className="font-semibold">
+   775→   775→                              {formatCurrency(entry.total_credit)}
+   776→   776→                            </TableCell>
+   777→   777→                            <TableCell className="text-center">
+   778→   778→                              {entry.is_posted ? (
+   779→   779→                                <Badge
+   780→   780→                                  variant="secondary"
+   781→   781→                                  className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+   782→   782→                                >
+   783→   783→                                  <CheckCircle2 className="w-3 h-3 ml-1" />
+   784→   784→                                  مرحل
+   785→   785→                                </Badge>
+   786→   786→                              ) : (
+   787→   787→                                <Badge
+   788→   788→                                  variant="secondary"
+   789→   789→                                  className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+   790→   790→                                >
+   791→   791→                                  <CircleDot className="w-3 h-3 ml-1" />
+   792→   792→                                  مسودة
+   793→   793→                                </Badge>
+   794→   794→                              )}
+   795→   795→                            </TableCell>
+   796→   796→                            <TableCell>
+   797→   797→                              <div className="flex items-center justify-center gap-1">
+   798→   798→                                <Button
+   799→   799→                                  variant="ghost"
+   800→   800→                                  size="icon"
+   801→   801→                                  className="h-8 w-8"
+   802→   802→                                  onClick={() => openViewDialog(entry)}
+   803→   803→                                  title="عرض التفاصيل"
+   804→   804→                                >
+   805→   805→                                  <Eye className="w-4 h-4" />
+   806→   806→                                </Button>
+   807→   807→                                {canEdit && !entry.is_posted && (
+   808→   808→                                  <>
+   809→   809→                                    <Button
+   810→   810→                                      variant="ghost"
+   811→   811→                                      size="icon"
+   812→   812→                                      className="h-8 w-8"
+   813→   813→                                      onClick={() => openEditDialog(entry)}
+   814→   814→                                      title="تعديل"
+   815→   815→                                    >
+   816→   816→                                      <Edit className="w-4 h-4" />
+   817→   817→                                    </Button>
+   818→   818→                                    <Button
+   819→   819→                                      variant="ghost"
+   820→   820→                                      size="icon"
+   821→   821→                                      className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
+   822→   822→                                      onClick={() => {
+   823→   823→                                        setPostingEntry(entry);
+   824→   824→                                        setPostDialogOpen(true);
+   825→   825→                                      }}
+   826→   826→                                      title="ترحيل"
+   827→   827→                                    >
+   828→   828→                                      <CheckCircle2 className="w-4 h-4" />
+   829→   829→                                    </Button>
+   830→   830→                                    <Button
+   831→   831→                                      variant="ghost"
+   832→   832→                                      size="icon"
+   833→   833→                                      className="h-8 w-8 text-destructive hover:text-destructive"
+   834→   834→                                      onClick={() => {
+   835→   835→                                        setDeletingEntry(entry);
+   836→   836→                                        setDeleteDialogOpen(true);
+   837→   837→                                      }}
+   838→   838→                                      title="حذف"
+   839→   839→                                    >
+   840→   840→                                      <Trash2 className="w-4 h-4" />
+   841→   841→                                    </Button>
+   842→   842→                                  </>
+   843→   843→                                )}
+   844→   844→                              </div>
+   845→   845→                            </TableCell>
+   846→   846→                          </TableRow>
+   847→   847→                        ))}
+   848→   848→                      </TableBody>
+   849→   849→                    </Table>
+   850→   850→                  </div>
+   851→   851→                </div>
+   852→   852→
+   853→   853→                {totalPages > 1 && (
+   854→   854→                  <div className="flex items-center justify-between px-4 py-3 border-t">
+   855→   855→                    <p className="text-sm text-muted-foreground">
+   856→   856→                      صفحة {page} من {totalPages} ({totalCount} قيد)
+   857→   857→                    </p>
+   858→   858→                    <div className="flex items-center gap-1">
+   859→   859→                      <Button
+   860→   860→                        variant="outline"
+   861→   861→                        size="icon"
+   862→   862→                        className="h-8 w-8"
+   863→   863→                        onClick={() => setPage(Math.max(1, page - 1))}
+   864→   864→                        disabled={page <= 1}
+   865→   865→                      >
+   866→   866→                        <ChevronRight className="w-4 h-4" />
+   867→   867→                      </Button>
+   868→   868→                      <Button
+   869→   869→                        variant="outline"
+   870→   870→                        size="icon"
+   871→   871→                        className="h-8 w-8"
+   872→   872→                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+   873→   873→                        disabled={page >= totalPages}
+   874→   874→                      >
+   875→   875→                        <ChevronLeft className="w-4 h-4" />
+   876→   876→                      </Button>
+   877→   877→                    </div>
+   878→   878→                  </div>
+   879→   879→                )}
+   880→   880→              </>
+   881→   881→            )}
+   882→   882→          </CardContent>
+   883→   883→        </Card>
+   884→   884→      </motion.div>
+   885→   885→
+   886→   886→      {/* Create/Edit Dialog */}
+   887→   887→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   888→   888→        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
+   889→   889→          <DialogHeader>
+   890→   890→            <DialogTitle className="flex items-center gap-2">
+   891→   891→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   892→   892→                <BookOpen className="w-4 h-4 text-white" />
+   893→   893→              </div>
+   894→   894→              {editingEntry ? 'تعديل القيد' : 'إنشاء قيد جديد'}
+   895→   895→            </DialogTitle>
+   896→   896→          </DialogHeader>
+   897→   897→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+   898→   898→            <div className="space-y-5 py-4">
+   899→   899→              {/* Basic Info */}
+   900→   900→              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   901→   901→                <div className="space-y-2">
+   902→   902→                  <Label>رقم القيد</Label>
+   903→   903→                  <Input value={entryNumber} disabled className="bg-muted" />
+   904→   904→                </div>
+   905→   905→                <div className="space-y-2">
+   906→   906→                  <Label>تاريخ القيد *</Label>
+   907→   907→                  <Input
+   908→   908→                    type="date"
+   909→   909→                    value={entryDate}
+   910→   910→                    onChange={(e) => setEntryDate(e.target.value)}
+   911→   911→                  />
+   912→   912→                </div>
+   913→   913→                <div className="space-y-2">
+   914→   914→                  <Label>الحالة</Label>
+   915→   915→                  <Input
+   916→   916→                    value={editingEntry?.is_posted ? 'مرحل' : 'مسودة'}
+   917→   917→                    disabled
+   918→   918→                    className="bg-muted"
+   919→   919→                  />
+   920→   920→                </div>
+   921→   921→              </div>
+   922→   922→
+   923→   923→              <div className="space-y-2">
+   924→   924→                <Label>الوصف *</Label>
+   925→   925→                <Input
+   926→   926→                  value={description}
+   927→   927→                  onChange={(e) => setDescription(e.target.value)}
+   928→   928→                  placeholder="وصف القيد المحاسبي..."
+   929→   929→                />
+   930→   930→              </div>
+   931→   931→
+   932→   932→              <div className="space-y-2">
+   933→   933→                <Label>ملاحظات</Label>
+   934→   934→                <Textarea
+   935→   935→                  value={notes}
+   936→   936→                  onChange={(e) => setNotes(e.target.value)}
+   937→   937→                  placeholder="ملاحظات إضافية..."
+   938→   938→                  rows={2}
+   939→   939→                />
+   940→   940→              </div>
+   941→   941→
+   942→   942→              <Separator />
+   943→   943→
+   944→   944→              {/* Lines */}
+   945→   945→              <div className="space-y-3">
+   946→   946→                <div className="flex items-center justify-between">
+   947→   947→                  <Label className="text-base font-semibold">بنود القيد</Label>
+   948→   948→                  <Button
+   949→   949→                    type="button"
+   950→   950→                    variant="outline"
+   951→   951→                    size="sm"
+   952→   952→                    onClick={addLine}
+   953→   953→                    className="gap-1"
+   954→   954→                  >
+   955→   955→                    <Plus className="w-3.5 h-3.5" />
+   956→   956→                    إضافة سطر
+   957→   957→                  </Button>
+   958→   958→                </div>
+   959→   959→
+   960→   960→                <div className="rounded-lg border overflow-hidden">
+   961→   961→                  {/* Lines Header */}
+   962→   962→                  <div className="bg-muted/50 grid grid-cols-[1fr_120px_120px_1fr_40px] gap-2 p-3 text-xs font-medium">
+   963→   963→                    <div className="text-right">اسم الحساب</div>
+   964→   964→                    <div className="text-right">مدين</div>
+   965→   965→                    <div className="text-right">دائن</div>
+   966→   966→                    <div className="text-right">البيان</div>
+   967→   967→                    <div></div>
+   968→   968→                  </div>
+   969→   969→
+   970→   970→                  {/* Lines Body */}
+   971→   971→                  <div className="divide-y">
+   972→   972→                    {lines.map((line, index) => (
+   973→   973→                      <div
+   974→   974→                        key={index}
+   975→   975→                        className="grid grid-cols-[1fr_120px_120px_1fr_40px] gap-2 p-2 items-center hover:bg-muted/20 transition-colors"
+   976→   976→                      >
+   977→   977→                        <Input
+   978→   978→                          value={line.account_name}
+   979→   979→                          onChange={(e) => updateLine(index, 'account_name', e.target.value)}
+   980→   980→                          placeholder="اسم الحساب"
+   981→   981→                          className="h-9 text-sm"
+   982→   982→                        />
+   983→   983→                        <Input
+   984→   984→                          type="number"
+   985→   985→                          inputMode="decimal"
+   986→   986→                          value={line.debit}
+   987→   987→                          onChange={(e) => updateLine(index, 'debit', e.target.value)}
+   988→   988→                          placeholder="0.00"
+   989→   989→                          className="h-9 text-sm text-left"
+   990→   990→                          min="0"
+   991→   991→                          step="0.01"
+   992→   992→                        />
+   993→   993→                        <Input
+   994→   994→                          type="number"
+   995→   995→                          inputMode="decimal"
+   996→   996→                          value={line.credit}
+   997→   997→                          onChange={(e) => updateLine(index, 'credit', e.target.value)}
+   998→   998→                          placeholder="0.00"
+   999→   999→                          className="h-9 text-sm text-left"
+  1000→  1000→                          min="0"
+  1001→  1001→                          step="0.01"
+  1002→  1002→                        />
+  1003→  1003→                        <Input
+  1004→  1004→                          value={line.description}
+  1005→  1005→                          onChange={(e) => updateLine(index, 'description', e.target.value)}
+  1006→  1006→                          placeholder="البيان"
+  1007→  1007→                          className="h-9 text-sm"
+  1008→  1008→                        />
+  1009→  1009→                        <Button
+  1010→  1010→                          type="button"
+  1011→  1011→                          variant="ghost"
+  1012→  1012→                          size="icon"
+  1013→  1013→                          className="h-8 w-8 text-destructive hover:text-destructive"
+  1014→  1014→                          onClick={() => removeLine(index)}
+  1015→  1015→                          title="حذف السطر"
+  1016→  1016→                        >
+  1017→  1017→                          <X className="w-4 h-4" />
+  1018→  1018→                        </Button>
+  1019→  1019→                      </div>
+  1020→  1020→                    ))}
+  1021→  1021→                  </div>
+  1022→  1022→
+  1023→  1023→                  {/* Totals */}
+  1024→  1024→                  <div className="bg-muted/50 grid grid-cols-[1fr_120px_120px_1fr_40px] gap-2 p-3 text-sm font-semibold border-t">
+  1025→  1025→                    <div className="text-right">الإجمالي</div>
+  1026→  1026→                    <div className="text-right text-primary">
+  1027→  1027→                      {formatCurrency(getTotalDebit())}
+  1028→  1028→                    </div>
+  1029→  1029→                    <div className="text-right">
+  1030→  1030→                      {formatCurrency(getTotalCredit())}
+  1031→  1031→                    </div>
+  1032→  1032→                    <div></div>
+  1033→  1033→                    <div></div>
+  1034→  1034→                  </div>
+  1035→  1035→                </div>
+  1036→  1036→
+  1037→  1037→                {/* Balance indicator */}
+  1038→  1038→                {Math.abs(getTotalDebit() - getTotalCredit()) > 0.01 && (
+  1039→  1039→                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+  1040→  1040→                    <X className="w-4 h-4 text-red-500 shrink-0" />
+  1041→  1041→                    <span className="text-sm text-red-700 dark:text-red-400">
+  1042→  1042→                      الفرق بين المدين والدائن: {formatCurrency(Math.abs(getTotalDebit() - getTotalCredit()))}
+  1043→  1043→                    </span>
+  1044→  1044→                  </div>
+  1045→  1045→                )}
+  1046→  1046→                {getTotalDebit() > 0 && Math.abs(getTotalDebit() - getTotalCredit()) <= 0.01 && (
+  1047→  1047→                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+  1048→  1048→                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+  1049→  1049→                    <span className="text-sm text-emerald-700 dark:text-emerald-400">
+  1050→  1050→                      القيد متوازن
+  1051→  1051→                    </span>
+  1052→  1052→                  </div>
+  1053→  1053→                )}
+  1054→  1054→              </div>
+  1055→  1055→            </div>
+  1056→  1056→          </ScrollArea>
+  1057→  1057→          <DialogFooter>
+  1058→  1058→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+  1059→  1059→              إلغاء
+  1060→  1060→            </Button>
+  1061→  1061→            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+  1062→  1062→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+  1063→  1063→              {editingEntry ? 'تحديث القيد' : 'حفظ القيد'}
+  1064→  1064→            </Button>
+  1065→  1065→          </DialogFooter>
+  1066→  1066→        </DialogContent>
+  1067→  1067→      </Dialog>
+  1068→  1068→
+  1069→  1069→      {/* View Detail Dialog */}
+  1070→  1070→      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+  1071→  1071→        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
+  1072→  1072→          <DialogHeader>
+  1073→  1073→            <DialogTitle className="flex items-center gap-2">
+  1074→  1074→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+  1075→  1075→                <FileText className="w-4 h-4 text-white" />
+  1076→  1076→              </div>
+  1077→  1077→              تفاصيل القيد {viewEntry?.entry_number}
+  1078→  1078→            </DialogTitle>
+  1079→  1079→          </DialogHeader>
+  1080→  1080→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+  1081→  1081→            {viewEntry && (
+  1082→  1082→              <div className="space-y-5 py-4">
+  1083→  1083→                {/* Entry Info */}
+  1084→  1084→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1085→  1085→                  <div className="p-3 rounded-lg bg-muted/30">
+  1086→  1086→                    <p className="text-xs text-muted-foreground mb-1">رقم القيد</p>
+  1087→  1087→                    <p className="font-semibold text-sm">{viewEntry.entry_number}</p>
+  1088→  1088→                  </div>
+  1089→  1089→                  <div className="p-3 rounded-lg bg-muted/30">
+  1090→  1090→                    <p className="text-xs text-muted-foreground mb-1">التاريخ</p>
+  1091→  1091→                    <p className="font-semibold text-sm">{formatDate(viewEntry.entry_date)}</p>
+  1092→  1092→                  </div>
+  1093→  1093→                  <div className="p-3 rounded-lg bg-muted/30">
+  1094→  1094→                    <p className="text-xs text-muted-foreground mb-1">الحالة</p>
+  1095→  1095→                    {viewEntry.is_posted ? (
+  1096→  1096→                      <Badge
+  1097→  1097→                        variant="secondary"
+  1098→  1098→                        className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+  1099→  1099→                      >
+  1100→  1100→                        <CheckCircle2 className="w-3 h-3 ml-1" />
+  1101→  1101→                        مرحل
+  1102→  1102→                      </Badge>
+  1103→  1103→                    ) : (
+  1104→  1104→                      <Badge
+  1105→  1105→                        variant="secondary"
+  1106→  1106→                        className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+  1107→  1107→                      >
+  1108→  1108→                        <CircleDot className="w-3 h-3 ml-1" />
+  1109→  1109→                        مسودة
+  1110→  1110→                      </Badge>
+  1111→  1111→                    )}
+  1112→  1112→                  </div>
+  1113→  1113→                  <div className="p-3 rounded-lg bg-muted/30">
+  1114→  1114→                    <p className="text-xs text-muted-foreground mb-1">تاريخ الإنشاء</p>
+  1115→  1115→                    <p className="font-semibold text-sm">{formatDateTime(viewEntry.created_at)}</p>
+  1116→  1116→                  </div>
+  1117→  1117→                </div>
+  1118→  1118→
+  1119→  1119→                <div>
+  1120→  1120→                  <p className="text-xs text-muted-foreground mb-1">الوصف</p>
+  1121→  1121→                  <p className="font-medium text-sm">{viewEntry.description}</p>
+  1122→  1122→                </div>
+  1123→  1123→
+  1124→  1124→                {viewEntry.notes && (
+  1125→  1125→                  <div>
+  1126→  1126→                    <p className="text-xs text-muted-foreground mb-1">ملاحظات</p>
+  1127→  1127→                    <p className="text-sm text-muted-foreground">{viewEntry.notes}</p>
+  1128→  1128→                  </div>
+  1129→  1129→                )}
+  1130→  1130→
+  1131→  1131→                <Separator />
+  1132→  1132→
+  1133→  1133→                {/* Lines Table */}
+  1134→  1134→                <div className="space-y-3">
+  1135→  1135→                  <h3 className="text-sm font-semibold">بنود القيد</h3>
+  1136→  1136→                  {viewLoading ? (
+  1137→  1137→                    <div className="flex items-center justify-center py-8">
+  1138→  1138→                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+  1139→  1139→                    </div>
+  1140→  1140→                  ) : viewLines.length === 0 ? (
+  1141→  1141→                    <p className="text-sm text-muted-foreground text-center py-4">لا توجد بنود</p>
+  1142→  1142→                  ) : (
+  1143→  1143→                    <div className="rounded-lg border overflow-hidden">
+  1144→  1144→                      <Table>
+  1145→  1145→                        <TableHeader>
+  1146→  1146→                          <TableRow className="bg-muted/30">
+  1147→  1147→                            <TableHead className="text-right text-xs font-bold">اسم الحساب</TableHead>
+  1148→  1148→                            <TableHead className="text-right text-xs font-bold">مدين</TableHead>
+  1149→  1149→                            <TableHead className="text-right text-xs font-bold">دائن</TableHead>
+  1150→  1150→                            <TableHead className="text-right text-xs font-bold hidden sm:table-cell">البيان</TableHead>
+  1151→  1151→                          </TableRow>
+  1152→  1152→                        </TableHeader>
+  1153→  1153→                        <TableBody>
+  1154→  1154→                          {viewLines.map((line) => (
+  1155→  1155→                            <TableRow key={line.id}>
+  1156→  1156→                              <TableCell className="text-sm font-medium">
+  1157→  1157→                                {line.account_name}
+  1158→  1158→                              </TableCell>
+  1159→  1159→                              <TableCell className="text-sm text-primary font-semibold">
+  1160→  1160→                                {line.debit > 0 ? formatCurrency(line.debit) : '—'}
+  1161→  1161→                              </TableCell>
+  1162→  1162→                              <TableCell className="text-sm font-semibold">
+  1163→  1163→                                {line.credit > 0 ? formatCurrency(line.credit) : '—'}
+  1164→  1164→                              </TableCell>
+  1165→  1165→                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
+  1166→  1166→                                {line.description || '—'}
+  1167→  1167→                              </TableCell>
+  1168→  1168→                            </TableRow>
+  1169→  1169→                          ))}
+  1170→  1170→                        </TableBody>
+  1171→  1171→                      </Table>
+  1172→  1172→                      {/* Totals */}
+  1173→  1173→                      <div className="bg-muted/50 grid grid-cols-[1fr_1fr_1fr_1fr] gap-2 p-3 text-sm font-semibold border-t">
+  1174→  1174→                        <div className="text-right">الإجمالي</div>
+  1175→  1175→                        <div className="text-right text-primary">
+  1176→  1176→                          {formatCurrency(viewEntry.total_debit)}
+  1177→  1177→                        </div>
+  1178→  1178→                        <div className="text-right">
+  1179→  1179→                          {formatCurrency(viewEntry.total_credit)}
+  1180→  1180→                        </div>
+  1181→  1181→                        <div className="hidden sm:block"></div>
+  1182→  1182→                      </div>
+  1183→  1183→                    </div>
+  1184→  1184→                  )}
+  1185→  1185→                </div>
+  1186→  1186→              </div>
+  1187→  1187→            )}
+  1188→  1188→          </ScrollArea>
+  1189→  1189→          <DialogFooter>
+  1190→  1190→            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+  1191→  1191→              إغلاق
+  1192→  1192→            </Button>
+  1193→  1193→          </DialogFooter>
+  1194→  1194→        </DialogContent>
+  1195→  1195→      </Dialog>
+  1196→  1196→
+  1197→  1197→      {/* Post Confirmation Dialog */}
+  1198→  1198→      <AlertDialog open={postDialogOpen} onOpenChange={setPostDialogOpen}>
+  1199→  1199→        <AlertDialogContent>
+  1200→  1200→          <AlertDialogHeader>
+  1201→  1201→            <AlertDialogTitle className="flex items-center gap-2">
+  1202→  1202→              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+  1203→  1203→              ترحيل القيد
+  1204→  1204→            </AlertDialogTitle>
+  1205→  1205→            <AlertDialogDescription>
+  1206→  1206→              هل أنت متأكد من ترحيل القيد &quot;{postingEntry?.entry_number}&quot;؟
+  1207→  1207→              بعد الترحيل لا يمكن تعديل القيد أو حذفه.
+  1208→  1208→            </AlertDialogDescription>
+  1209→  1209→          </AlertDialogHeader>
+  1210→  1210→          <AlertDialogFooter>
+  1211→  1211→            <AlertDialogCancel onClick={() => setPostingEntry(null)}>إلغاء</AlertDialogCancel>
+  1212→  1212→            <AlertDialogAction onClick={handlePost} className="bg-emerald-600 hover:bg-emerald-700">
+  1213→  1213→              ترحيل
+  1214→  1214→            </AlertDialogAction>
+  1215→  1215→          </AlertDialogFooter>
+  1216→  1216→        </AlertDialogContent>
+  1217→  1217→      </AlertDialog>
+  1218→  1218→
+  1219→  1219→      {/* Delete Confirmation Dialog */}
+  1220→  1220→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1221→  1221→        <AlertDialogContent>
+  1222→  1222→          <AlertDialogHeader>
+  1223→  1223→            <AlertDialogTitle className="flex items-center gap-2">
+  1224→  1224→              <Trash2 className="w-5 h-5 text-destructive" />
+  1225→  1225→              حذف القيد
+  1226→  1226→            </AlertDialogTitle>
+  1227→  1227→            <AlertDialogDescription>
+  1228→  1228→              هل أنت متأكد من حذف القيد &quot;{deletingEntry?.entry_number}&quot;؟ لا يمكن التراجع عن هذا الإجراء وسيتم حذف جميع بنود القيد.
+  1229→  1229→            </AlertDialogDescription>
+  1230→  1230→          </AlertDialogHeader>
+  1231→  1231→          <AlertDialogFooter>
+  1232→  1232→            <AlertDialogCancel onClick={() => setDeletingEntry(null)}>إلغاء</AlertDialogCancel>
+  1233→  1233→            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+  1234→  1234→              حذف
+  1235→  1235→            </AlertDialogAction>
+  1236→  1236→          </AlertDialogFooter>
+  1237→  1237→        </AlertDialogContent>
+  1238→  1238→      </AlertDialog>
+  1239→  1239→    </div>
+  1240→  1240→  );
+  1241→  1241→}
+  1242→  1242→

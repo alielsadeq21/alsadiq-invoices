@@ -1,0 +1,660 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { DashboardStats, MonthlyData, BranchSpending, Invoice } from '@/lib/types';
+     7→     7→import { formatCurrency, formatDate, getStatusLabel, getStatusColor } from '@/lib/utils';
+     8→     8→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     9→     9→import { Badge } from '@/components/ui/badge';
+    10→    10→import { Button } from '@/components/ui/button';
+    11→    11→import {
+    12→    12→  FileText,
+    13→    13→  TrendingUp,
+    14→    14→  RotateCcw,
+    15→    15→  Building2,
+    16→    16→  Plus,
+    17→    17→  ArrowUpLeft,
+    18→    18→  Activity,
+    19→    19→  Receipt,
+    20→    20→  AlertTriangle,
+    21→    21→} from 'lucide-react';
+    22→    22→import {
+    23→    23→  BarChart,
+    24→    24→  Bar,
+    25→    25→  XAxis,
+    26→    26→  YAxis,
+    27→    27→  CartesianGrid,
+    28→    28→  Tooltip,
+    29→    29→  ResponsiveContainer,
+    30→    30→  Legend,
+    31→    31→} from 'recharts';
+    32→    32→import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+    33→    33→import { ar } from 'date-fns/locale';
+    34→    34→import { motion } from 'framer-motion';
+    35→    35→
+    36→    36→export default function DashboardPage() {
+    37→    37→  const { navigateTo, settings, user, isAdmin, hasPermission } = useAppStore();
+    38→    38→  const [stats, setStats] = useState<DashboardStats>({
+    39→    39→    todayInvoices: 0,
+    40→    40→    todayTotal: 0,
+    41→    41→    todayReturns: 0,
+    42→    42→    activeBranches: 0,
+    43→    43→    netSpending: 0,
+    44→    44→  });
+    45→    45→  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+    46→    46→  const [branchSpending, setBranchSpending] = useState<BranchSpending[]>([]);
+    47→    47→  const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+    48→    48→  const [topItems, setTopItems] = useState<{ name: string; count: number; total: number }[]>([]);
+    49→    49→  const [todayExpenses, setTodayExpenses] = useState(0);
+    50→    50→  const [lowStockCount, setLowStockCount] = useState(0);
+    51→    51→  const [loading, setLoading] = useState(true);
+    52→    52→
+    53→    53→  const userBranchId = user?.branch_id || null;
+    54→    54→
+    55→    55→  useEffect(() => {
+    56→    56→    loadDashboardData();
+    57→    57→  }, []);
+    58→    58→
+    59→    59→  const loadDashboardData = async () => {
+    60→    60→    setLoading(true);
+    61→    61→    try {
+    62→    62→      const today = new Date().toISOString().split('T')[0];
+    63→    63→      const currentMonth = format(new Date(), 'yyyy-MM');
+    64→    64→
+    65→    65→      // Today's invoices
+    66→    66→      let todayInvoicesQuery = supabase
+    67→    67→        .from('invoices')
+    68→    68→        .select('total')
+    69→    69→        .eq('invoice_date', today)
+    70→    70→        .eq('status', 'active');
+    71→    71→      if (userBranchId && !isAdmin) todayInvoicesQuery = todayInvoicesQuery.eq('branch_id', userBranchId);
+    72→    72→      const { data: todayInvoices } = await todayInvoicesQuery;
+    73→    73→
+    74→    74→      const todayTotal = (todayInvoices || []).reduce((sum, inv) => sum + Number(inv.total), 0);
+    75→    75→
+    76→    76→      // Today's returns
+    77→    77→      let todayReturnsQuery = supabase
+    78→    78→        .from('returns')
+    79→    79→        .select('total')
+    80→    80→        .eq('return_date', today);
+    81→    81→      if (userBranchId && !isAdmin) todayReturnsQuery = todayReturnsQuery.eq('branch_id', userBranchId);
+    82→    82→      const { data: todayReturns } = await todayReturnsQuery;
+    83→    83→
+    84→    84→      const todayReturnsTotal = (todayReturns || []).reduce((sum, ret) => sum + Number(ret.total), 0);
+    85→    85→
+    86→    86→      // Active branches
+    87→    87→      let activeBranches = 0;
+    88→    88→      if (userBranchId && !isAdmin) {
+    89→    89→        activeBranches = 1; // Branch user only sees their own branch
+    90→    90→      } else {
+    91→    91→        const { count: branchCount } = await supabase
+    92→    92→          .from('branches')
+    93→    93→          .select('*', { count: 'exact', head: true })
+    94→    94→          .eq('is_active', true);
+    95→    95→        activeBranches = branchCount || 0;
+    96→    96→      }
+    97→    97→
+    98→    98→      setStats({
+    99→    99→        todayInvoices: todayInvoices?.length || 0,
+   100→   100→        todayTotal,
+   101→   101→        todayReturns: todayReturnsTotal,
+   102→   102→        activeBranches,
+   103→   103→        netSpending: todayTotal - todayReturnsTotal,
+   104→   104→      });
+   105→   105→
+   106→   106→      // Today's expenses
+   107→   107→      let todayExpensesQuery = supabase
+   108→   108→        .from('expenses')
+   109→   109→        .select('amount')
+   110→   110→        .eq('expense_date', today);
+   111→   111→      if (userBranchId && !isAdmin) todayExpensesQuery = todayExpensesQuery.eq('branch_id', userBranchId);
+   112→   112→      const { data: todayExpensesData } = await todayExpensesQuery;
+   113→   113→      const todayExpTotal = (todayExpensesData || []).reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+   114→   114→      setTodayExpenses(todayExpTotal);
+   115→   115→
+   116→   116→      // Low stock count
+   117→   117→      const { data: allInventory } = await supabase
+   118→   118→        .from('inventory')
+   119→   119→        .select('quantity, min_quantity, branch_id');
+   120→   120→      let relevantInv: any[] = allInventory || [];
+   121→   121→      if (userBranchId && !isAdmin) {
+   122→   122→        relevantInv = relevantInv.filter((item: any) => item.branch_id === userBranchId);
+   123→   123→      }
+   124→   124→      const lowStock = relevantInv.filter((item: any) => Number(item.quantity) <= Number(item.min_quantity || 0)).length;
+   125→   125→      setLowStockCount(lowStock);
+   126→   126→
+   127→   127→      // Monthly chart data (last 6 months)
+   128→   128→      const monthlyPromises: Promise<{ month: string; total: number; returns: number; expenses: number; net: number }>[] = [];
+   129→   129→      for (let i = 5; i >= 0; i--) {
+   130→   130→        const date = subMonths(new Date(), i);
+   131→   131→        const monthStart = startOfMonth(date).toISOString().split('T')[0];
+   132→   132→        const monthEnd = endOfMonth(date).toISOString().split('T')[0];
+   133→   133→        const monthLabel = format(date, 'MMM yyyy', { locale: ar });
+   134→   134→
+   135→   135→        monthlyPromises.push(
+   136→   136→          Promise.all([
+   137→   137→            (() => {
+   138→   138→              let q = supabase
+   139→   139→                .from('invoices')
+   140→   140→                .select('total')
+   141→   141→                .gte('invoice_date', monthStart)
+   142→   142→                .lte('invoice_date', monthEnd)
+   143→   143→                .eq('status', 'active');
+   144→   144→              if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
+   145→   145→              return q;
+   146→   146→            })(),
+   147→   147→            (() => {
+   148→   148→              let q = supabase
+   149→   149→                .from('returns')
+   150→   150→                .select('total')
+   151→   151→                .gte('return_date', monthStart)
+   152→   152→                .lte('return_date', monthEnd);
+   153→   153→              if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
+   154→   154→              return q;
+   155→   155→            })(),
+   156→   156→            (() => {
+   157→   157→              let q = supabase
+   158→   158→                .from('expenses')
+   159→   159→                .select('amount')
+   160→   160→                .gte('expense_date', monthStart)
+   161→   161→                .lte('expense_date', monthEnd);
+   162→   162→              if (userBranchId && !isAdmin) q = q.eq('branch_id', userBranchId);
+   163→   163→              return q;
+   164→   164→            })(),
+   165→   165→          ]).then(([invRes, retRes, expRes]) => {
+   166→   166→            const total = (invRes.data || []).reduce((s, i) => s + Number(i.total), 0);
+   167→   167→            const returns = (retRes.data || []).reduce((s, r) => s + Number(r.total), 0);
+   168→   168→            const expenses = (expRes.data || []).reduce((s: number, e: any) => s + Number(e.amount), 0);
+   169→   169→            return {
+   170→   170→              month: monthLabel,
+   171→   171→              total,
+   172→   172→              returns,
+   173→   173→              expenses,
+   174→   174→              net: total - returns,
+   175→   175→            };
+   176→   176→          })
+   177→   177→        );
+   178→   178→      }
+   179→   179→
+   180→   180→      const monthly = await Promise.all(monthlyPromises);
+   181→   181→      setMonthlyData(monthly);
+   182→   182→
+   183→   183→      // Branch spending this month
+   184→   184→      const monthStart = startOfMonth(new Date()).toISOString().split('T')[0];
+   185→   185→      const monthEnd = endOfMonth(new Date()).toISOString().split('T')[0];
+   186→   186→
+   187→   187→      let branchInvoicesQuery = supabase
+   188→   188→        .from('invoices')
+   189→   189→        .select('branch_id, total, branches(name)')
+   190→   190→        .gte('invoice_date', monthStart)
+   191→   191→        .lte('invoice_date', monthEnd)
+   192→   192→        .eq('status', 'active');
+   193→   193→      if (userBranchId && !isAdmin) branchInvoicesQuery = branchInvoicesQuery.eq('branch_id', userBranchId);
+   194→   194→      const { data: branchInvoices } = await branchInvoicesQuery;
+   195→   195→
+   196→   196→      const branchMap: Record<string, { name: string; total: number; count: number }> = {};
+   197→   197→      (branchInvoices || []).forEach((inv) => {
+   198→   198→        const branchData = inv.branches as unknown as { name: string } | null;
+   199→   199→        const bName = branchData?.name || 'غير معروف';
+   200→   200→        if (!branchMap[inv.branch_id]) {
+   201→   201→          branchMap[inv.branch_id] = { name: bName, total: 0, count: 0 };
+   202→   202→        }
+   203→   203→        branchMap[inv.branch_id].total += Number(inv.total);
+   204→   204→        branchMap[inv.branch_id].count += 1;
+   205→   205→      });
+   206→   206→
+   207→   207→      const branchList = Object.entries(branchMap)
+   208→   208→        .map(([id, data]) => ({ branch_id: id, branch_name: data.name, total: data.total, invoice_count: data.count }))
+   209→   209→        .sort((a, b) => b.total - a.total)
+   210→   210→        .slice(0, 5);
+   211→   211→      setBranchSpending(branchList);
+   212→   212→
+   213→   213→      // Recent invoices
+   214→   214→      let recentInvoicesQuery = supabase
+   215→   215→        .from('invoices')
+   216→   216→        .select('*, branches(name)')
+   217→   217→        .order('created_at', { ascending: false })
+   218→   218→        .limit(5);
+   219→   219→      if (userBranchId && !isAdmin) recentInvoicesQuery = recentInvoicesQuery.eq('branch_id', userBranchId);
+   220→   220→      const { data: recent } = await recentInvoicesQuery;
+   221→   221→
+   222→   222→      setRecentInvoices((recent as unknown as Invoice[]) || []);
+   223→   223→
+   224→   224→      // Top items this month
+   225→   225→      const { data: itemsData } = await supabase
+   226→   226→        .from('invoice_items')
+   227→   227→        .select('item_name, quantity, total_price')
+   228→   228→        .gte('created_at', monthStart);
+   229→   229→
+   230→   230→      const itemMap: Record<string, { name: string; count: number; total: number }> = {};
+   231→   231→      (itemsData || []).forEach((item: { item_name: string; quantity: number; total_price: number }) => {
+   232→   232→        if (!itemMap[item.item_name]) {
+   233→   233→          itemMap[item.item_name] = { name: item.item_name, count: 0, total: 0 };
+   234→   234→        }
+   235→   235→        itemMap[item.item_name].count += Number(item.quantity);
+   236→   236→        itemMap[item.item_name].total += Number(item.total_price);
+   237→   237→      });
+   238→   238→
+   239→   239→      const topItemsList = Object.values(itemMap)
+   240→   240→        .sort((a, b) => b.total - a.total)
+   241→   241→        .slice(0, 5);
+   242→   242→      setTopItems(topItemsList);
+   243→   243→    } catch (err) {
+   244→   244→      console.error('Error loading dashboard:', err);
+   245→   245→    } finally {
+   246→   246→      setLoading(false);
+   247→   247→    }
+   248→   248→  };
+   249→   249→
+   250→   250→  const statCards = [
+   251→   251→    {
+   252→   252→      title: 'فواتير اليوم',
+   253→   253→      value: stats.todayInvoices,
+   254→   254→      icon: FileText,
+   255→   255→      gradient: 'from-emerald-400 to-emerald-600',
+   256→   256→      accent: 'from-emerald-400 to-emerald-500',
+   257→   257→      lightBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+   258→   258→    },
+   259→   259→    {
+   260→   260→      title: 'صرف اليوم',
+   261→   261→      value: formatCurrency(stats.todayTotal),
+   262→   262→      icon: TrendingUp,
+   263→   263→      gradient: 'from-amber-400 to-amber-600',
+   264→   264→      accent: 'from-amber-400 to-amber-500',
+   265→   265→      lightBg: 'bg-amber-50/80 dark:bg-amber-950/30',
+   266→   266→    },
+   267→   267→    {
+   268→   268→      title: 'مرتجعات اليوم',
+   269→   269→      value: formatCurrency(stats.todayReturns),
+   270→   270→      icon: RotateCcw,
+   271→   271→      gradient: 'from-red-400 to-red-600',
+   272→   272→      accent: 'from-red-400 to-red-500',
+   273→   273→      lightBg: 'bg-red-50/80 dark:bg-red-950/30',
+   274→   274→    },
+   275→   275→    {
+   276→   276→      title: 'فروع نشطة',
+   277→   277→      value: stats.activeBranches,
+   278→   278→      icon: Building2,
+   279→   279→      gradient: 'from-sky-400 to-sky-600',
+   280→   280→      accent: 'from-sky-400 to-sky-500',
+   281→   281→      lightBg: 'bg-sky-50/80 dark:bg-sky-950/30',
+   282→   282→    },
+   283→   283→    {
+   284→   284→      title: 'مصروفات اليوم',
+   285→   285→      value: formatCurrency(todayExpenses),
+   286→   286→      icon: Receipt,
+   287→   287→      gradient: 'from-purple-400 to-purple-600',
+   288→   288→      accent: 'from-purple-400 to-purple-500',
+   289→   289→      lightBg: 'bg-purple-50/80 dark:bg-purple-950/30',
+   290→   290→    },
+   291→   291→    {
+   292→   292→      title: 'مخزون منخفض',
+   293→   293→      value: lowStockCount,
+   294→   294→      icon: AlertTriangle,
+   295→   295→      gradient: 'from-orange-400 to-orange-600',
+   296→   296→      accent: 'from-orange-400 to-orange-500',
+   297→   297→      lightBg: 'bg-orange-50/80 dark:bg-orange-950/30',
+   298→   298→    },
+   299→   299→  ];
+   300→   300→
+   301→   301→  const branchBarColors = [
+   302→   302→    'from-emerald-400 to-emerald-600',
+   303→   303→    'from-sky-400 to-sky-600',
+   304→   304→    'from-amber-400 to-amber-600',
+   305→   305→    'from-purple-400 to-purple-600',
+   306→   306→    'from-rose-400 to-rose-600',
+   307→   307→  ];
+   308→   308→
+   309→   309→  const rankGradients = [
+   310→   310→    'from-amber-300 to-amber-500',      // Gold
+   311→   311→    'from-slate-300 to-slate-500',       // Silver
+   312→   312→    'from-orange-400 to-orange-600',     // Bronze
+   313→   313→    'from-slate-400 to-slate-500',       // 4th
+   314→   314→    'from-slate-400 to-slate-500',       // 5th
+   315→   315→  ];
+   316→   316→
+   317→   317→  const invoiceStatusIcons: Record<string, string> = {
+   318→   318→    active: 'bg-gradient-to-br from-emerald-400 to-emerald-600',
+   319→   319→    cancelled: 'bg-gradient-to-br from-red-400 to-red-600',
+   320→   320→    partially_returned: 'bg-gradient-to-br from-amber-400 to-amber-600',
+   321→   321→    fully_returned: 'bg-gradient-to-br from-slate-400 to-slate-600',
+   322→   322→  };
+   323→   323→
+   324→   324→  if (loading) {
+   325→   325→    return (
+   326→   326→      <div className="flex items-center justify-center min-h-[60vh]">
+   327→   327→        <div className="animate-pulse space-y-4 w-full max-w-4xl">
+   328→   328→          <div className="h-8 bg-muted rounded-lg w-48" />
+   329→   329→          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+   330→   330→            {[1, 2, 3, 4, 5, 6].map((i) => (
+   331→   331→              <div key={i} className="h-32 bg-muted rounded-2xl" />
+   332→   332→            ))}
+   333→   333→          </div>
+   334→   334→          <div className="h-80 bg-muted rounded-2xl" />
+   335→   335→        </div>
+   336→   336→      </div>
+   337→   337→    );
+   338→   338→  }
+   339→   339→
+   340→   340→  return (
+   341→   341→    <div className="space-y-6">
+   342→   342→      {/* Header */}
+   343→   343→      <motion.div
+   344→   344→        initial={{ opacity: 0, y: -10 }}
+   345→   345→        animate={{ opacity: 1, y: 0 }}
+   346→   346→        transition={{ duration: 0.4, ease: 'easeOut' }}
+   347→   347→        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+   348→   348→      >
+   349→   349→        <div>
+   350→   350→          <h1 className="text-2xl font-bold tracking-tight">لوحة التحكم</h1>
+   351→   351→          <p className="text-muted-foreground text-sm mt-1.5">
+   352→   352→            مرحباً،{' '}
+   353→   353→            <span
+   354→   354→              className="font-semibold bg-gradient-to-l from-emerald-600 to-teal-500 bg-clip-text text-transparent"
+   355→   355→            >
+   356→   356→              {useAppStore.getState().user?.full_name || 'علي محمد الصادق'}
+   357→   357→            </span>
+   358→   358→          </p>
+   359→   359→        </div>
+   360→   360→        {hasPermission('invoices', 'create') && (
+   361→   361→          <Button
+   362→   362→            onClick={() => navigateTo('invoice-form')}
+   363→   363→            className="gap-2 shadow-lg shadow-emerald-500/20 bg-gradient-to-l from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white border-0 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/30 hover:scale-[1.03]"
+   364→   364→          >
+   365→   365→            <Plus className="w-4 h-4" />
+   366→   366→            فاتورة جديدة
+   367→   367→          </Button>
+   368→   368→        )}
+   369→   369→      </motion.div>
+   370→   370→
+   371→   371→      {/* Stats Cards */}
+   372→   372→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+   373→   373→        {statCards.map((card, index) => {
+   374→   374→          const Icon = card.icon;
+   375→   375→          return (
+   376→   376→            <motion.div
+   377→   377→              key={card.title}
+   378→   378→              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+   379→   379→              animate={{ opacity: 1, y: 0, scale: 1 }}
+   380→   380→              transition={{ duration: 0.4, delay: index * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+   381→   381→            >
+   382→   382→              <Card className="group border-0 shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 overflow-hidden relative">
+   383→   383→                {/* Top accent line */}
+   384→   384→                <div className={`absolute top-0 right-0 left-0 h-1 bg-gradient-to-l ${card.accent}`} />
+   385→   385→                <CardContent className="p-5 pt-6">
+   386→   386→                  <div className="flex items-center justify-between">
+   387→   387→                    <div>
+   388→   388→                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{card.title}</p>
+   389→   389→                      <p className="text-2xl font-bold mt-2 tracking-tight">{card.value}</p>
+   390→   390→                    </div>
+   391→   391→                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${card.gradient} shadow-lg shadow-black/5`}>
+   392→   392→                      <Icon className="w-6 h-6 text-white" />
+   393→   393→                    </div>
+   394→   394→                  </div>
+   395→   395→                </CardContent>
+   396→   396→              </Card>
+   397→   397→            </motion.div>
+   398→   398→          );
+   399→   399→        })}
+   400→   400→      </div>
+   401→   401→
+   402→   402→      {/* Net Spending Card */}
+   403→   403→      <motion.div
+   404→   404→        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+   405→   405→        animate={{ opacity: 1, y: 0, scale: 1 }}
+   406→   406→        transition={{ duration: 0.5, delay: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+   407→   407→      >
+   408→   408→        <Card className="border-0 shadow-lg bg-gradient-to-l from-emerald-600 via-emerald-700 to-teal-700 text-primary-foreground overflow-hidden relative">
+   409→   409→          {/* Decorative background circles */}
+   410→   410→          <div className="absolute -left-8 -top-8 w-32 h-32 rounded-full bg-white/5" />
+   411→   411→          <div className="absolute -left-4 -bottom-10 w-24 h-24 rounded-full bg-white/5" />
+   412→   412→          <CardContent className="p-6 flex items-center justify-between relative z-10">
+   413→   413→            <div>
+   414→   414→              <p className="text-sm font-medium text-primary-foreground/70 tracking-wide">صافي الصرف اليوم</p>
+   415→   415→              <p className="text-4xl font-bold mt-2 tracking-tight">{formatCurrency(stats.netSpending)}</p>
+   416→   416→              <p className="text-xs text-primary-foreground/50 mt-2 flex items-center gap-1">
+   417→   417→                <span className="inline-block w-4 h-px bg-primary-foreground/30" />
+   418→   418→                إجمالي الصرف - إجمالي المرتجعات
+   419→   419→              </p>
+   420→   420→            </div>
+   421→   421→            <motion.div
+   422→   422→              animate={{ rotate: [0, 5, -5, 0] }}
+   423→   423→              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+   424→   424→            >
+   425→   425→              <Activity className="w-16 h-16 text-primary-foreground/15" />
+   426→   426→            </motion.div>
+   427→   427→          </CardContent>
+   428→   428→        </Card>
+   429→   429→      </motion.div>
+   430→   430→
+   431→   431→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   432→   432→        {/* Monthly Chart */}
+   433→   433→        <motion.div
+   434→   434→          initial={{ opacity: 0, y: 20 }}
+   435→   435→          animate={{ opacity: 1, y: 0 }}
+   436→   436→          transition={{ duration: 0.5, delay: 0.45, ease: [0.25, 0.46, 0.45, 0.94] }}
+   437→   437→          className="lg:col-span-2"
+   438→   438→        >
+   439→   439→          <Card className="border-0 shadow-md overflow-hidden">
+   440→   440→            {/* Top gradient accent */}
+   441→   441→            <div className="h-1 bg-gradient-to-l from-emerald-400 via-sky-400 to-purple-400" />
+   442→   442→            <CardHeader className="pb-2 pt-5">
+   443→   443→              <div className="flex items-center gap-2">
+   444→   444→                <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600" />
+   445→   445→                <CardTitle className="text-lg tracking-tight">الصرف الشهري</CardTitle>
+   446→   446→              </div>
+   447→   447→            </CardHeader>
+   448→   448→            <CardContent>
+   449→   449→              <div className="h-72 bg-muted/20 rounded-xl p-2">
+   450→   450→                <ResponsiveContainer width="100%" height="100%">
+   451→   451→                  <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+   452→   452→                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+   453→   453→                    <XAxis
+   454→   454→                      dataKey="month"
+   455→   455→                      tick={{ fontSize: 12 }}
+   456→   456→                      stroke="var(--muted-foreground)"
+   457→   457→                    />
+   458→   458→                    <YAxis
+   459→   459→                      tick={{ fontSize: 12 }}
+   460→   460→                      stroke="var(--muted-foreground)"
+   461→   461→                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+   462→   462→                    />
+   463→   463→                    <Tooltip
+   464→   464→                      formatter={(value: number) => formatCurrency(value)}
+   465→   465→                      contentStyle={{
+   466→   466→                        backgroundColor: 'var(--card)',
+   467→   467→                        border: '1px solid var(--border)',
+   468→   468→                        borderRadius: '12px',
+   469→   469→                        direction: 'rtl',
+   470→   470→                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+   471→   471→                      }}
+   472→   472→                    />
+   473→   473→                    <Legend />
+   474→   474→                    <Bar dataKey="total" name="الصرف" fill="oklch(0.52 0.11 172)" radius={[6, 6, 0, 0]} />
+   475→   475→                    <Bar dataKey="returns" name="المرتجعات" fill="oklch(0.65 0.2 25)" radius={[6, 6, 0, 0]} />
+   476→   476→                    <Bar dataKey="expenses" name="المصروفات" fill="oklch(0.55 0.2 300)" radius={[6, 6, 0, 0]} />
+   477→   477→                  </BarChart>
+   478→   478→                </ResponsiveContainer>
+   479→   479→              </div>
+   480→   480→            </CardContent>
+   481→   481→          </Card>
+   482→   482→        </motion.div>
+   483→   483→
+   484→   484→        {/* Branch Spending */}
+   485→   485→        <motion.div
+   486→   486→          initial={{ opacity: 0, y: 20 }}
+   487→   487→          animate={{ opacity: 1, y: 0 }}
+   488→   488→          transition={{ duration: 0.5, delay: 0.55, ease: [0.25, 0.46, 0.45, 0.94] }}
+   489→   489→        >
+   490→   490→          <Card className="border-0 shadow-md h-full overflow-hidden">
+   491→   491→            <div className="h-1 bg-gradient-to-l from-sky-400 to-emerald-400" />
+   492→   492→            <CardHeader className="pb-2 pt-5">
+   493→   493→              <div className="flex items-center gap-2">
+   494→   494→                <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-sky-400 to-emerald-500" />
+   495→   495→                <div>
+   496→   496→                  <CardTitle className="text-lg tracking-tight">أكثر الفروع صرفاً</CardTitle>
+   497→   497→                  <p className="text-xs text-muted-foreground mt-0.5">هذا الشهر</p>
+   498→   498→                </div>
+   499→   499→              </div>
+   500→   500→            </CardHeader>
+   501→   501→            <CardContent>
+   502→   502→              {branchSpending.length === 0 ? (
+   503→   503→                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+   504→   504→                  لا توجد بيانات
+   505→   505→                </div>
+   506→   506→              ) : (
+   507→   507→                <div className="space-y-4">
+   508→   508→                  {branchSpending.map((branch, i) => (
+   509→   509→                    <div key={branch.branch_id} className="group space-y-2">
+   510→   510→                      <div className="flex items-center justify-between">
+   511→   511→                        <div className="flex items-center gap-2">
+   512→   512→                          <div className={`w-6 h-6 rounded-md flex items-center justify-center bg-gradient-to-br ${branchBarColors[i]} text-white text-[10px] font-bold shadow-sm`}>
+   513→   513→                            {i + 1}
+   514→   514→                          </div>
+   515→   515→                          <span className="text-sm font-medium truncate group-hover:text-primary transition-colors">{branch.branch_name}</span>
+   516→   516→                        </div>
+   517→   517→                        <span className="text-xs text-muted-foreground">{branch.invoice_count} فاتورة</span>
+   518→   518→                      </div>
+   519→   519→                      <div className="flex items-center gap-3">
+   520→   520→                        <div className="flex-1 bg-muted/60 rounded-full h-2.5 overflow-hidden">
+   521→   521→                          <motion.div
+   522→   522→                            initial={{ width: 0 }}
+   523→   523→                            animate={{
+   524→   524→                              width: `${Math.min((branch.total / (branchSpending[0]?.total || 1)) * 100, 100)}%`,
+   525→   525→                            }}
+   526→   526→                            transition={{ duration: 0.8, delay: 0.6 + i * 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+   527→   527→                            className={`h-full rounded-full bg-gradient-to-l ${branchBarColors[i]} group-hover:shadow-md transition-shadow`}
+   528→   528→                          />
+   529→   529→                        </div>
+   530→   530→                        <span className="text-xs font-semibold min-w-[80px] text-left tabular-nums">
+   531→   531→                          {formatCurrency(branch.total)}
+   532→   532→                        </span>
+   533→   533→                      </div>
+   534→   534→                    </div>
+   535→   535→                  ))}
+   536→   536→                </div>
+   537→   537→              )}
+   538→   538→            </CardContent>
+   539→   539→          </Card>
+   540→   540→        </motion.div>
+   541→   541→      </div>
+   542→   542→
+   543→   543→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   544→   544→        {/* Recent Invoices */}
+   545→   545→        <motion.div
+   546→   546→          initial={{ opacity: 0, y: 20 }}
+   547→   547→          animate={{ opacity: 1, y: 0 }}
+   548→   548→          transition={{ duration: 0.5, delay: 0.65, ease: [0.25, 0.46, 0.45, 0.94] }}
+   549→   549→        >
+   550→   550→          <Card className="border-0 shadow-md overflow-hidden">
+   551→   551→            <div className="h-1 bg-gradient-to-l from-amber-400 to-emerald-400" />
+   552→   552→            <CardHeader className="pb-2 pt-5 flex-row items-center justify-between">
+   553→   553→              <div className="flex items-center gap-2">
+   554→   554→                <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-amber-400 to-emerald-500" />
+   555→   555→                <CardTitle className="text-lg tracking-tight">آخر الفواتير</CardTitle>
+   556→   556→              </div>
+   557→   557→              <Button
+   558→   558→                variant="ghost"
+   559→   559→                size="sm"
+   560→   560→                className="text-primary hover:bg-primary/10 gap-1"
+   561→   561→                onClick={() => navigateTo('invoices')}
+   562→   562→              >
+   563→   563→                عرض الكل
+   564→   564→                <ArrowUpLeft className="w-4 h-4" />
+   565→   565→              </Button>
+   566→   566→            </CardHeader>
+   567→   567→            <CardContent>
+   568→   568→              {recentInvoices.length === 0 ? (
+   569→   569→                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+   570→   570→                  لا توجد فواتير
+   571→   571→                </div>
+   572→   572→              ) : (
+   573→   573→                <div className="space-y-2">
+   574→   574→                  {recentInvoices.map((invoice) => (
+   575→   575→                    <div
+   576→   576→                      key={invoice.id}
+   577→   577→                      className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-all duration-200 hover:scale-[1.01] hover:shadow-sm border border-transparent hover:border-muted"
+   578→   578→                      onClick={() => navigateTo('invoice-detail', { id: invoice.id })}
+   579→   579→                    >
+   580→   580→                      <div className="flex items-center gap-3">
+   581→   581→                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${invoiceStatusIcons[invoice.status] || 'bg-gradient-to-br from-slate-400 to-slate-600'} shadow-sm`}>
+   582→   582→                          <FileText className="w-4 h-4 text-white" />
+   583→   583→                        </div>
+   584→   584→                        <div>
+   585→   585→                          <p className="text-sm font-semibold">{invoice.invoice_number}</p>
+   586→   586→                          <p className="text-xs text-muted-foreground mt-0.5">
+   587→   587→                            {(invoice as unknown as { branches?: { name: string } })?.branches?.name || 'غير معروف'} • {formatDate(invoice.invoice_date)}
+   588→   588→                          </p>
+   589→   589→                        </div>
+   590→   590→                      </div>
+   591→   591→                      <div className="text-left">
+   592→   592→                        <p className="text-sm font-bold tabular-nums">{formatCurrency(invoice.total)}</p>
+   593→   593→                        <Badge
+   594→   594→                          variant="secondary"
+   595→   595→                          className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${getStatusColor(invoice.status)}`}
+   596→   596→                        >
+   597→   597→                          {getStatusLabel(invoice.status)}
+   598→   598→                        </Badge>
+   599→   599→                      </div>
+   600→   600→                    </div>
+   601→   601→                  ))}
+   602→   602→                </div>
+   603→   603→              )}
+   604→   604→            </CardContent>
+   605→   605→          </Card>
+   606→   606→        </motion.div>
+   607→   607→
+   608→   608→        {/* Top Items */}
+   609→   609→        <motion.div
+   610→   610→          initial={{ opacity: 0, y: 20 }}
+   611→   611→          animate={{ opacity: 1, y: 0 }}
+   612→   612→          transition={{ duration: 0.5, delay: 0.75, ease: [0.25, 0.46, 0.45, 0.94] }}
+   613→   613→        >
+   614→   614→          <Card className="border-0 shadow-md overflow-hidden">
+   615→   615→            <div className="h-1 bg-gradient-to-l from-purple-400 to-amber-400" />
+   616→   616→            <CardHeader className="pb-2 pt-5">
+   617→   617→              <div className="flex items-center gap-2">
+   618→   618→                <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-purple-400 to-amber-500" />
+   619→   619→                <div>
+   620→   620→                  <CardTitle className="text-lg tracking-tight">أكثر الأصناف صرفاً</CardTitle>
+   621→   621→                  <p className="text-xs text-muted-foreground mt-0.5">هذا الشهر</p>
+   622→   622→                </div>
+   623→   623→              </div>
+   624→   624→            </CardHeader>
+   625→   625→            <CardContent>
+   626→   626→              {topItems.length === 0 ? (
+   627→   627→                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+   628→   628→                  لا توجد بيانات
+   629→   629→                </div>
+   630→   630→              ) : (
+   631→   631→                <div className="space-y-2">
+   632→   632→                  {topItems.map((item, i) => (
+   633→   633→                    <div
+   634→   634→                      key={item.name}
+   635→   635→                      className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 transition-all duration-200 hover:scale-[1.01] border border-transparent hover:border-muted"
+   636→   636→                    >
+   637→   637→                      <div className="flex items-center gap-3">
+   638→   638→                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center bg-gradient-to-br ${rankGradients[i]} shadow-sm`}>
+   639→   639→                          <span className="text-sm font-bold text-white">{i + 1}</span>
+   640→   640→                        </div>
+   641→   641→                        <div>
+   642→   642→                          <p className="text-sm font-semibold">{item.name}</p>
+   643→   643→                          <p className="text-xs text-muted-foreground mt-0.5">
+   644→   644→                            كمية: {item.count.toLocaleString('ar-EG')}
+   645→   645→                          </p>
+   646→   646→                        </div>
+   647→   647→                      </div>
+   648→   648→                      <p className="text-sm font-bold tabular-nums">{formatCurrency(item.total)}</p>
+   649→   649→                    </div>
+   650→   650→                  ))}
+   651→   651→                </div>
+   652→   652→              )}
+   653→   653→            </CardContent>
+   654→   654→          </Card>
+   655→   655→        </motion.div>
+   656→   656→      </div>
+   657→   657→    </div>
+   658→   658→  );
+   659→   659→}
+   660→   660→

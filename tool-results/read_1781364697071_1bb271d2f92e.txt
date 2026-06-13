@@ -1,0 +1,622 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { supabase } from '@/lib/supabase';
+     6→     6→import type { ExpenseCategory } from '@/lib/types';
+     7→     7→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     8→     8→import { Button } from '@/components/ui/button';
+     9→     9→import { Input } from '@/components/ui/input';
+    10→    10→import { Label } from '@/components/ui/label';
+    11→    11→import { Separator } from '@/components/ui/separator';
+    12→    12→import { Switch } from '@/components/ui/switch';
+    13→    13→import {
+    14→    14→  AlertDialog,
+    15→    15→  AlertDialogAction,
+    16→    16→  AlertDialogCancel,
+    17→    17→  AlertDialogContent,
+    18→    18→  AlertDialogDescription,
+    19→    19→  AlertDialogFooter,
+    20→    20→  AlertDialogHeader,
+    21→    21→  AlertDialogTitle,
+    22→    22→} from '@/components/ui/alert-dialog';
+    23→    23→import {
+    24→    24→  Tag,
+    25→    25→  Plus,
+    26→    26→  Pencil,
+    27→    27→  Trash2,
+    28→    28→  Star,
+    29→    29→  GripVertical,
+    30→    30→  Loader2,
+    31→    31→  Tags,
+    32→    32→  Power,
+    33→    33→  PowerOff,
+    34→    34→  ShieldAlert,
+    35→    35→} from 'lucide-react';
+    36→    36→import { toast } from 'sonner';
+    37→    37→import { motion } from 'framer-motion';
+    38→    38→import { cn } from '@/lib/utils';
+    39→    39→
+    40→    40→export default function ExpenseCategoriesPage() {
+    41→    41→  const { isAdmin, hasPermission } = useAppStore();
+    42→    42→  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+    43→    43→  const [loading, setLoading] = useState(true);
+    44→    44→  const [saving, setSaving] = useState(false);
+    45→    45→
+    46→    46→  // Edit state
+    47→    47→  const [editId, setEditId] = useState<string | null>(null);
+    48→    48→  const [editName, setEditName] = useState('');
+    49→    49→  const [editDescription, setEditDescription] = useState('');
+    50→    50→  const [editIsActive, setEditIsActive] = useState(true);
+    51→    51→
+    52→    52→  // Add new
+    53→    53→  const [newName, setNewName] = useState('');
+    54→    54→  const [newDescription, setNewDescription] = useState('');
+    55→    55→
+    56→    56→  // Delete dialog
+    57→    57→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    58→    58→  const [deletingCategory, setDeletingCategory] = useState<ExpenseCategory | null>(null);
+    59→    59→
+    60→    60→  const canView = isAdmin || hasPermission('expense_categories', 'view');
+    61→    61→  const canCreate = isAdmin || hasPermission('expense_categories', 'create');
+    62→    62→  const canEdit = isAdmin || hasPermission('expense_categories', 'edit');
+    63→    63→  const canDelete = isAdmin || hasPermission('expense_categories', 'delete');
+    64→    64→
+    65→    65→  useEffect(() => {
+    66→    66→    loadCategories();
+    67→    67→  }, []);
+    68→    68→
+    69→    69→  const loadCategories = async () => {
+    70→    70→    if (!canView) return;
+    71→    71→    setLoading(true);
+    72→    72→    try {
+    73→    73→      const { data, error } = await supabase
+    74→    74→        .from('expense_categories')
+    75→    75→        .select('*')
+    76→    76→        .order('created_at', { ascending: true });
+    77→    77→
+    78→    78→      if (error) throw error;
+    79→    79→
+    80→    80→      if (data && data.length > 0) {
+    81→    81→        setCategories(data as ExpenseCategory[]);
+    82→    82→      } else {
+    83→    83→        // Seed default categories if none exist
+    84→    84→        const defaults = [
+    85→    85→          { name: 'رواتب', description: 'رواتب الموظفين', is_active: true },
+    86→    86→          { name: 'إيجارات', description: 'إيجارات المحلات والمستودعات', is_active: true },
+    87→    87→          { name: 'صيانة', description: 'مصاريف الصيانة والإصلاح', is_active: true },
+    88→    88→          { name: 'نقل ومواصلات', description: 'مصاريف النقل والشحن', is_active: true },
+    89→    89→          { name: 'مصاريف إدارية', description: 'مصاريف إدارية وقرطاسية', is_active: true },
+    90→    90→        ];
+    91→    91→        const { data: inserted, error: insertError } = await supabase
+    92→    92→          .from('expense_categories')
+    93→    93→          .insert(defaults)
+    94→    94→          .select();
+    95→    95→
+    96→    96→        if (!insertError && inserted) {
+    97→    97→          setCategories(inserted as ExpenseCategory[]);
+    98→    98→        } else {
+    99→    99→          setCategories([
+   100→   100→            { id: '1', name: 'رواتب', description: 'رواتب الموظفين', is_active: true, created_at: '', updated_at: '' },
+   101→   101→            { id: '2', name: 'إيجارات', description: 'إيجارات المحلات والمستودعات', is_active: true, created_at: '', updated_at: '' },
+   102→   102→            { id: '3', name: 'صيانة', description: 'مصاريف الصيانة والإصلاح', is_active: true, created_at: '', updated_at: '' },
+   103→   103→            { id: '4', name: 'نقل ومواصلات', description: 'مصاريف النقل والشحن', is_active: true, created_at: '', updated_at: '' },
+   104→   104→            { id: '5', name: 'مصاريف إدارية', description: 'مصاريف إدارية وقرطاسية', is_active: true, created_at: '', updated_at: '' },
+   105→   105→          ]);
+   106→   106→        }
+   107→   107→      }
+   108→   108→    } catch {
+   109→   109→      setCategories([
+   110→   110→        { id: '1', name: 'رواتب', description: 'رواتب الموظفين', is_active: true, created_at: '', updated_at: '' },
+   111→   111→        { id: '2', name: 'إيجارات', description: 'إيجارات المحلات والمستودعات', is_active: true, created_at: '', updated_at: '' },
+   112→   112→        { id: '3', name: 'صيانة', description: 'مصاريف الصيانة والإصلاح', is_active: true, created_at: '', updated_at: '' },
+   113→   113→        { id: '4', name: 'نقل ومواصلات', description: 'مصاريف النقل والشحن', is_active: true, created_at: '', updated_at: '' },
+   114→   114→        { id: '5', name: 'مصاريف إدارية', description: 'مصاريف إدارية وقرطاسية', is_active: true, created_at: '', updated_at: '' },
+   115→   115→      ]);
+   116→   116→    } finally {
+   117→   117→      setLoading(false);
+   118→   118→    }
+   119→   119→  };
+   120→   120→
+   121→   121→  const handleAdd = async () => {
+   122→   122→    if (!newName.trim()) {
+   123→   123→      toast.error('يرجى إدخال اسم التصنيف');
+   124→   124→      return;
+   125→   125→    }
+   126→   126→    if (categories.some(c => c.name === newName.trim())) {
+   127→   127→      toast.error('هذا التصنيف موجود بالفعل');
+   128→   128→      return;
+   129→   129→    }
+   130→   130→
+   131→   131→    setSaving(true);
+   132→   132→    try {
+   133→   133→      const newCategory = {
+   134→   134→        name: newName.trim(),
+   135→   135→        description: newDescription.trim() || null,
+   136→   136→        is_active: true,
+   137→   137→      };
+   138→   138→
+   139→   139→      const { data, error } = await supabase
+   140→   140→        .from('expense_categories')
+   141→   141→        .insert(newCategory)
+   142→   142→        .select()
+   143→   143→        .single();
+   144→   144→
+   145→   145→      if (error) throw error;
+   146→   146→
+   147→   147→      setCategories(prev => [...prev, data as ExpenseCategory]);
+   148→   148→      setNewName('');
+   149→   149→      setNewDescription('');
+   150→   150→      toast.success('تم إضافة تصنيف المصروفات بنجاح');
+   151→   151→    } catch {
+   152→   152→      toast.error('حدث خطأ أثناء إضافة تصنيف المصروفات');
+   153→   153→    } finally {
+   154→   154→      setSaving(false);
+   155→   155→    }
+   156→   156→  };
+   157→   157→
+   158→   158→  const handleEdit = async () => {
+   159→   159→    if (!editId || !editName.trim()) {
+   160→   160→      toast.error('يرجى إدخال اسم التصنيف');
+   161→   161→      return;
+   162→   162→    }
+   163→   163→    if (categories.some(c => c.name === editName.trim() && c.id !== editId)) {
+   164→   164→      toast.error('هذا التصنيف موجود بالفعل');
+   165→   165→      return;
+   166→   166→    }
+   167→   167→
+   168→   168→    setSaving(true);
+   169→   169→    try {
+   170→   170→      const updates = {
+   171→   171→        name: editName.trim(),
+   172→   172→        description: editDescription.trim() || null,
+   173→   173→        is_active: editIsActive,
+   174→   174→        updated_at: new Date().toISOString(),
+   175→   175→      };
+   176→   176→
+   177→   177→      const { error } = await supabase
+   178→   178→        .from('expense_categories')
+   179→   179→        .update(updates)
+   180→   180→        .eq('id', editId);
+   181→   181→
+   182→   182→      if (error) throw error;
+   183→   183→
+   184→   184→      setCategories(prev =>
+   185→   185→        prev.map(c => (c.id === editId ? { ...c, ...updates } : c))
+   186→   186→      );
+   187→   187→
+   188→   188→      setEditId(null);
+   189→   189→      setEditName('');
+   190→   190→      setEditDescription('');
+   191→   191→      setEditIsActive(true);
+   192→   192→      toast.success('تم تعديل تصنيف المصروفات بنجاح');
+   193→   193→    } catch {
+   194→   194→      toast.error('حدث خطأ أثناء تعديل تصنيف المصروفات');
+   195→   195→    } finally {
+   196→   196→      setSaving(false);
+   197→   197→    }
+   198→   198→  };
+   199→   199→
+   200→   200→  const handleDelete = async () => {
+   201→   201→    if (!deletingCategory) return;
+   202→   202→
+   203→   203→    try {
+   204→   204→      const { error } = await supabase
+   205→   205→        .from('expense_categories')
+   206→   206→        .delete()
+   207→   207→        .eq('id', deletingCategory.id);
+   208→   208→
+   209→   209→      if (error) throw error;
+   210→   210→
+   211→   211→      setCategories(prev => prev.filter(c => c.id !== deletingCategory.id));
+   212→   212→      toast.success('تم حذف تصنيف المصروفات بنجاح');
+   213→   213→      setDeleteDialogOpen(false);
+   214→   214→      setDeletingCategory(null);
+   215→   215→    } catch {
+   216→   216→      toast.error('حدث خطأ أثناء حذف تصنيف المصروفات');
+   217→   217→    }
+   218→   218→  };
+   219→   219→
+   220→   220→  const handleToggleActive = async (category: ExpenseCategory) => {
+   221→   221→    if (!canEdit) return;
+   222→   222→    const newIsActive = !category.is_active;
+   223→   223→
+   224→   224→    try {
+   225→   225→      const { error } = await supabase
+   226→   226→        .from('expense_categories')
+   227→   227→        .update({ is_active: newIsActive, updated_at: new Date().toISOString() })
+   228→   228→        .eq('id', category.id);
+   229→   229→
+   230→   230→      if (error) throw error;
+   231→   231→
+   232→   232→      setCategories(prev =>
+   233→   233→        prev.map(c => (c.id === category.id ? { ...c, is_active: newIsActive } : c))
+   234→   234→      );
+   235→   235→
+   236→   236→      toast.success(newIsActive ? 'تم تفعيل التصنيف' : 'تم تعطيل التصنيف');
+   237→   237→    } catch {
+   238→   238→      toast.error('حدث خطأ أثناء تحديث حالة التصنيف');
+   239→   239→    }
+   240→   240→  };
+   241→   241→
+   242→   242→  const startEdit = (category: ExpenseCategory) => {
+   243→   243→    setEditId(category.id);
+   244→   244→    setEditName(category.name);
+   245→   245→    setEditDescription(category.description || '');
+   246→   246→    setEditIsActive(category.is_active);
+   247→   247→  };
+   248→   248→
+   249→   249→  const cancelEdit = () => {
+   250→   250→    setEditId(null);
+   251→   251→    setEditName('');
+   252→   252→    setEditDescription('');
+   253→   253→    setEditIsActive(true);
+   254→   254→  };
+   255→   255→
+   256→   256→  if (!canView) {
+   257→   257→    return (
+   258→   258→      <div className="space-y-6 max-w-2xl">
+   259→   259→        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+   260→   260→          <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   261→   261→            <ShieldAlert className="w-10 h-10 text-white" />
+   262→   262→          </div>
+   263→   263→          <h2 className="text-xl font-bold">غير مسموح</h2>
+   264→   264→          <p className="text-muted-foreground text-sm text-center max-w-xs">
+   265→   265→            ليس لديك صلاحية لعرض تصنيفات المصروفات
+   266→   266→          </p>
+   267→   267→        </div>
+   268→   268→      </div>
+   269→   269→    );
+   270→   270→  }
+   271→   271→
+   272→   272→  return (
+   273→   273→    <div className="space-y-6 max-w-2xl">
+   274→   274→      {/* Header */}
+   275→   275→      <div className="flex items-center gap-3">
+   276→   276→        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   277→   277→          <Tags className="w-6 h-6 text-white" />
+   278→   278→        </div>
+   279→   279→        <div>
+   280→   280→          <h1 className="text-2xl font-bold">تصنيفات المصروفات</h1>
+   281→   281→          <p className="text-muted-foreground text-sm mt-0.5">
+   282→   282→            إدارة تصنيفات المصروفات المتاحة - إضافة أو تعديل أو حذف أو تفعيل
+   283→   283→          </p>
+   284→   284→        </div>
+   285→   285→      </div>
+   286→   286→
+   287→   287→      {/* Add new */}
+   288→   288→      {canCreate && (
+   289→   289→        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   290→   290→          <Card className="border-0 shadow-md overflow-hidden">
+   291→   291→            <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c, #f97316)' }} />
+   292→   292→            <CardHeader className="pb-3">
+   293→   293→              <CardTitle className="text-lg flex items-center gap-2">
+   294→   294→                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   295→   295→                  <Plus className="w-4 h-4 text-white" />
+   296→   296→                </div>
+   297→   297→                إضافة تصنيف جديد
+   298→   298→              </CardTitle>
+   299→   299→            </CardHeader>
+   300→   300→            <CardContent>
+   301→   301→              <div className="space-y-3">
+   302→   302→                <div className="flex gap-3">
+   303→   303→                  <div className="flex-1">
+   304→   304→                    <Input
+   305→   305→                      value={newName}
+   306→   306→                      onChange={(e) => setNewName(e.target.value)}
+   307→   307→                      placeholder="اسم التصنيف (مثال: رواتب)"
+   308→   308→                      onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+   309→   309→                    />
+   310→   310→                  </div>
+   311→   311→                  <Button onClick={handleAdd} disabled={saving} className="gap-2" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   312→   312→                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+   313→   313→                    إضافة
+   314→   314→                  </Button>
+   315→   315→                </div>
+   316→   316→                <Input
+   317→   317→                  value={newDescription}
+   318→   318→                  onChange={(e) => setNewDescription(e.target.value)}
+   319→   319→                  placeholder="وصف التصنيف (اختياري)"
+   320→   320→                  onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+   321→   321→                />
+   322→   322→              </div>
+   323→   323→            </CardContent>
+   324→   324→          </Card>
+   325→   325→        </motion.div>
+   326→   326→      )}
+   327→   327→
+   328→   328→      {/* List */}
+   329→   329→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   330→   330→        <Card className="border-0 shadow-md overflow-hidden">
+   331→   331→          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c, #f97316)' }} />
+   332→   332→          <CardHeader className="pb-3">
+   333→   333→            <CardTitle className="text-lg flex items-center gap-2">
+   334→   334→              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   335→   335→                <Tags className="w-4 h-4 text-white" />
+   336→   336→              </div>
+   337→   337→              تصنيفات المصروفات الحالية
+   338→   338→            </CardTitle>
+   339→   339→          </CardHeader>
+   340→   340→          <CardContent>
+   341→   341→            {loading ? (
+   342→   342→              <div className="flex items-center justify-center py-12">
+   343→   343→                <div className="flex flex-col items-center gap-3">
+   344→   344→                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+   345→   345→                  <p className="text-sm text-muted-foreground">جاري التحميل...</p>
+   346→   346→                </div>
+   347→   347→              </div>
+   348→   348→            ) : categories.length === 0 ? (
+   349→   349→              <div className="flex flex-col items-center justify-center py-12 gap-3">
+   350→   350→                <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-md" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   351→   351→                  <Tag className="w-8 h-8 text-white" />
+   352→   352→                </div>
+   353→   353→                <p className="text-muted-foreground text-sm">لا توجد تصنيفات مصروفات مسجلة</p>
+   354→   354→              </div>
+   355→   355→            ) : (
+   356→   356→              <>
+   357→   357→                {/* Desktop List */}
+   358→   358→                <div className="hidden sm:block space-y-1">
+   359→   359→                  {categories.map((category) => (
+   360→   360→                    <div key={category.id}>
+   361→   361→                      {editId === category.id ? (
+   362→   362→                        <div className="p-3 rounded-xl bg-orange-50/50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 space-y-3">
+   363→   363→                          <div className="flex items-center gap-3">
+   364→   364→                            <div className="flex-1">
+   365→   365→                              <Input
+   366→   366→                                value={editName}
+   367→   367→                                onChange={(e) => setEditName(e.target.value)}
+   368→   368→                                placeholder="اسم التصنيف"
+   369→   369→                                autoFocus
+   370→   370→                              />
+   371→   371→                            </div>
+   372→   372→                            <div className="flex gap-1">
+   373→   373→                              <Button size="sm" onClick={handleEdit} disabled={saving} className="gap-1" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   374→   374→                                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+   375→   375→                                حفظ
+   376→   376→                              </Button>
+   377→   377→                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
+   378→   378→                                إلغاء
+   379→   379→                              </Button>
+   380→   380→                            </div>
+   381→   381→                          </div>
+   382→   382→                          <Input
+   383→   383→                            value={editDescription}
+   384→   384→                            onChange={(e) => setEditDescription(e.target.value)}
+   385→   385→                            placeholder="وصف التصنيف (اختياري)"
+   386→   386→                          />
+   387→   387→                          <div className="flex items-center gap-2">
+   388→   388→                            <Switch
+   389→   389→                              id={`active-${category.id}`}
+   390→   390→                              checked={editIsActive}
+   391→   391→                              onCheckedChange={(checked) => setEditIsActive(checked)}
+   392→   392→                            />
+   393→   393→                            <Label htmlFor={`active-${category.id}`} className="text-xs cursor-pointer">
+   394→   394→                              تصنيف نشط
+   395→   395→                            </Label>
+   396→   396→                          </div>
+   397→   397→                        </div>
+   398→   398→                      ) : (
+   399→   399→                        <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors group">
+   400→   400→                          <GripVertical className="w-4 h-4 text-muted-foreground/50" />
+   401→   401→                          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: category.is_active ? 'linear-gradient(135deg, #f97316, #ea580c)' : 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+   402→   402→                            <Tag className="w-4 h-4 text-white" />
+   403→   403→                          </div>
+   404→   404→                          <div className="flex-1 min-w-0">
+   405→   405→                            <div className="flex items-center gap-2">
+   406→   406→                              <span className={cn("font-medium text-sm", !category.is_active && "text-muted-foreground line-through")}>
+   407→   407→                                {category.name}
+   408→   408→                              </span>
+   409→   409→                              {category.is_active ? (
+   410→   410→                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+   411→   411→                                  <Star className="w-3 h-3" />
+   412→   412→                                  نشط
+   413→   413→                                </span>
+   414→   414→                              ) : (
+   415→   415→                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-muted">
+   416→   416→                                  <PowerOff className="w-3 h-3" />
+   417→   417→                                  معطل
+   418→   418→                                </span>
+   419→   419→                              )}
+   420→   420→                            </div>
+   421→   421→                            {category.description && (
+   422→   422→                              <p className={cn("text-xs mt-0.5 truncate", !category.is_active ? "text-muted-foreground/60" : "text-muted-foreground")}>
+   423→   423→                                {category.description}
+   424→   424→                              </p>
+   425→   425→                            )}
+   426→   426→                          </div>
+   427→   427→                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   428→   428→                            {canEdit && (
+   429→   429→                              <Button
+   430→   430→                                variant="ghost"
+   431→   431→                                size="icon"
+   432→   432→                                className="h-8 w-8 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+   433→   433→                                onClick={() => handleToggleActive(category)}
+   434→   434→                                title={category.is_active ? 'تعطيل' : 'تفعيل'}
+   435→   435→                              >
+   436→   436→                                {category.is_active ? (
+   437→   437→                                  <PowerOff className="w-4 h-4 text-orange-500" />
+   438→   438→                                ) : (
+   439→   439→                                  <Power className="w-4 h-4 text-emerald-500" />
+   440→   440→                                )}
+   441→   441→                              </Button>
+   442→   442→                            )}
+   443→   443→                            {canEdit && (
+   444→   444→                              <Button
+   445→   445→                                variant="ghost"
+   446→   446→                                size="icon"
+   447→   447→                                className="h-8 w-8 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+   448→   448→                                onClick={() => startEdit(category)}
+   449→   449→                                title="تعديل"
+   450→   450→                              >
+   451→   451→                                <Pencil className="w-4 h-4 text-orange-600" />
+   452→   452→                              </Button>
+   453→   453→                            )}
+   454→   454→                            {canDelete && (
+   455→   455→                              <Button
+   456→   456→                                variant="ghost"
+   457→   457→                                size="icon"
+   458→   458→                                className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-900/20"
+   459→   459→                                onClick={() => {
+   460→   460→                                  setDeletingCategory(category);
+   461→   461→                                  setDeleteDialogOpen(true);
+   462→   462→                                }}
+   463→   463→                                title="حذف"
+   464→   464→                              >
+   465→   465→                                <Trash2 className="w-4 h-4 text-red-500" />
+   466→   466→                              </Button>
+   467→   467→                            )}
+   468→   468→                          </div>
+   469→   469→                        </div>
+   470→   470→                      )}
+   471→   471→                      <Separator className="mt-1 last:hidden" />
+   472→   472→                    </div>
+   473→   473→                  ))}
+   474→   474→                </div>
+   475→   475→
+   476→   476→                {/* Mobile Cards */}
+   477→   477→                <div className="sm:hidden space-y-2">
+   478→   478→                  {categories.map((category) => (
+   479→   479→                    <div key={category.id}>
+   480→   480→                      {editId === category.id ? (
+   481→   481→                        <div className="p-3 rounded-xl bg-orange-50/50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 space-y-3">
+   482→   482→                          <Input
+   483→   483→                            value={editName}
+   484→   484→                            onChange={(e) => setEditName(e.target.value)}
+   485→   485→                            placeholder="اسم التصنيف"
+   486→   486→                            autoFocus
+   487→   487→                          />
+   488→   488→                          <Input
+   489→   489→                            value={editDescription}
+   490→   490→                            onChange={(e) => setEditDescription(e.target.value)}
+   491→   491→                            placeholder="وصف التصنيف (اختياري)"
+   492→   492→                          />
+   493→   493→                          <div className="flex items-center gap-2">
+   494→   494→                            <Switch
+   495→   495→                              id={`active-m-${category.id}`}
+   496→   496→                              checked={editIsActive}
+   497→   497→                              onCheckedChange={(checked) => setEditIsActive(checked)}
+   498→   498→                            />
+   499→   499→                            <Label htmlFor={`active-m-${category.id}`} className="text-xs cursor-pointer">
+   500→   500→                              تصنيف نشط
+   501→   501→                            </Label>
+   502→   502→                          </div>
+   503→   503→                          <div className="flex gap-2">
+   504→   504→                            <Button size="sm" onClick={handleEdit} disabled={saving} className="flex-1 gap-1" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   505→   505→                              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+   506→   506→                              حفظ
+   507→   507→                            </Button>
+   508→   508→                            <Button size="sm" variant="ghost" onClick={cancelEdit} className="flex-1">
+   509→   509→                              إلغاء
+   510→   510→                            </Button>
+   511→   511→                          </div>
+   512→   512→                        </div>
+   513→   513→                      ) : (
+   514→   514→                        <div className={`rounded-xl border-r-4 ${category.is_active ? 'border-orange-500' : 'border-gray-400'} bg-card p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5`}>
+   515→   515→                          <div className="flex items-start gap-3">
+   516→   516→                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: category.is_active ? 'linear-gradient(135deg, #f97316, #ea580c)' : 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+   517→   517→                              <Tag className="w-4 h-4 text-white" />
+   518→   518→                            </div>
+   519→   519→                            <div className="flex-1 min-w-0">
+   520→   520→                              <div className="flex items-center gap-2 flex-wrap">
+   521→   521→                                <span className={cn("font-medium text-sm", !category.is_active && "text-muted-foreground line-through")}>
+   522→   522→                                  {category.name}
+   523→   523→                                </span>
+   524→   524→                                {category.is_active ? (
+   525→   525→                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+   526→   526→                                    <Star className="w-3 h-3" />
+   527→   527→                                    نشط
+   528→   528→                                  </span>
+   529→   529→                                ) : (
+   530→   530→                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-muted">
+   531→   531→                                    <PowerOff className="w-3 h-3" />
+   532→   532→                                    معطل
+   533→   533→                                  </span>
+   534→   534→                                )}
+   535→   535→                              </div>
+   536→   536→                              {category.description && (
+   537→   537→                                <p className={cn("text-xs mt-1 truncate", !category.is_active ? "text-muted-foreground/60" : "text-muted-foreground")}>
+   538→   538→                                  {category.description}
+   539→   539→                                </p>
+   540→   540→                              )}
+   541→   541→                            </div>
+   542→   542→                            <div className="flex gap-1 flex-shrink-0">
+   543→   543→                              {canEdit && (
+   544→   544→                                <Button
+   545→   545→                                  variant="ghost"
+   546→   546→                                  size="icon"
+   547→   547→                                  className="h-8 w-8"
+   548→   548→                                  onClick={() => handleToggleActive(category)}
+   549→   549→                                  title={category.is_active ? 'تعطيل' : 'تفعيل'}
+   550→   550→                                >
+   551→   551→                                  {category.is_active ? (
+   552→   552→                                    <PowerOff className="w-4 h-4 text-orange-500" />
+   553→   553→                                  ) : (
+   554→   554→                                    <Power className="w-4 h-4 text-emerald-500" />
+   555→   555→                                  )}
+   556→   556→                                </Button>
+   557→   557→                              )}
+   558→   558→                              {canEdit && (
+   559→   559→                                <Button
+   560→   560→                                  variant="ghost"
+   561→   561→                                  size="icon"
+   562→   562→                                  className="h-8 w-8"
+   563→   563→                                  onClick={() => startEdit(category)}
+   564→   564→                                  title="تعديل"
+   565→   565→                                >
+   566→   566→                                  <Pencil className="w-4 h-4 text-orange-600" />
+   567→   567→                                </Button>
+   568→   568→                              )}
+   569→   569→                              {canDelete && (
+   570→   570→                                <Button
+   571→   571→                                  variant="ghost"
+   572→   572→                                  size="icon"
+   573→   573→                                  className="h-8 w-8"
+   574→   574→                                  onClick={() => {
+   575→   575→                                    setDeletingCategory(category);
+   576→   576→                                    setDeleteDialogOpen(true);
+   577→   577→                                  }}
+   578→   578→                                  title="حذف"
+   579→   579→                                >
+   580→   580→                                  <Trash2 className="w-4 h-4 text-red-500" />
+   581→   581→                                </Button>
+   582→   582→                              )}
+   583→   583→                            </div>
+   584→   584→                          </div>
+   585→   585→                        </div>
+   586→   586→                      )}
+   587→   587→                    </div>
+   588→   588→                  ))}
+   589→   589→                </div>
+   590→   590→              </>
+   591→   591→            )}
+   592→   592→          </CardContent>
+   593→   593→        </Card>
+   594→   594→      </motion.div>
+   595→   595→
+   596→   596→      {/* Delete Dialog */}
+   597→   597→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+   598→   598→        <AlertDialogContent className="w-[95vw] sm:w-auto">
+   599→   599→          <AlertDialogHeader>
+   600→   600→            <AlertDialogTitle className="flex items-center gap-2">
+   601→   601→              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   602→   602→                <Trash2 className="w-4 h-4 text-white" />
+   603→   603→              </div>
+   604→   604→              حذف تصنيف المصروفات
+   605→   605→            </AlertDialogTitle>
+   606→   606→            <AlertDialogDescription>
+   607→   607→              هل أنت متأكد من حذف تصنيف المصروفات &quot;{deletingCategory?.name}&quot;؟
+   608→   608→              لا يمكن التراجع عن هذا الإجراء.
+   609→   609→            </AlertDialogDescription>
+   610→   610→          </AlertDialogHeader>
+   611→   611→          <AlertDialogFooter>
+   612→   612→            <AlertDialogCancel onClick={() => setDeletingCategory(null)}>تراجع</AlertDialogCancel>
+   613→   613→            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+   614→   614→              حذف
+   615→   615→            </AlertDialogAction>
+   616→   616→          </AlertDialogFooter>
+   617→   617→        </AlertDialogContent>
+   618→   618→      </AlertDialog>
+   619→   619→    </div>
+   620→   620→  );
+   621→   621→}
+   622→   622→

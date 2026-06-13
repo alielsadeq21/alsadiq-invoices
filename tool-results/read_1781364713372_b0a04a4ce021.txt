@@ -1,0 +1,675 @@
+   568→            </div>
+   569→          </div>
+   570→          <div className="flex items-center gap-2">
+   571→            {canExport && (
+   572→              <Button variant="outline" onClick={handleExport} className="gap-2">
+   573→                <ArrowUpDown className="w-4 h-4" />
+   574→                تصدير
+   575→              </Button>
+   576→            )}
+   577→            {canCreate && (
+   578→              <Button onClick={openCreateDialog} className="gap-2 shadow-md" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   579→                <Plus className="w-4 h-4" />
+   580→                قيد جديد
+   581→              </Button>
+   582→            )}
+   583→          </div>
+   584→        </div>
+   585→      </motion.div>
+   586→
+   587→      {/* Filters */}
+   588→      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
+   589→        <Card className="border-0 shadow-md overflow-hidden">
+   590→          <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9, #4c1d95)' }} />
+   591→          <CardContent className="p-4">
+   592→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+   593→              <div className="relative">
+   594→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   595→                <Input
+   596→                  placeholder="بحث برقم القيد أو الوصف..."
+   597→                  value={search}
+   598→                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   599→                  className="pr-10"
+   600→                />
+   601→              </div>
+   602→              <div>
+   603→                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+   604→                  <SelectTrigger>
+   605→                    <SelectValue placeholder="حالة القيد" />
+   606→                  </SelectTrigger>
+   607→                  <SelectContent>
+   608→                    <SelectItem value="all">الكل</SelectItem>
+   609→                    <SelectItem value="posted">مرحل</SelectItem>
+   610→                    <SelectItem value="draft">مسودة</SelectItem>
+   611→                  </SelectContent>
+   612→                </Select>
+   613→              </div>
+   614→              <div>
+   615→                <Input
+   616→                  type="date"
+   617→                  placeholder="من تاريخ"
+   618→                  value={dateFrom}
+   619→                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+   620→                />
+   621→              </div>
+   622→              <div>
+   623→                <Input
+   624→                  type="date"
+   625→                  placeholder="إلى تاريخ"
+   626→                  value={dateTo}
+   627→                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+   628→                />
+   629→              </div>
+   630→            </div>
+   631→            {hasActiveFilters && (
+   632→              <div className="flex items-center justify-end mt-3">
+   633→                <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-muted-foreground hover:text-foreground">
+   634→                  <X className="w-3.5 h-3.5" />
+   635→                  مسح الفلاتر
+   636→                </Button>
+   637→              </div>
+   638→            )}
+   639→          </CardContent>
+   640→        </Card>
+   641→      </motion.div>
+   642→
+   643→      {/* Entries Table */}
+   644→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   645→        <Card className="border-0 shadow-md overflow-hidden">
+   646→          <CardContent className="p-0">
+   647→            {loading ? (
+   648→              <div className="flex items-center justify-center py-12">
+   649→                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   650→              </div>
+   651→            ) : entries.length === 0 ? (
+   652→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   653→                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   654→                  <BookOpen className="w-12 h-12 text-white/80" />
+   655→                </div>
+   656→                <h3 className="text-xl font-bold mb-2">لا توجد قيود</h3>
+   657→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   658→                  لم يتم إنشاء أي قيود محاسبية بعد. ابدأ بإنشاء أول قيد.
+   659→                </p>
+   660→                {canCreate && (
+   661→                  <Button onClick={openCreateDialog} className="gap-2 shadow-md" size="lg" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   662→                    <Plus className="w-5 h-5" />
+   663→                    إنشاء قيد جديد
+   664→                  </Button>
+   665→                )}
+   666→              </div>
+   667→            ) : (
+   668→              <>
+   669→                {/* Mobile Card Layout */}
+   670→                <div className="sm:hidden divide-y">
+   671→                  {entries.map((entry) => (
+   672→                    <div key={entry.id} className="p-4 space-y-3">
+   673→                      <div className="flex items-center justify-between">
+   674→                        <div className="flex items-center gap-2">
+   675→                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   676→                            <Hash className="w-4 h-4 text-white" />
+   677→                          </div>
+   678→                          <span className="font-semibold text-sm">{entry.entry_number}</span>
+   679→                        </div>
+   680→                        {entry.is_posted ? (
+   681→                          <Badge
+   682→                            variant="secondary"
+   683→                            className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+   684→                          >
+   685→                            <CheckCircle2 className="w-3 h-3 ml-1" />
+   686→                            مرحل
+   687→                          </Badge>
+   688→                        ) : (
+   689→                          <Badge
+   690→                            variant="secondary"
+   691→                            className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+   692→                          >
+   693→                            <CircleDot className="w-3 h-3 ml-1" />
+   694→                            مسودة
+   695→                          </Badge>
+   696→                        )}
+   697→                      </div>
+   698→                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   699→                        <Calendar className="w-3.5 h-3.5" />
+   700→                        {formatDate(entry.entry_date)}
+   701→                      </div>
+   702→                      {entry.description && (
+   703→                        <p className="text-sm text-muted-foreground truncate">{entry.description}</p>
+   704→                      )}
+   705→                      <div className="flex items-center gap-4">
+   706→                        <div>
+   707→                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+   708→                          <p className="text-sm font-bold text-primary">{formatCurrency(entry.total_debit)}</p>
+   709→                        </div>
+   710→                        <div>
+   711→                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+   712→                          <p className="text-sm font-bold">{formatCurrency(entry.total_credit)}</p>
+   713→                        </div>
+   714→                      </div>
+   715→                      <div className="flex items-center gap-1 pt-1">
+   716→                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openViewDialog(entry)}>
+   717→                          <Eye className="w-3.5 h-3.5" />
+   718→                          عرض
+   719→                        </Button>
+   720→                        {canEdit && !entry.is_posted && (
+   721→                          <>
+   722→                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openEditDialog(entry)}>
+   723→                              <Edit className="w-3.5 h-3.5" />
+   724→                              تعديل
+   725→                            </Button>
+   726→                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-emerald-600" onClick={() => { setPostingEntry(entry); setPostDialogOpen(true); }}>
+   727→                              <CheckCircle2 className="w-3.5 h-3.5" />
+   728→                              ترحيل
+   729→                            </Button>
+   730→                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-destructive" onClick={() => { setDeletingEntry(entry); setDeleteDialogOpen(true); }}>
+   731→                              <Trash2 className="w-3.5 h-3.5" />
+   732→                            </Button>
+   733→                          </>
+   734→                        )}
+   735→                      </div>
+   736→                    </div>
+   737→                  ))}
+   738→                </div>
+   739→
+   740→                {/* Desktop Table */}
+   741→                <div className="hidden sm:block">
+   742→                  <div className="h-1" style={{ background: 'linear-gradient(90deg, #8b5cf6, #6d28d9, #4c1d95)' }} />
+   743→                  <div className="overflow-x-auto">
+   744→                    <Table>
+   745→                      <TableHeader>
+   746→                        <TableRow className="bg-muted/30">
+   747→                          <TableHead className="text-right font-bold">رقم القيد</TableHead>
+   748→                          <TableHead className="text-right font-bold">التاريخ</TableHead>
+   749→                          <TableHead className="text-right font-bold hidden md:table-cell">الوصف</TableHead>
+   750→                          <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+   751→                          <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+   752→                          <TableHead className="text-center font-bold">الحالة</TableHead>
+   753→                          <TableHead className="text-center font-bold">الإجراءات</TableHead>
+   754→                        </TableRow>
+   755→                      </TableHeader>
+   756→                      <TableBody>
+   757→                        {entries.map((entry) => (
+   758→                          <TableRow key={entry.id} className="hover:bg-muted/30 transition-colors">
+   759→                            <TableCell className="font-medium">
+   760→                              <div className="flex items-center gap-2">
+   761→                                <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   762→                                  <FileText className="w-3 h-3 text-white" />
+   763→                                </div>
+   764→                                {entry.entry_number}
+   765→                              </div>
+   766→                            </TableCell>
+   767→                            <TableCell>{formatDate(entry.entry_date)}</TableCell>
+   768→                            <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+   769→                              {entry.description}
+   770→                            </TableCell>
+   771→                            <TableCell className="font-semibold text-primary">
+   772→                              {formatCurrency(entry.total_debit)}
+   773→                            </TableCell>
+   774→                            <TableCell className="font-semibold">
+   775→                              {formatCurrency(entry.total_credit)}
+   776→                            </TableCell>
+   777→                            <TableCell className="text-center">
+   778→                              {entry.is_posted ? (
+   779→                                <Badge
+   780→                                  variant="secondary"
+   781→                                  className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+   782→                                >
+   783→                                  <CheckCircle2 className="w-3 h-3 ml-1" />
+   784→                                  مرحل
+   785→                                </Badge>
+   786→                              ) : (
+   787→                                <Badge
+   788→                                  variant="secondary"
+   789→                                  className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+   790→                                >
+   791→                                  <CircleDot className="w-3 h-3 ml-1" />
+   792→                                  مسودة
+   793→                                </Badge>
+   794→                              )}
+   795→                            </TableCell>
+   796→                            <TableCell>
+   797→                              <div className="flex items-center justify-center gap-1">
+   798→                                <Button
+   799→                                  variant="ghost"
+   800→                                  size="icon"
+   801→                                  className="h-8 w-8"
+   802→                                  onClick={() => openViewDialog(entry)}
+   803→                                  title="عرض التفاصيل"
+   804→                                >
+   805→                                  <Eye className="w-4 h-4" />
+   806→                                </Button>
+   807→                                {canEdit && !entry.is_posted && (
+   808→                                  <>
+   809→                                    <Button
+   810→                                      variant="ghost"
+   811→                                      size="icon"
+   812→                                      className="h-8 w-8"
+   813→                                      onClick={() => openEditDialog(entry)}
+   814→                                      title="تعديل"
+   815→                                    >
+   816→                                      <Edit className="w-4 h-4" />
+   817→                                    </Button>
+   818→                                    <Button
+   819→                                      variant="ghost"
+   820→                                      size="icon"
+   821→                                      className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
+   822→                                      onClick={() => {
+   823→                                        setPostingEntry(entry);
+   824→                                        setPostDialogOpen(true);
+   825→                                      }}
+   826→                                      title="ترحيل"
+   827→                                    >
+   828→                                      <CheckCircle2 className="w-4 h-4" />
+   829→                                    </Button>
+   830→                                    <Button
+   831→                                      variant="ghost"
+   832→                                      size="icon"
+   833→                                      className="h-8 w-8 text-destructive hover:text-destructive"
+   834→                                      onClick={() => {
+   835→                                        setDeletingEntry(entry);
+   836→                                        setDeleteDialogOpen(true);
+   837→                                      }}
+   838→                                      title="حذف"
+   839→                                    >
+   840→                                      <Trash2 className="w-4 h-4" />
+   841→                                    </Button>
+   842→                                  </>
+   843→                                )}
+   844→                              </div>
+   845→                            </TableCell>
+   846→                          </TableRow>
+   847→                        ))}
+   848→                      </TableBody>
+   849→                    </Table>
+   850→                  </div>
+   851→                </div>
+   852→
+   853→                {totalPages > 1 && (
+   854→                  <div className="flex items-center justify-between px-4 py-3 border-t">
+   855→                    <p className="text-sm text-muted-foreground">
+   856→                      صفحة {page} من {totalPages} ({totalCount} قيد)
+   857→                    </p>
+   858→                    <div className="flex items-center gap-1">
+   859→                      <Button
+   860→                        variant="outline"
+   861→                        size="icon"
+   862→                        className="h-8 w-8"
+   863→                        onClick={() => setPage(Math.max(1, page - 1))}
+   864→                        disabled={page <= 1}
+   865→                      >
+   866→                        <ChevronRight className="w-4 h-4" />
+   867→                      </Button>
+   868→                      <Button
+   869→                        variant="outline"
+   870→                        size="icon"
+   871→                        className="h-8 w-8"
+   872→                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+   873→                        disabled={page >= totalPages}
+   874→                      >
+   875→                        <ChevronLeft className="w-4 h-4" />
+   876→                      </Button>
+   877→                    </div>
+   878→                  </div>
+   879→                )}
+   880→              </>
+   881→            )}
+   882→          </CardContent>
+   883→        </Card>
+   884→      </motion.div>
+   885→
+   886→      {/* Create/Edit Dialog */}
+   887→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   888→        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
+   889→          <DialogHeader>
+   890→            <DialogTitle className="flex items-center gap-2">
+   891→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+   892→                <BookOpen className="w-4 h-4 text-white" />
+   893→              </div>
+   894→              {editingEntry ? 'تعديل القيد' : 'إنشاء قيد جديد'}
+   895→            </DialogTitle>
+   896→          </DialogHeader>
+   897→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+   898→            <div className="space-y-5 py-4">
+   899→              {/* Basic Info */}
+   900→              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   901→                <div className="space-y-2">
+   902→                  <Label>رقم القيد</Label>
+   903→                  <Input value={entryNumber} disabled className="bg-muted" />
+   904→                </div>
+   905→                <div className="space-y-2">
+   906→                  <Label>تاريخ القيد *</Label>
+   907→                  <Input
+   908→                    type="date"
+   909→                    value={entryDate}
+   910→                    onChange={(e) => setEntryDate(e.target.value)}
+   911→                  />
+   912→                </div>
+   913→                <div className="space-y-2">
+   914→                  <Label>الحالة</Label>
+   915→                  <Input
+   916→                    value={editingEntry?.is_posted ? 'مرحل' : 'مسودة'}
+   917→                    disabled
+   918→                    className="bg-muted"
+   919→                  />
+   920→                </div>
+   921→              </div>
+   922→
+   923→              <div className="space-y-2">
+   924→                <Label>الوصف *</Label>
+   925→                <Input
+   926→                  value={description}
+   927→                  onChange={(e) => setDescription(e.target.value)}
+   928→                  placeholder="وصف القيد المحاسبي..."
+   929→                />
+   930→              </div>
+   931→
+   932→              <div className="space-y-2">
+   933→                <Label>ملاحظات</Label>
+   934→                <Textarea
+   935→                  value={notes}
+   936→                  onChange={(e) => setNotes(e.target.value)}
+   937→                  placeholder="ملاحظات إضافية..."
+   938→                  rows={2}
+   939→                />
+   940→              </div>
+   941→
+   942→              <Separator />
+   943→
+   944→              {/* Lines */}
+   945→              <div className="space-y-3">
+   946→                <div className="flex items-center justify-between">
+   947→                  <Label className="text-base font-semibold">بنود القيد</Label>
+   948→                  <Button
+   949→                    type="button"
+   950→                    variant="outline"
+   951→                    size="sm"
+   952→                    onClick={addLine}
+   953→                    className="gap-1"
+   954→                  >
+   955→                    <Plus className="w-3.5 h-3.5" />
+   956→                    إضافة سطر
+   957→                  </Button>
+   958→                </div>
+   959→
+   960→                <div className="rounded-lg border overflow-hidden">
+   961→                  {/* Lines Header */}
+   962→                  <div className="bg-muted/50 grid grid-cols-[1fr_120px_120px_1fr_40px] gap-2 p-3 text-xs font-medium">
+   963→                    <div className="text-right">اسم الحساب</div>
+   964→                    <div className="text-right">مدين</div>
+   965→                    <div className="text-right">دائن</div>
+   966→                    <div className="text-right">البيان</div>
+   967→                    <div></div>
+   968→                  </div>
+   969→
+   970→                  {/* Lines Body */}
+   971→                  <div className="divide-y">
+   972→                    {lines.map((line, index) => (
+   973→                      <div
+   974→                        key={index}
+   975→                        className="grid grid-cols-[1fr_120px_120px_1fr_40px] gap-2 p-2 items-center hover:bg-muted/20 transition-colors"
+   976→                      >
+   977→                        <Input
+   978→                          value={line.account_name}
+   979→                          onChange={(e) => updateLine(index, 'account_name', e.target.value)}
+   980→                          placeholder="اسم الحساب"
+   981→                          className="h-9 text-sm"
+   982→                        />
+   983→                        <Input
+   984→                          type="number"
+   985→                          inputMode="decimal"
+   986→                          value={line.debit}
+   987→                          onChange={(e) => updateLine(index, 'debit', e.target.value)}
+   988→                          placeholder="0.00"
+   989→                          className="h-9 text-sm text-left"
+   990→                          min="0"
+   991→                          step="0.01"
+   992→                        />
+   993→                        <Input
+   994→                          type="number"
+   995→                          inputMode="decimal"
+   996→                          value={line.credit}
+   997→                          onChange={(e) => updateLine(index, 'credit', e.target.value)}
+   998→                          placeholder="0.00"
+   999→                          className="h-9 text-sm text-left"
+  1000→                          min="0"
+  1001→                          step="0.01"
+  1002→                        />
+  1003→                        <Input
+  1004→                          value={line.description}
+  1005→                          onChange={(e) => updateLine(index, 'description', e.target.value)}
+  1006→                          placeholder="البيان"
+  1007→                          className="h-9 text-sm"
+  1008→                        />
+  1009→                        <Button
+  1010→                          type="button"
+  1011→                          variant="ghost"
+  1012→                          size="icon"
+  1013→                          className="h-8 w-8 text-destructive hover:text-destructive"
+  1014→                          onClick={() => removeLine(index)}
+  1015→                          title="حذف السطر"
+  1016→                        >
+  1017→                          <X className="w-4 h-4" />
+  1018→                        </Button>
+  1019→                      </div>
+  1020→                    ))}
+  1021→                  </div>
+  1022→
+  1023→                  {/* Totals */}
+  1024→                  <div className="bg-muted/50 grid grid-cols-[1fr_120px_120px_1fr_40px] gap-2 p-3 text-sm font-semibold border-t">
+  1025→                    <div className="text-right">الإجمالي</div>
+  1026→                    <div className="text-right text-primary">
+  1027→                      {formatCurrency(getTotalDebit())}
+  1028→                    </div>
+  1029→                    <div className="text-right">
+  1030→                      {formatCurrency(getTotalCredit())}
+  1031→                    </div>
+  1032→                    <div></div>
+  1033→                    <div></div>
+  1034→                  </div>
+  1035→                </div>
+  1036→
+  1037→                {/* Balance indicator */}
+  1038→                {Math.abs(getTotalDebit() - getTotalCredit()) > 0.01 && (
+  1039→                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+  1040→                    <X className="w-4 h-4 text-red-500 shrink-0" />
+  1041→                    <span className="text-sm text-red-700 dark:text-red-400">
+  1042→                      الفرق بين المدين والدائن: {formatCurrency(Math.abs(getTotalDebit() - getTotalCredit()))}
+  1043→                    </span>
+  1044→                  </div>
+  1045→                )}
+  1046→                {getTotalDebit() > 0 && Math.abs(getTotalDebit() - getTotalCredit()) <= 0.01 && (
+  1047→                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+  1048→                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+  1049→                    <span className="text-sm text-emerald-700 dark:text-emerald-400">
+  1050→                      القيد متوازن
+  1051→                    </span>
+  1052→                  </div>
+  1053→                )}
+  1054→              </div>
+  1055→            </div>
+  1056→          </ScrollArea>
+  1057→          <DialogFooter>
+  1058→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+  1059→              إلغاء
+  1060→            </Button>
+  1061→            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+  1062→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+  1063→              {editingEntry ? 'تحديث القيد' : 'حفظ القيد'}
+  1064→            </Button>
+  1065→          </DialogFooter>
+  1066→        </DialogContent>
+  1067→      </Dialog>
+  1068→
+  1069→      {/* View Detail Dialog */}
+  1070→      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+  1071→        <DialogContent className="w-[95vw] sm:w-auto sm:max-w-3xl max-h-[90vh]">
+  1072→          <DialogHeader>
+  1073→            <DialogTitle className="flex items-center gap-2">
+  1074→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' }}>
+  1075→                <FileText className="w-4 h-4 text-white" />
+  1076→              </div>
+  1077→              تفاصيل القيد {viewEntry?.entry_number}
+  1078→            </DialogTitle>
+  1079→          </DialogHeader>
+  1080→          <ScrollArea className="max-h-[calc(90vh-180px)] pl-1">
+  1081→            {viewEntry && (
+  1082→              <div className="space-y-5 py-4">
+  1083→                {/* Entry Info */}
+  1084→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1085→                  <div className="p-3 rounded-lg bg-muted/30">
+  1086→                    <p className="text-xs text-muted-foreground mb-1">رقم القيد</p>
+  1087→                    <p className="font-semibold text-sm">{viewEntry.entry_number}</p>
+  1088→                  </div>
+  1089→                  <div className="p-3 rounded-lg bg-muted/30">
+  1090→                    <p className="text-xs text-muted-foreground mb-1">التاريخ</p>
+  1091→                    <p className="font-semibold text-sm">{formatDate(viewEntry.entry_date)}</p>
+  1092→                  </div>
+  1093→                  <div className="p-3 rounded-lg bg-muted/30">
+  1094→                    <p className="text-xs text-muted-foreground mb-1">الحالة</p>
+  1095→                    {viewEntry.is_posted ? (
+  1096→                      <Badge
+  1097→                        variant="secondary"
+  1098→                        className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+  1099→                      >
+  1100→                        <CheckCircle2 className="w-3 h-3 ml-1" />
+  1101→                        مرحل
+  1102→                      </Badge>
+  1103→                    ) : (
+  1104→                      <Badge
+  1105→                        variant="secondary"
+  1106→                        className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+  1107→                      >
+  1108→                        <CircleDot className="w-3 h-3 ml-1" />
+  1109→                        مسودة
+  1110→                      </Badge>
+  1111→                    )}
+  1112→                  </div>
+  1113→                  <div className="p-3 rounded-lg bg-muted/30">
+  1114→                    <p className="text-xs text-muted-foreground mb-1">تاريخ الإنشاء</p>
+  1115→                    <p className="font-semibold text-sm">{formatDateTime(viewEntry.created_at)}</p>
+  1116→                  </div>
+  1117→                </div>
+  1118→
+  1119→                <div>
+  1120→                  <p className="text-xs text-muted-foreground mb-1">الوصف</p>
+  1121→                  <p className="font-medium text-sm">{viewEntry.description}</p>
+  1122→                </div>
+  1123→
+  1124→                {viewEntry.notes && (
+  1125→                  <div>
+  1126→                    <p className="text-xs text-muted-foreground mb-1">ملاحظات</p>
+  1127→                    <p className="text-sm text-muted-foreground">{viewEntry.notes}</p>
+  1128→                  </div>
+  1129→                )}
+  1130→
+  1131→                <Separator />
+  1132→
+  1133→                {/* Lines Table */}
+  1134→                <div className="space-y-3">
+  1135→                  <h3 className="text-sm font-semibold">بنود القيد</h3>
+  1136→                  {viewLoading ? (
+  1137→                    <div className="flex items-center justify-center py-8">
+  1138→                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+  1139→                    </div>
+  1140→                  ) : viewLines.length === 0 ? (
+  1141→                    <p className="text-sm text-muted-foreground text-center py-4">لا توجد بنود</p>
+  1142→                  ) : (
+  1143→                    <div className="rounded-lg border overflow-hidden">
+  1144→                      <Table>
+  1145→                        <TableHeader>
+  1146→                          <TableRow className="bg-muted/30">
+  1147→                            <TableHead className="text-right text-xs font-bold">اسم الحساب</TableHead>
+  1148→                            <TableHead className="text-right text-xs font-bold">مدين</TableHead>
+  1149→                            <TableHead className="text-right text-xs font-bold">دائن</TableHead>
+  1150→                            <TableHead className="text-right text-xs font-bold hidden sm:table-cell">البيان</TableHead>
+  1151→                          </TableRow>
+  1152→                        </TableHeader>
+  1153→                        <TableBody>
+  1154→                          {viewLines.map((line) => (
+  1155→                            <TableRow key={line.id}>
+  1156→                              <TableCell className="text-sm font-medium">
+  1157→                                {line.account_name}
+  1158→                              </TableCell>
+  1159→                              <TableCell className="text-sm text-primary font-semibold">
+  1160→                                {line.debit > 0 ? formatCurrency(line.debit) : '—'}
+  1161→                              </TableCell>
+  1162→                              <TableCell className="text-sm font-semibold">
+  1163→                                {line.credit > 0 ? formatCurrency(line.credit) : '—'}
+  1164→                              </TableCell>
+  1165→                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
+  1166→                                {line.description || '—'}
+  1167→                              </TableCell>
+  1168→                            </TableRow>
+  1169→                          ))}
+  1170→                        </TableBody>
+  1171→                      </Table>
+  1172→                      {/* Totals */}
+  1173→                      <div className="bg-muted/50 grid grid-cols-[1fr_1fr_1fr_1fr] gap-2 p-3 text-sm font-semibold border-t">
+  1174→                        <div className="text-right">الإجمالي</div>
+  1175→                        <div className="text-right text-primary">
+  1176→                          {formatCurrency(viewEntry.total_debit)}
+  1177→                        </div>
+  1178→                        <div className="text-right">
+  1179→                          {formatCurrency(viewEntry.total_credit)}
+  1180→                        </div>
+  1181→                        <div className="hidden sm:block"></div>
+  1182→                      </div>
+  1183→                    </div>
+  1184→                  )}
+  1185→                </div>
+  1186→              </div>
+  1187→            )}
+  1188→          </ScrollArea>
+  1189→          <DialogFooter>
+  1190→            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+  1191→              إغلاق
+  1192→            </Button>
+  1193→          </DialogFooter>
+  1194→        </DialogContent>
+  1195→      </Dialog>
+  1196→
+  1197→      {/* Post Confirmation Dialog */}
+  1198→      <AlertDialog open={postDialogOpen} onOpenChange={setPostDialogOpen}>
+  1199→        <AlertDialogContent>
+  1200→          <AlertDialogHeader>
+  1201→            <AlertDialogTitle className="flex items-center gap-2">
+  1202→              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+  1203→              ترحيل القيد
+  1204→            </AlertDialogTitle>
+  1205→            <AlertDialogDescription>
+  1206→              هل أنت متأكد من ترحيل القيد &quot;{postingEntry?.entry_number}&quot;؟
+  1207→              بعد الترحيل لا يمكن تعديل القيد أو حذفه.
+  1208→            </AlertDialogDescription>
+  1209→          </AlertDialogHeader>
+  1210→          <AlertDialogFooter>
+  1211→            <AlertDialogCancel onClick={() => setPostingEntry(null)}>إلغاء</AlertDialogCancel>
+  1212→            <AlertDialogAction onClick={handlePost} className="bg-emerald-600 hover:bg-emerald-700">
+  1213→              ترحيل
+  1214→            </AlertDialogAction>
+  1215→          </AlertDialogFooter>
+  1216→        </AlertDialogContent>
+  1217→      </AlertDialog>
+  1218→
+  1219→      {/* Delete Confirmation Dialog */}
+  1220→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1221→        <AlertDialogContent>
+  1222→          <AlertDialogHeader>
+  1223→            <AlertDialogTitle className="flex items-center gap-2">
+  1224→              <Trash2 className="w-5 h-5 text-destructive" />
+  1225→              حذف القيد
+  1226→            </AlertDialogTitle>
+  1227→            <AlertDialogDescription>
+  1228→              هل أنت متأكد من حذف القيد &quot;{deletingEntry?.entry_number}&quot;؟ لا يمكن التراجع عن هذا الإجراء وسيتم حذف جميع بنود القيد.
+  1229→            </AlertDialogDescription>
+  1230→          </AlertDialogHeader>
+  1231→          <AlertDialogFooter>
+  1232→            <AlertDialogCancel onClick={() => setDeletingEntry(null)}>إلغاء</AlertDialogCancel>
+  1233→            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+  1234→              حذف
+  1235→            </AlertDialogAction>
+  1236→          </AlertDialogFooter>
+  1237→        </AlertDialogContent>
+  1238→      </AlertDialog>
+  1239→    </div>
+  1240→  );
+  1241→}
+  1242→

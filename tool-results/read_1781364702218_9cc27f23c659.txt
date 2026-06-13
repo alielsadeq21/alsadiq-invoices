@@ -1,0 +1,1821 @@
+     1→     1→import { formatCurrency, formatDate, numberToArabicWords } from './utils';
+     2→     2→import type { Invoice, InvoiceItem, Settings, Branch } from './types';
+     3→     3→
+     4→     4→/**
+     5→     5→ * Invoice Template Generator
+     6→     6→ * Generates a complete, self-contained HTML document for printing and PDF export.
+     7→     7→ * Uses pure CSS (no Tailwind dependency) so it works in any context.
+     8→     8→ * 
+     9→     9→ * Supports branch-specific data: each branch can have its own logo, address,
+    10→    10→ * phone, tax number, commercial register, etc. that appear on invoices.
+    11→    11→ */
+    12→    12→
+    13→    13→interface InvoiceDocumentData {
+    14→    14→  invoice: Invoice;
+    15→    15→  items: InvoiceItem[];
+    16→    16→  branchName: string;
+    17→    17→  branch?: Branch | null;
+    18→    18→  customerName?: string;
+    19→    19→  settings: Settings | null;
+    20→    20→  userFullName: string;
+    21→    21→  showSignatures?: boolean;
+    22→    22→}
+    23→    23→
+    24→    24→function formatTime(time: string | null): string {
+    25→    25→  if (!time) return '';
+    26→    26→  const [h, m] = time.split(':');
+    27→    27→  const hour = parseInt(h);
+    28→    28→  const ampm = hour >= 12 ? 'م' : 'ص';
+    29→    29→  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    30→    30→  return `${displayHour}:${m} ${ampm}`;
+    31→    31→}
+    32→    32→
+    33→    33→/**
+    34→    34→ * Checks if any item has unit_count > 1, meaning we should show the unit_count columns
+    35→    35→ */
+    36→    36→function hasUnitCount(items: InvoiceItem[]): boolean {
+    37→    37→  return items.some(item => Number(item.unit_count) > 1);
+    38→    38→}
+    39→    39→
+    40→    40→/**
+    41→    41→ * Resolves a value: branch-specific data takes priority over global settings.
+    42→    42→ * This allows each branch to override global settings with its own details.
+    43→    43→ */
+    44→    44→function resolveBranchValue(
+    45→    45→  branchValue: string | null | undefined,
+    46→    46→  settingsValue: string | null | undefined,
+    47→    47→  fallback: string = ''
+    48→    48→): string {
+    49→    49→  if (branchValue && branchValue.trim()) return branchValue.trim();
+    50→    50→  if (settingsValue && settingsValue.trim()) return settingsValue.trim();
+    51→    51→  return fallback;
+    52→    52→}
+    53→    53→
+    54→    54→function getInvoiceCSS(showUnitCount: boolean): string {
+    55→    55→  const unitCountColWidth = showUnitCount ? '70px' : '0px';
+    56→    56→  const totalPiecesColWidth = showUnitCount ? '90px' : '0px';
+    57→    57→
+    58→    58→  return `
+    59→    59→    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+    60→    60→
+    61→    61→    *, *::before, *::after {
+    62→    62→      margin: 0;
+    63→    63→      padding: 0;
+    64→    64→      box-sizing: border-box;
+    65→    65→      -webkit-print-color-adjust: exact !important;
+    66→    66→      print-color-adjust: exact !important;
+    67→    67→      color-adjust: exact !important;
+    68→    68→    }
+    69→    69→
+    70→    70→    body {
+    71→    71→      font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
+    72→    72→      color: #1a1a2e;
+    73→    73→      background: #ffffff;
+    74→    74→      direction: rtl;
+    75→    75→      line-height: 1.6;
+    76→    76→      margin: 0;
+    77→    77→      padding: 0;
+    78→    78→    }
+    79→    79→
+    80→    80→    @page {
+    81→    81→      size: A4;
+    82→    82→      margin: 8mm;
+    83→    83→    }
+    84→    84→
+    85→    85→    .invoice-container {
+    86→    86→      width: 100%;
+    87→    87→      max-width: 210mm;
+    88→    88→      margin: 0 auto;
+    89→    89→      padding: 4mm 6mm;
+    90→    90→      position: relative;
+    91→    91→    }
+    92→    92→
+    93→    93→    /* ===== HEADER ===== */
+    94→    94→    .inv-header {
+    95→    95→      display: flex;
+    96→    96→      align-items: stretch;
+    97→    97→      border: 2.5px solid #0D7C66;
+    98→    98→      border-radius: 12px;
+    99→    99→      overflow: hidden;
+   100→   100→      margin-bottom: 14px;
+   101→   101→    }
+   102→   102→
+   103→   103→    .inv-header-logo {
+   104→   104→      background: #0D7C66;
+   105→   105→      padding: 18px 22px;
+   106→   106→      display: flex;
+   107→   107→      align-items: center;
+   108→   108→      justify-content: center;
+   109→   109→      min-width: 110px;
+   110→   110→    }
+   111→   111→
+   112→   112→    .inv-header-logo .logo-text {
+   113→   113→      font-size: 56px;
+   114→   114→      font-weight: 800;
+   115→   115→      color: #D4A843;
+   116→   116→      line-height: 1;
+   117→   117→      user-select: none;
+   118→   118→    }
+   119→   119→
+   120→   120→    .inv-header-logo img {
+   121→   121→      width: 70px;
+   122→   122→      height: 70px;
+   123→   123→      object-fit: contain;
+   124→   124→    }
+   125→   125→
+   126→   126→    .inv-header-info {
+   127→   127→      flex: 1;
+   128→   128→      padding: 12px 20px;
+   129→   129→      display: flex;
+   130→   130→      flex-direction: column;
+   131→   131→      justify-content: center;
+   132→   132→    }
+   133→   133→
+   134→   134→    .inv-header-info h1 {
+   135→   135→      font-size: 22px;
+   136→   136→      font-weight: 700;
+   137→   137→      color: #0D7C66;
+   138→   138→      margin-bottom: 4px;
+   139→   139→    }
+   140→   140→
+   141→   141→    .inv-header-info .contact-line {
+   142→   142→      font-size: 11px;
+   143→   143→      color: #555;
+   144→   144→      line-height: 1.8;
+   145→   145→    }
+   146→   146→
+   147→   147→    .inv-header-info .contact-line span {
+   148→   148→      margin-left: 18px;
+   149→   149→      white-space: nowrap;
+   150→   150→    }
+   151→   151→
+   152→   152→    .inv-header-title {
+   153→   153→      background: linear-gradient(135deg, #0D7C66, #0A5E4D);
+   154→   154→      padding: 16px 24px;
+   155→   155→      display: flex;
+   156→   156→      flex-direction: column;
+   157→   157→      align-items: center;
+   158→   158→      justify-content: center;
+   159→   159→      min-width: 170px;
+   160→   160→    }
+   161→   161→
+   162→   162→    .inv-header-title h2 {
+   163→   163→      font-size: 18px;
+   164→   164→      font-weight: 700;
+   165→   165→      color: #ffffff;
+   166→   166→      margin-bottom: 3px;
+   167→   167→    }
+   168→   168→
+   169→   169→    .inv-header-title .inv-num {
+   170→   170→      font-size: 14px;
+   171→   171→      color: #D4A843;
+   172→   172→      font-weight: 600;
+   173→   173→    }
+   174→   174→
+   175→   175→    .inv-header-title .inv-date {
+   176→   176→      font-size: 11px;
+   177→   177→      color: rgba(255, 255, 255, 0.85);
+   178→   178→      margin-top: 3px;
+   179→   179→    }
+   180→   180→
+   181→   181→    /* ===== BRANCH INFO BAR ===== */
+   182→   182→    .inv-branch-bar {
+   183→   183→      display: flex;
+   184→   184→      align-items: center;
+   185→   185→      justify-content: center;
+   186→   186→      gap: 20px;
+   187→   187→      background: linear-gradient(135deg, rgba(13,124,102,0.06), rgba(212,168,67,0.04));
+   188→   188→      border: 1px solid rgba(13,124,102,0.15);
+   189→   189→      border-radius: 8px;
+   190→   190→      padding: 8px 16px;
+   191→   191→      margin-bottom: 10px;
+   192→   192→      font-size: 11px;
+   193→   193→      color: #444;
+   194→   194→    }
+   195→   195→
+   196→   196→    .inv-branch-bar .branch-label {
+   197→   197→      font-weight: 700;
+   198→   198→      color: #0D7C66;
+   199→   199→    }
+   200→   200→
+   201→   201→    .inv-branch-bar .branch-sep {
+   202→   202→      color: #ccc;
+   203→   203→    }
+   204→   204→
+   205→   205→    /* ===== GOLD DIVIDER ===== */
+   206→   206→    .gold-divider {
+   207→   207→      height: 3px;
+   208→   208→      background: linear-gradient(90deg, #0D7C66, #D4A843, #0D7C66);
+   209→   209→      border-radius: 2px;
+   210→   210→      margin-bottom: 14px;
+   211→   211→    }
+   212→   212→
+   213→   213→    /* ===== INVOICE INFO GRID ===== */
+   214→   214→    .inv-info-grid {
+   215→   215→      display: grid;
+   216→   216→      grid-template-columns: repeat(4, 1fr);
+   217→   217→      gap: 0;
+   218→   218→      border: 1px solid #ddd;
+   219→   219→      border-radius: 10px;
+   220→   220→      overflow: hidden;
+   221→   221→      margin-bottom: 14px;
+   222→   222→    }
+   223→   223→
+   224→   224→    .inv-info-cell {
+   225→   225→      padding: 10px 14px;
+   226→   226→      border-left: 1px solid #e5e5e5;
+   227→   227→    }
+   228→   228→
+   229→   229→    .inv-info-cell:last-child {
+   230→   230→      border-left: none;
+   231→   231→    }
+   232→   232→
+   233→   233→    .inv-info-cell .label {
+   234→   234→      font-size: 10px;
+   235→   235→      color: #888;
+   236→   236→      font-weight: 600;
+   237→   237→      margin-bottom: 3px;
+   238→   238→    }
+   239→   239→
+   240→   240→    .inv-info-cell .value {
+   241→   241→      font-size: 13px;
+   242→   242→      color: #1a1a2e;
+   243→   243→      font-weight: 600;
+   244→   244→    }
+   245→   245→
+   246→   246→    /* ===== ITEMS TABLE ===== */
+   247→   247→    .inv-table {
+   248→   248→      width: 100%;
+   249→   249→      border-collapse: collapse;
+   250→   250→      margin-bottom: 14px;
+   251→   251→      border-radius: 10px;
+   252→   252→      overflow: hidden;
+   253→   253→      border: 1.5px solid #0D7C66;
+   254→   254→    }
+   255→   255→
+   256→   256→    .inv-table thead tr {
+   257→   257→      background: #0D7C66;
+   258→   258→    }
+   259→   259→
+   260→   260→    .inv-table thead th {
+   261→   261→      padding: 11px 10px;
+   262→   262→      color: #ffffff;
+   263→   263→      font-size: 12px;
+   264→   264→      font-weight: 600;
+   265→   265→      text-align: right;
+   266→   266→      border-left: 1px solid rgba(255, 255, 255, 0.2);
+   267→   267→    }
+   268→   268→
+   269→   269→    .inv-table thead th:last-child {
+   270→   270→      border-left: none;
+   271→   271→    }
+   272→   272→
+   273→   273→    .inv-table thead th.col-num {
+   274→   274→      width: 40px;
+   275→   275→      text-align: center;
+   276→   276→    }
+   277→   277→
+   278→   278→    .inv-table thead th.col-name {
+   279→   279→      text-align: right;
+   280→   280→    }
+   281→   281→
+   282→   282→    .inv-table thead th.col-qty {
+   283→   283→      width: 80px;
+   284→   284→      text-align: center;
+   285→   285→    }
+   286→   286→
+   287→   287→    .inv-table thead th.col-unit-count {
+   288→   288→      width: ${unitCountColWidth};
+   289→   289→      text-align: center;
+   290→   290→      ${showUnitCount ? '' : 'display:none;'}
+   291→   291→    }
+   292→   292→
+   293→   293→    .inv-table thead th.col-total-pieces {
+   294→   294→      width: ${totalPiecesColWidth};
+   295→   295→      text-align: center;
+   296→   296→      ${showUnitCount ? '' : 'display:none;'}
+   297→   297→    }
+   298→   298→
+   299→   299→    .inv-table thead th.col-price {
+   300→   300→      width: 120px;
+   301→   301→      text-align: center;
+   302→   302→    }
+   303→   303→
+   304→   304→    .inv-table thead th.col-total {
+   305→   305→      width: 120px;
+   306→   306→      text-align: left;
+   307→   307→    }
+   308→   308→
+   309→   309→    .inv-table tbody td {
+   310→   310→      padding: 10px 10px;
+   311→   311→      font-size: 12px;
+   312→   312→      border-bottom: 1px solid #e5e5e5;
+   313→   313→      border-left: 1px solid #e5e5e5;
+   314→   314→    }
+   315→   315→
+   316→   316→    .inv-table tbody td:last-child {
+   317→   317→      border-left: none;
+   318→   318→    }
+   319→   319→
+   320→   320→    .inv-table tbody tr.even-row {
+   321→   321→      background: #f7faf9;
+   322→   322→    }
+   323→   323→
+   324→   324→    .inv-table tbody td.col-num {
+   325→   325→      text-align: center;
+   326→   326→      color: #888;
+   327→   327→    }
+   328→   328→
+   329→   329→    .inv-table tbody td.col-name {
+   330→   330→      font-weight: 500;
+   331→   331→      color: #1a1a2e;
+   332→   332→    }
+   333→   333→
+   334→   334→    .inv-table tbody td.col-qty {
+   335→   335→      text-align: center;
+   336→   336→    }
+   337→   337→
+   338→   338→    .inv-table tbody td.col-unit-count {
+   339→   339→      text-align: center;
+   340→   340→      color: #0D7C66;
+   341→   341→      font-weight: 600;
+   342→   342→      ${showUnitCount ? '' : 'display:none;'}
+   343→   343→    }
+   344→   344→
+   345→   345→    .inv-table tbody td.col-total-pieces {
+   346→   346→      text-align: center;
+   347→   347→      font-weight: 700;
+   348→   348→      color: #0D7C66;
+   349→   349→      ${showUnitCount ? '' : 'display:none;'}
+   350→   350→    }
+   351→   351→
+   352→   352→    .inv-table tbody td.col-price {
+   353→   353→      text-align: center;
+   354→   354→    }
+   355→   355→
+   356→   356→    .inv-table tbody td.col-total {
+   357→   357→      text-align: left;
+   358→   358→      font-weight: 700;
+   359→   359→      color: #0D7C66;
+   360→   360→    }
+   361→   361→
+   362→   362→    /* ===== TOTALS ===== */
+   363→   363→    .inv-totals-row {
+   364→   364→      display: flex;
+   365→   365→      justify-content: flex-end;
+   366→   366→      margin-bottom: 14px;
+   367→   367→    }
+   368→   368→
+   369→   369→    .inv-totals-box {
+   370→   370→      width: 290px;
+   371→   371→      border: 1px solid #ddd;
+   372→   372→      border-radius: 10px;
+   373→   373→      overflow: hidden;
+   374→   374→    }
+   375→   375→
+   376→   376→    .inv-totals-box .total-row {
+   377→   377→      display: flex;
+   378→   378→      justify-content: space-between;
+   379→   379→      align-items: center;
+   380→   380→      padding: 9px 14px;
+   381→   381→      font-size: 12px;
+   382→   382→      border-bottom: 1px solid #eee;
+   383→   383→    }
+   384→   384→
+   385→   385→    .inv-totals-box .total-row:last-child {
+   386→   386→      border-bottom: none;
+   387→   387→    }
+   388→   388→
+   389→   389→    .inv-totals-box .total-row .total-label {
+   390→   390→      color: #666;
+   391→   391→    }
+   392→   392→
+   393→   393→    .inv-totals-box .total-row .total-value {
+   394→   394→      font-weight: 600;
+   395→   395→      color: #1a1a2e;
+   396→   396→    }
+   397→   397→
+   398→   398→    .inv-totals-box .grand-total {
+   399→   399→      background: #0D7C66;
+   400→   400→      padding: 12px 14px;
+   401→   401→      display: flex;
+   402→   402→      justify-content: space-between;
+   403→   403→      align-items: center;
+   404→   404→    }
+   405→   405→
+   406→   406→    .inv-totals-box .grand-total .total-label {
+   407→   407→      color: #ffffff;
+   408→   408→      font-size: 14px;
+   409→   409→      font-weight: 700;
+   410→   410→    }
+   411→   411→
+   412→   412→    .inv-totals-box .grand-total .total-value {
+   413→   413→      color: #ffffff;
+   414→   414→      font-size: 16px;
+   415→   415→      font-weight: 800;
+   416→   416→    }
+   417→   417→
+   418→   418→    /* ===== NOTES ===== */
+   419→   419→    .inv-notes {
+   420→   420→      padding: 10px 14px;
+   421→   421→      background: #FFF9E6;
+   422→   422→      border: 1px solid #F0D060;
+   423→   423→      border-radius: 8px;
+   424→   424→      margin-bottom: 14px;
+   425→   425→      font-size: 12px;
+   426→   426→    }
+   427→   427→
+   428→   428→    .inv-notes .notes-label {
+   429→   429→      font-weight: 700;
+   430→   430→      color: #8B7020;
+   431→   431→    }
+   432→   432→
+   433→   433→    .inv-notes .notes-text {
+   434→   434→      color: #6B5510;
+   435→   435→      margin-top: 2px;
+   436→   436→    }
+   437→   437→
+   438→   438→    /* ===== CANCEL ===== */
+   439→   439→    .inv-cancel {
+   440→   440→      padding: 10px 14px;
+   441→   441→      background: #FFF0F0;
+   442→   442→      border: 1px solid #E8A0A0;
+   443→   443→      border-radius: 8px;
+   444→   444→      margin-bottom: 14px;
+   445→   445→      font-size: 12px;
+   446→   446→    }
+   447→   447→
+   448→   448→    .inv-cancel .cancel-label {
+   449→   449→      font-weight: 700;
+   450→   450→      color: #8B2020;
+   451→   451→    }
+   452→   452→
+   453→   453→    .inv-cancel .cancel-text {
+   454→   454→      color: #6B1010;
+   455→   455→      margin-top: 2px;
+   456→   456→    }
+   457→   457→
+   458→   458→    /* ===== AMOUNT IN WORDS ===== */
+   459→   459→    .inv-amount-words {
+   460→   460→      padding: 10px 14px;
+   461→   461→      background: #f0faf7;
+   462→   462→      border: 1px solid #b8e0d5;
+   463→   463→      border-radius: 8px;
+   464→   464→      margin-bottom: 14px;
+   465→   465→      font-size: 12px;
+   466→   466→    }
+   467→   467→
+   468→   468→    .inv-amount-words .amount-label {
+   469→   469→      font-weight: 700;
+   470→   470→      color: #0D7C66;
+   471→   471→    }
+   472→   472→
+   473→   473→    .inv-amount-words .amount-text {
+   474→   474→      color: #1a1a2e;
+   475→   475→      font-weight: 500;
+   476→   476→    }
+   477→   477→
+   478→   478→    /* ===== SIGNATURES ===== */
+   479→   479→    .inv-signatures {
+   480→   480→      display: grid;
+   481→   481→      grid-template-columns: repeat(3, 1fr);
+   482→   482→      gap: 16px;
+   483→   483→      margin-bottom: 16px;
+   484→   484→    }
+   485→   485→
+   486→   486→    .sig-box {
+   487→   487→      border: 1px solid #ccc;
+   488→   488→      border-radius: 8px;
+   489→   489→      padding: 10px;
+   490→   490→      text-align: center;
+   491→   491→    }
+   492→   492→
+   493→   493→    .sig-box .sig-label {
+   494→   494→      font-size: 11px;
+   495→   495→      color: #0D7C66;
+   496→   496→      font-weight: 700;
+   497→   497→      margin-bottom: 30px;
+   498→   498→    }
+   499→   499→
+   500→   500→    .sig-box .sig-line {
+   501→   501→      border-top: 1px dashed #999;
+   502→   502→      padding-top: 6px;
+   503→   503→      font-size: 10px;
+   504→   504→      color: #888;
+   505→   505→    }
+   506→   506→
+   507→   507→    /* ===== FOOTER ===== */
+   508→   508→    .inv-footer {
+   509→   509→      text-align: center;
+   510→   510→      padding-top: 10px;
+   511→   511→      border-top: 2px solid #0D7C66;
+   512→   512→    }
+   513→   513→
+   514→   514→    .inv-footer .footer-text {
+   515→   515→      font-size: 11px;
+   516→   516→      color: #888;
+   517→   517→    }
+   518→   518→
+   519→   519→    .inv-footer .footer-brand {
+   520→   520→      font-size: 10px;
+   521→   521→      color: #aaa;
+   522→   522→      margin-top: 4px;
+   523→   523→    }
+   524→   524→
+   525→   525→    /* ===== BRANCH REG INFO ===== */
+   526→   526→    .inv-reg-info {
+   527→   527→      display: flex;
+   528→   528→      justify-content: center;
+   529→   529→      gap: 24px;
+   530→   530→      margin-top: 6px;
+   531→   531→      font-size: 10px;
+   532→   532→      color: #999;
+   533→   533→    }
+   534→   534→
+   535→   535→    .inv-reg-info span {
+   536→   536→      white-space: nowrap;
+   537→   537→    }
+   538→   538→
+   539→   539→    /* ===== WATERMARK ===== */
+   540→   540→    .watermark {
+   541→   541→      position: fixed;
+   542→   542→      top: 50%;
+   543→   543→      left: 50%;
+   544→   544→      transform: translate(-50%, -50%) rotate(-30deg);
+   545→   545→      font-size: 80px;
+   546→   546→      font-weight: 800;
+   547→   547→      color: rgba(220, 50, 50, 0.08);
+   548→   548→      pointer-events: none;
+   549→   549→      z-index: 0;
+   550→   550→    }
+   551→   551→
+   552→   552→    .watermark.cancelled {
+   553→   553→      color: rgba(220, 50, 50, 0.12);
+   554→   554→    }
+   555→   555→
+   556→   556→    /* ===== ITEMS COUNT ===== */
+   557→   557→    .items-count {
+   558→   558→      text-align: left;
+   559→   559→      font-size: 11px;
+   560→   560→      color: #888;
+   561→   561→      margin-bottom: 14px;
+   562→   562→      display: flex;
+   563→   563→      justify-content: space-between;
+   564→   564→    }
+   565→   565→
+   566→   566→    .items-count .total-pieces {
+   567→   567→      color: #0D7C66;
+   568→   568→      font-weight: 600;
+   569→   569→    }
+   570→   570→
+   571→   571→    /* ===== PRINT MEDIA ===== */
+   572→   572→    @media print {
+   573→   573→      body {
+   574→   574→        margin: 0;
+   575→   575→        background: white !important;
+   576→   576→      }
+   577→   577→      .invoice-container {
+   578→   578→        padding: 0;
+   579→   579→        max-width: 100%;
+   580→   580→      }
+   581→   581→
+   582→   582→      /* ===== HIGH-CONTRAST B&W OVERRIDES ===== */
+   583→   583→      .inv-header {
+   584→   584→        border-color: #000 !important;
+   585→   585→        border-width: 3px !important;
+   586→   586→      }
+   587→   587→      .inv-header-logo {
+   588→   588→        background: #000 !important;
+   589→   589→      }
+   590→   590→      .inv-header-logo .logo-text {
+   591→   591→        color: #fff !important;
+   592→   592→      }
+   593→   593→      .inv-header-logo img {
+   594→   594→        filter: brightness(0) invert(1) !important;
+   595→   595→      }
+   596→   596→      .inv-header-info h1 {
+   597→   597→        color: #000 !important;
+   598→   598→      }
+   599→   599→      .inv-header-title {
+   600→   600→        background: #222 !important;
+   601→   601→      }
+   602→   602→      .inv-header-title h2 {
+   603→   603→        color: #fff !important;
+   604→   604→      }
+   605→   605→      .inv-header-title .inv-num {
+   606→   606→        color: #ccc !important;
+   607→   607→      }
+   608→   608→      .inv-header-title .inv-date {
+   609→   609→        color: #999 !important;
+   610→   610→      }
+   611→   611→      .inv-branch-bar {
+   612→   612→        background: #f5f5f5 !important;
+   613→   613→        border-color: #999 !important;
+   614→   614→      }
+   615→   615→      .inv-branch-bar .branch-label {
+   616→   616→        color: #000 !important;
+   617→   617→      }
+   618→   618→      .gold-divider {
+   619→   619→        background: #333 !important;
+   620→   620→      }
+   621→   621→      .inv-info-grid {
+   622→   622→        border-color: #333 !important;
+   623→   623→      }
+   624→   624→      .inv-info-cell {
+   625→   625→        border-left-color: #ccc !important;
+   626→   626→      }
+   627→   627→      .inv-info-cell .label {
+   628→   628→        color: #555 !important;
+   629→   629→      }
+   630→   630→      .inv-info-cell .value {
+   631→   631→        color: #000 !important;
+   632→   632→      }
+   633→   633→      .inv-table {
+   634→   634→        border-color: #000 !important;
+   635→   635→      }
+   636→   636→      .inv-table thead tr {
+   637→   637→        background: #000 !important;
+   638→   638→      }
+   639→   639→      .inv-table thead th {
+   640→   640→        color: #fff !important;
+   641→   641→        border-left-color: rgba(255,255,255,0.3) !important;
+   642→   642→      }
+   643→   643→      .inv-table tbody td {
+   644→   644→        border-bottom-color: #999 !important;
+   645→   645→        border-left-color: #999 !important;
+   646→   646→        color: #000 !important;
+   647→   647→      }
+   648→   648→      .inv-table tbody tr.even-row {
+   649→   649→        background: #f0f0f0 !important;
+   650→   650→      }
+   651→   651→      .inv-table tbody td.col-unit-count,
+   652→   652→      .inv-table tbody td.col-total-pieces {
+   653→   653→        color: #000 !important;
+   654→   654→        font-weight: 700 !important;
+   655→   655→      }
+   656→   656→      .inv-table tbody td.col-total {
+   657→   657→        color: #000 !important;
+   658→   658→        font-weight: 800 !important;
+   659→   659→      }
+   660→   660→      .inv-totals-box {
+   661→   661→        border-color: #333 !important;
+   662→   662→      }
+   663→   663→      .inv-totals-box .total-row {
+   664→   664→        border-bottom-color: #ccc !important;
+   665→   665→      }
+   666→   666→      .inv-totals-box .total-row .total-label {
+   667→   667→        color: #333 !important;
+   668→   668→      }
+   669→   669→      .inv-totals-box .total-row .total-value {
+   670→   670→        color: #000 !important;
+   671→   671→      }
+   672→   672→      .inv-totals-box .grand-total {
+   673→   673→        background: #000 !important;
+   674→   674→      }
+   675→   675→      .inv-totals-box .grand-total .total-label,
+   676→   676→      .inv-totals-box .grand-total .total-value {
+   677→   677→        color: #fff !important;
+   678→   678→      }
+   679→   679→      .inv-amount-words {
+   680→   680→        background: #eee !important;
+   681→   681→        border-color: #999 !important;
+   682→   682→      }
+   683→   683→      .inv-amount-words .amount-label {
+   684→   684→        color: #000 !important;
+   685→   685→      }
+   686→   686→      .inv-amount-words .amount-text {
+   687→   687→        color: #000 !important;
+   688→   688→      }
+   689→   689→      .inv-notes {
+   690→   690→        background: #f5f5f5 !important;
+   691→   691→        border-color: #999 !important;
+   692→   692→      }
+   693→   693→      .inv-notes .notes-label {
+   694→   694→        color: #333 !important;
+   695→   695→      }
+   696→   696→      .inv-notes .notes-text {
+   697→   697→        color: #000 !important;
+   698→   698→      }
+   699→   699→      .inv-cancel {
+   700→   700→        background: #f0f0f0 !important;
+   701→   701→        border-color: #999 !important;
+   702→   702→      }
+   703→   703→      .inv-cancel .cancel-label {
+   704→   704→        color: #000 !important;
+   705→   705→      }
+   706→   706→      .inv-cancel .cancel-text {
+   707→   707→        color: #333 !important;
+   708→   708→      }
+   709→   709→      .inv-signatures .sig-box {
+   710→   710→        border-color: #666 !important;
+   711→   711→      }
+   712→   712→      .inv-signatures .sig-label {
+   713→   713→        color: #000 !important;
+   714→   714→      }
+   715→   715→      .inv-signatures .sig-line {
+   716→   716→        border-top-color: #666 !important;
+   717→   717→        color: #333 !important;
+   718→   718→      }
+   719→   719→      .inv-footer {
+   720→   720→        border-top-color: #000 !important;
+   721→   721→      }
+   722→   722→      .inv-footer .footer-text {
+   723→   723→        color: #333 !important;
+   724→   724→      }
+   725→   725→      .inv-footer .footer-brand {
+   726→   726→        color: #666 !important;
+   727→   727→      }
+   728→   728→      .inv-reg-info {
+   729→   729→        color: #555 !important;
+   730→   730→      }
+   731→   731→      .watermark.cancelled {
+   732→   732→        color: rgba(0,0,0,0.12) !important;
+   733→   733→      }
+   734→   734→      .items-count {
+   735→   735→        color: #333 !important;
+   736→   736→      }
+   737→   737→      .items-count .total-pieces {
+   738→   738→        color: #000 !important;
+   739→   739→      }
+   740→   740→    }
+   741→   741→  `;
+   742→   742→}
+   743→   743→
+   744→   744→export function generateInvoiceDocument(data: InvoiceDocumentData): string {
+   745→   745→  const { invoice, items, branchName, branch, customerName, settings, userFullName, showSignatures = false } = data;
+   746→   746→
+   747→   747→  const invoiceTime = formatTime(invoice.invoice_time);
+   748→   748→
+   749→   749→  // Resolve values: branch-specific data takes priority over global settings
+   750→   750→  const factoryName = resolveBranchValue(
+   751→   751→    branch?.name,
+   752→   752→    settings?.factory_name,
+   753→   753→    'مصنع الصادق'
+   754→   754→  );
+   755→   755→  const factoryAddress = resolveBranchValue(branch?.address, settings?.address);
+   756→   756→  const factoryPhone = resolveBranchValue(branch?.phone, settings?.phone);
+   757→   757→  const factoryEmail = resolveBranchValue(branch?.email, settings?.email);
+   758→   758→  const taxNumber = resolveBranchValue(branch?.tax_number, settings?.tax_number);
+   759→   759→  const commercialRegister = resolveBranchValue(branch?.commercial_register, settings?.commercial_register);
+   760→   760→  const logoUrl = resolveBranchValue(branch?.logo_url, settings?.logo_url);
+   761→   761→  const invoiceFooter = resolveBranchValue(branch?.invoice_footer, settings?.invoice_footer, 'شكراً لتعاملكم معنا');
+   762→   762→
+   763→   763→  const showUnitCount = hasUnitCount(items);
+   764→   764→
+   765→   765→  const logoSection = logoUrl
+   766→   766→    ? `<img src="${logoUrl}" alt="شعار" style="width:70px;height:70px;object-fit:contain;" />`
+   767→   767→    : `<span class="logo-text">ص</span>`;
+   768→   768→
+   769→   769→  const isCancelled = invoice.status === 'cancelled';
+   770→   770→  const watermarkHtml = isCancelled
+   771→   771→    ? '<div class="watermark cancelled">ملغاة</div>'
+   772→   772→    : '';
+   773→   773→
+   774→   774→  const notesHtml = invoice.notes
+   775→   775→    ? `<div class="inv-notes"><span class="notes-label">ملاحظات: </span><span class="notes-text">${invoice.notes}</span></div>`
+   776→   776→    : '';
+   777→   777→
+   778→   778→  const cancelHtml = invoice.cancel_reason
+   779→   779→    ? `<div class="inv-cancel"><span class="cancel-label">سبب الإلغاء: </span><span class="cancel-text">${invoice.cancel_reason}</span></div>`
+   780→   780→    : '';
+   781→   781→
+   782→   782→  const taxRow = invoice.tax_rate > 0
+   783→   783→    ? `<div class="total-row"><span class="total-label">الضريبة (${invoice.tax_rate}%)</span><span class="total-value">${formatCurrency(invoice.tax_amount)}</span></div>`
+   784→   784→    : '';
+   785→   785→
+   786→   786→  // Calculate total pieces
+   787→   787→  const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
+   788→   788→
+   789→   789→  const itemsRows = items.map((item, index) => {
+   790→   790→    const unitCount = Number(item.unit_count) || 1;
+   791→   791→    const itemTotalPieces = Number(item.quantity) * unitCount;
+   792→   792→    return `
+   793→   793→      <tr class="${index % 2 === 1 ? 'even-row' : ''}">
+   794→   794→        <td class="col-num">${index + 1}</td>
+   795→   795→        <td class="col-name">${item.item_name}</td>
+   796→   796→        <td class="col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+   797→   797→        <td class="col-unit-count">${unitCount > 1 ? unitCount.toLocaleString('ar-EG') : '—'}</td>
+   798→   798→        <td class="col-total-pieces">${unitCount > 1 ? itemTotalPieces.toLocaleString('ar-EG') : '—'}</td>
+   799→   799→        <td class="col-price">${formatCurrency(Number(item.unit_price))}</td>
+   800→   800→        <td class="col-total">${formatCurrency(Number(item.total_price))}</td>
+   801→   801→      </tr>`;
+   802→   802→  }).join('');
+   803→   803→
+   804→   804→  // Build branch info bar (shows branch-specific contact details)
+   805→   805→  const branchBarParts: string[] = [];
+   806→   806→  if (factoryAddress) branchBarParts.push(factoryAddress);
+   807→   807→  if (factoryPhone) branchBarParts.push(`هاتف: ${factoryPhone}`);
+   808→   808→  if (factoryEmail) branchBarParts.push(factoryEmail);
+   809→   809→  const branchBarHtml = branchBarParts.length > 0
+   810→   810→    ? `<div class="inv-branch-bar">
+   811→   811→        <span class="branch-label">فرع ${branchName}</span>
+   812→   812→        ${branchBarParts.map(p => `<span class="branch-sep">|</span><span>${p}</span>`).join('')}
+   813→   813→      </div>`
+   814→   814→    : '';
+   815→   815→
+   816→   816→  // Registration info line at the bottom
+   817→   817→  const regInfoParts: string[] = [];
+   818→   818→  if (taxNumber) regInfoParts.push(`الرقم الضريبي: ${taxNumber}`);
+   819→   819→  if (commercialRegister) regInfoParts.push(`السجل التجاري: ${commercialRegister}`);
+   820→   820→  const regInfoHtml = regInfoParts.length > 0
+   821→   821→    ? `<div class="inv-reg-info">${regInfoParts.map(p => `<span>${p}</span>`).join('')}</div>`
+   822→   822→    : '';
+   823→   823→
+   824→   824→  return `<!DOCTYPE html>
+   825→   825→<html dir="rtl" lang="ar">
+   826→   826→<head>
+   827→   827→  <meta charset="UTF-8">
+   828→   828→  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   829→   829→  <title>فاتورة صرف - ${invoice.invoice_number}</title>
+   830→   830→  <style>${getInvoiceCSS(showUnitCount)}</style>
+   831→   831→</head>
+   832→   832→<body>
+   833→   833→  ${watermarkHtml}
+   834→   834→  <div class="invoice-container">
+   835→   835→    <!-- HEADER -->
+   836→   836→    <div class="inv-header">
+   837→   837→      <div class="inv-header-logo">
+   838→   838→        ${logoSection}
+   839→   839→      </div>
+   840→   840→      <div class="inv-header-info">
+   841→   841→        <h1>${factoryName}</h1>
+   842→   842→        <div class="contact-line">
+   843→   843→          ${factoryAddress ? `<span>${factoryAddress}</span>` : ''}
+   844→   844→          ${factoryPhone ? `<span>هاتف: ${factoryPhone}</span>` : ''}
+   845→   845→          ${factoryEmail ? `<span>${factoryEmail}</span>` : ''}
+   846→   846→        </div>
+   847→   847→        <div class="contact-line">
+   848→   848→          ${taxNumber ? `<span>الرقم الضريبي: ${taxNumber}</span>` : ''}
+   849→   849→          ${commercialRegister ? `<span>السجل التجاري: ${commercialRegister}</span>` : ''}
+   850→   850→        </div>
+   851→   851→      </div>
+   852→   852→      <div class="inv-header-title">
+   853→   853→        <h2>فاتورة صرف</h2>
+   854→   854→        <span class="inv-num">${invoice.invoice_number}</span>
+   855→   855→        <span class="inv-date">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</span>
+   856→   856→      </div>
+   857→   857→    </div>
+   858→   858→
+   859→   859→    <!-- BRANCH INFO BAR -->
+   860→   860→    ${branchBarHtml}
+   861→   861→
+   862→   862→    <!-- GOLD DIVIDER -->
+   863→   863→    <div class="gold-divider"></div>
+   864→   864→
+   865→   865→    <!-- INVOICE INFO -->
+   866→   866→    <div class="inv-info-grid" style="grid-template-columns: repeat(4, 1fr);">
+   867→   867→      <div class="inv-info-cell">
+   868→   868→        <div class="label">الفرع</div>
+   869→   869→        <div class="value">${branchName}</div>
+   870→   870→      </div>
+   871→   871→      <div class="inv-info-cell">
+   872→   872→        <div class="label">العميل</div>
+   873→   873→        <div class="value">${customerName || '—'}</div>
+   874→   874→      </div>
+   875→   875→      <div class="inv-info-cell">
+   876→   876→        <div class="label">المستلم</div>
+   877→   877→        <div class="value">${invoice.receiver_name || '—'}</div>
+   878→   878→      </div>
+   879→   879→      <div class="inv-info-cell">
+   880→   880→        <div class="label">السائق</div>
+   881→   881→        <div class="value">${invoice.driver_name || '—'}${invoice.driver_phone ? ` <span style="color:#999;font-size:11px;">(${invoice.driver_phone})</span>` : ''}</div>
+   882→   882→      </div>
+   883→   883→    </div>
+   884→   884→
+   885→   885→    <!-- ITEMS TABLE -->
+   886→   886→    <table class="inv-table">
+   887→   887→      <thead>
+   888→   888→        <tr>
+   889→   889→          <th class="col-num">#</th>
+   890→   890→          <th class="col-name">الصنف</th>
+   891→   891→          <th class="col-qty">الكمية</th>
+   892→   892→          <th class="col-unit-count">عدد/وحدة</th>
+   893→   893→          <th class="col-total-pieces">إجمالي القطع</th>
+   894→   894→          <th class="col-price">سعر الوحدة</th>
+   895→   895→          <th class="col-total">الإجمالي</th>
+   896→   896→        </tr>
+   897→   897→      </thead>
+   898→   898→      <tbody>
+   899→   899→        ${itemsRows}
+   900→   900→      </tbody>
+   901→   901→    </table>
+   902→   902→
+   903→   903→    <!-- ITEMS COUNT -->
+   904→   904→    <div class="items-count">
+   905→   905→      <span>عدد الأصناف: ${items.length}</span>
+   906→   906→      ${showUnitCount ? `<span class="total-pieces">إجمالي القطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
+   907→   907→    </div>
+   908→   908→
+   909→   909→    <!-- TOTALS -->
+   910→   910→    <div class="inv-totals-row">
+   911→   911→      <div class="inv-totals-box">
+   912→   912→        <div class="total-row">
+   913→   913→          <span class="total-label">المجموع الفرعي</span>
+   914→   914→          <span class="total-value">${formatCurrency(invoice.subtotal)}</span>
+   915→   915→        </div>
+   916→   916→        ${taxRow}
+   917→   917→        <div class="grand-total">
+   918→   918→          <span class="total-label">الإجمالي النهائي</span>
+   919→   919→          <span class="total-value">${formatCurrency(invoice.total)}</span>
+   920→   920→        </div>
+   921→   921→      </div>
+   922→   922→    </div>
+   923→   923→
+   924→   924→    <!-- NOTES -->
+   925→   925→    ${notesHtml}
+   926→   926→
+   927→   927→    <!-- CANCEL REASON -->
+   928→   928→    ${cancelHtml}
+   929→   929→
+   930→   930→    <!-- AMOUNT IN WORDS -->
+   931→   931→    <div class="inv-amount-words">
+   932→   932→      <span class="amount-label">المبلغ: </span>
+   933→   933→      <span class="amount-text">${numberToArabicWords(Number(invoice.total))}</span>
+   934→   934→    </div>
+   935→   935→
+   936→   936→    ${showSignatures ? `<!-- SIGNATURES -->
+   937→   937→    <div class="inv-signatures">
+   938→   938→      <div class="sig-box">
+   939→   939→        <div class="sig-label">المحاسب</div>
+   940→   940→        <div class="sig-line">${userFullName}</div>
+   941→   941→      </div>
+   942→   942→      <div class="sig-box">
+   943→   943→        <div class="sig-label">المستلم</div>
+   944→   944→        <div class="sig-line">${invoice.receiver_name || ''}</div>
+   945→   945→      </div>
+   946→   946→      <div class="sig-box">
+   947→   947→        <div class="sig-label">السائق</div>
+   948→   948→        <div class="sig-line">${invoice.driver_name || ''}</div>
+   949→   949→      </div>
+   950→   950→    </div>` : ''}
+   951→   951→
+   952→   952→    <!-- FOOTER -->
+   953→   953→    <div class="inv-footer">
+   954→   954→      <p class="footer-text">${invoiceFooter}</p>
+   955→   955→      <p class="footer-brand">${factoryName} - نظام علي الصادق</p>
+   956→   956→      ${regInfoHtml}
+   957→   957→    </div>
+   958→   958→  </div>
+   959→   959→</body>
+   960→   960→</html>`;
+   961→   961→}
+   962→   962→
+   963→   963→/**
+   964→   964→ * Extracts the body content and CSS from the generated document.
+   965→   965→ * Used for the PDF approach where we inject into a hidden div.
+   966→   966→ */
+   967→   967→export function extractInvoiceParts(htmlDoc: string): { css: string; body: string } {
+   968→   968→  const styleMatch = htmlDoc.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+   969→   969→  const bodyMatch = htmlDoc.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+   970→   970→
+   971→   971→  return {
+   972→   972→    css: styleMatch ? styleMatch[1] : '',
+   973→   973→    body: bodyMatch ? bodyMatch[1] : '',
+   974→   974→  };
+   975→   975→}
+   976→   976→
+   977→   977→/**
+   978→   978→ * Generates a professional thermal receipt HTML document for 80mm thermal printers.
+   979→   979→ * Features: brand header with branch data, items table, decorative separators, signatures.
+   980→   980→ * Supports branch-specific data (logo, address, phone, tax number, etc.)
+   981→   981→ */
+   982→   982→export function generateThermalDocument(data: InvoiceDocumentData): string {
+   983→   983→  const { invoice, items, branchName, branch, customerName, settings, userFullName, showSignatures = false } = data;
+   984→   984→
+   985→   985→  const invoiceTime = formatTime(invoice.invoice_time);
+   986→   986→
+   987→   987→  // Resolve values: branch-specific data takes priority over global settings
+   988→   988→  const factoryName = resolveBranchValue(
+   989→   989→    branch?.name,
+   990→   990→    settings?.factory_name,
+   991→   991→    'مصنع الصادق'
+   992→   992→  );
+   993→   993→  const factoryPhone = resolveBranchValue(branch?.phone, settings?.phone);
+   994→   994→  const factoryAddress = resolveBranchValue(branch?.address, settings?.address);
+   995→   995→  const factoryEmail = resolveBranchValue(branch?.email, settings?.email);
+   996→   996→  const taxNumber = resolveBranchValue(branch?.tax_number, settings?.tax_number);
+   997→   997→  const commercialRegister = resolveBranchValue(branch?.commercial_register, settings?.commercial_register);
+   998→   998→  const logoUrl = resolveBranchValue(branch?.logo_url, settings?.logo_url);
+   999→   999→  const invoiceFooter = resolveBranchValue(branch?.invoice_footer, settings?.invoice_footer, 'شكراً لتعاملكم معنا');
+  1000→  1000→
+  1001→  1001→  const showUnitCount = hasUnitCount(items);
+  1002→  1002→
+  1003→  1003→  const logoSection = logoUrl
+  1004→  1004→    ? `<img src="${logoUrl}" alt="شعار" style="width:38px;height:38px;object-fit:contain;" />`
+  1005→  1005→    : `<span class="r-logo-text">ص</span>`;
+  1006→  1006→
+  1007→  1007→  const totalPieces = items.reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_count) || 1)), 0);
+  1008→  1008→  const isCancelled = invoice.status === 'cancelled';
+  1009→  1009→
+  1010→  1010→  // Items table rows
+  1011→  1011→  const itemsRows = items.map((item, index) => {
+  1012→  1012→    const unitCount = Number(item.unit_count) || 1;
+  1013→  1013→    const itemTotalPieces = Number(item.quantity) * unitCount;
+  1014→  1014→    const hasUnitInfo = showUnitCount && unitCount > 1;
+  1015→  1015→    return `
+  1016→  1016→      <tr class="${index % 2 === 1 ? 'r-row-alt' : ''}">
+  1017→  1017→        <td class="r-col-num">${index + 1}</td>
+  1018→  1018→        <td class="r-col-name">${item.item_name}</td>
+  1019→  1019→        <td class="r-col-qty">${Number(item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
+  1020→  1020→        ${hasUnitInfo ? `<td class="r-col-uc">${unitCount}</td>` : ''}
+  1021→  1021→        <td class="r-col-price">${formatCurrency(Number(item.unit_price))}</td>
+  1022→  1022→        <td class="r-col-total">${formatCurrency(Number(item.total_price))}</td>
+  1023→  1023→      </tr>
+  1024→  1024→      ${hasUnitInfo ? `<tr class="${index % 2 === 1 ? 'r-row-alt' : ''}"><td></td><td colspan="5" class="r-sub-row">إجمالي القطع: ${itemTotalPieces.toLocaleString('ar-EG')}</td></tr>` : ''}`;
+  1025→  1025→  }).join('');
+  1026→  1026→
+  1027→  1027→  const taxRow = invoice.tax_rate > 0
+  1028→  1028→    ? `<div class="r-total-row"><span class="r-total-label">الضريبة (${invoice.tax_rate}%)</span><span class="r-total-val">${formatCurrency(invoice.tax_amount)}</span></div>`
+  1029→  1029→    : '';
+  1030→  1030→
+  1031→  1031→  // Cancelled watermark
+  1032→  1032→  const watermarkHtml = isCancelled
+  1033→  1033→    ? '<div class="r-watermark">ملغاة</div>'
+  1034→  1034→    : '';
+  1035→  1035→
+  1036→  1036→  // Notes
+  1037→  1037→  const notesHtml = invoice.notes
+  1038→  1038→    ? `<div class="r-notes"><strong>ملاحظات:</strong> ${invoice.notes}</div>`
+  1039→  1039→    : '';
+  1040→  1040→
+  1041→  1041→  // Cancel reason
+  1042→  1042→  const cancelHtml = invoice.cancel_reason
+  1043→  1043→    ? `<div class="r-cancel"><strong>سبب الإلغاء:</strong> ${invoice.cancel_reason}</div>`
+  1044→  1044→    : '';
+  1045→  1045→
+  1046→  1046→  // Build branch info lines for thermal receipt
+  1047→  1047→  const branchInfoLines: string[] = [];
+  1048→  1048→  if (factoryAddress) branchInfoLines.push(factoryAddress);
+  1049→  1049→  if (factoryPhone) branchInfoLines.push(`هاتف: ${factoryPhone}`);
+  1050→  1050→  if (factoryEmail) branchInfoLines.push(factoryEmail);
+  1051→  1051→  const branchInfoHtml = branchInfoLines.length > 0
+  1052→  1052→    ? `<div class="r-brand-info">${branchInfoLines.join(' &bull; ')}</div>`
+  1053→  1053→    : '';
+  1054→  1054→
+  1055→  1055→  // Tax/registration info line
+  1056→  1056→  const regInfoParts: string[] = [];
+  1057→  1057→  if (taxNumber) regInfoParts.push(`ض: ${taxNumber}`);
+  1058→  1058→  if (commercialRegister) regInfoParts.push(`سجل: ${commercialRegister}`);
+  1059→  1059→  const regInfoHtml = regInfoParts.length > 0
+  1060→  1060→    ? `<div class="r-brand-info">${regInfoParts.join(' &bull; ')}</div>`
+  1061→  1061→    : '';
+  1062→  1062→
+  1063→  1063→  return `<!DOCTYPE html>
+  1064→  1064→<html dir="rtl" lang="ar">
+  1065→  1065→<head>
+  1066→  1066→  <meta charset="UTF-8">
+  1067→  1067→  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  1068→  1068→  <title>فاتورة حرارية - ${invoice.invoice_number}</title>
+  1069→  1069→  <style>
+  1070→  1070→    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+  1071→  1071→
+  1072→  1072→    *, *::before, *::after {
+  1073→  1073→      margin: 0;
+  1074→  1074→      padding: 0;
+  1075→  1075→      box-sizing: border-box;
+  1076→  1076→      -webkit-print-color-adjust: exact !important;
+  1077→  1077→      print-color-adjust: exact !important;
+  1078→  1078→      color-adjust: exact !important;
+  1079→  1079→    }
+  1080→  1080→
+  1081→  1081→    body {
+  1082→  1082→      font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
+  1083→  1083→      color: #000;
+  1084→  1084→      background: #fff;
+  1085→  1085→      direction: rtl;
+  1086→  1086→      line-height: 1.4;
+  1087→  1087→      margin: 0;
+  1088→  1088→      padding: 0;
+  1089→  1089→      font-size: 10px;
+  1090→  1090→    }
+  1091→  1091→
+  1092→  1092→    @page {
+  1093→  1093→      size: 80mm auto;
+  1094→  1094→      margin: 0;
+  1095→  1095→    }
+  1096→  1096→
+  1097→  1097→    .r-container {
+  1098→  1098→      width: 80mm;
+  1099→  1099→      margin: 0 auto;
+  1100→  1100→      padding: 0;
+  1101→  1101→    }
+  1102→  1102→
+  1103→  1103→    /* ===== TOP BRAND BAR ===== */
+  1104→  1104→    .r-brand-bar {
+  1105→  1105→      background: #0D7C66;
+  1106→  1106→      padding: 4mm 3mm 3mm 3mm;
+  1107→  1107→      text-align: center;
+  1108→  1108→      position: relative;
+  1109→  1109→    }
+  1110→  1110→
+  1111→  1111→    .r-brand-bar::after {
+  1112→  1112→      content: '';
+  1113→  1113→      position: absolute;
+  1114→  1114→      bottom: 0;
+  1115→  1115→      left: 0;
+  1116→  1116→      right: 0;
+  1117→  1117→      height: 2px;
+  1118→  1118→      background: #D4A843;
+  1119→  1119→    }
+  1120→  1120→
+  1121→  1121→    .r-brand-logo {
+  1122→  1122→      display: inline-block;
+  1123→  1123→      vertical-align: middle;
+  1124→  1124→    }
+  1125→  1125→
+  1126→  1126→    .r-logo-text {
+  1127→  1127→      font-size: 28px;
+  1128→  1128→      font-weight: 800;
+  1129→  1129→      color: #D4A843;
+  1130→  1130→      line-height: 1;
+  1131→  1131→    }
+  1132→  1132→
+  1133→  1133→    .r-brand-bar img {
+  1134→  1134→      width: 32px;
+  1135→  1135→      height: 32px;
+  1136→  1136→      object-fit: contain;
+  1137→  1137→      vertical-align: middle;
+  1138→  1138→    }
+  1139→  1139→
+  1140→  1140→    .r-brand-name {
+  1141→  1141→      font-size: 13px;
+  1142→  1142→      font-weight: 800;
+  1143→  1143→      color: #fff;
+  1144→  1144→      margin-top: 2px;
+  1145→  1145→    }
+  1146→  1146→
+  1147→  1147→    .r-brand-info {
+  1148→  1148→      font-size: 7.5px;
+  1149→  1149→      color: rgba(255,255,255,0.8);
+  1150→  1150→      line-height: 1.5;
+  1151→  1151→      margin-top: 1px;
+  1152→  1152→    }
+  1153→  1153→
+  1154→  1154→    /* ===== BRANCH NAME BADGE ===== */
+  1155→  1155→    .r-branch-badge {
+  1156→  1156→      background: rgba(212,168,67,0.15);
+  1157→  1157→      border: 1px solid rgba(212,168,67,0.4);
+  1158→  1158→      border-top: none;
+  1159→  1159→      text-align: center;
+  1160→  1160→      padding: 1.5mm 0;
+  1161→  1161→      font-size: 8px;
+  1162→  1162→      color: #0D7C66;
+  1163→  1163→      font-weight: 700;
+  1164→  1164→    }
+  1165→  1165→
+  1166→  1166→    /* ===== INVOICE TITLE BOX ===== */
+  1167→  1167→    .r-title-box {
+  1168→  1168→      border: 2px solid #0D7C66;
+  1169→  1169→      border-top: none;
+  1170→  1170→      text-align: center;
+  1171→  1171→      padding: 2mm 0;
+  1172→  1172→      background: linear-gradient(to left, rgba(13,124,102,0.05), rgba(212,168,67,0.05), rgba(13,124,102,0.05));
+  1173→  1173→    }
+  1174→  1174→
+  1175→  1175→    .r-title-text {
+  1176→  1176→      font-size: 13px;
+  1177→  1177→      font-weight: 800;
+  1178→  1178→      color: #0D7C66;
+  1179→  1179→      letter-spacing: 1px;
+  1180→  1180→    }
+  1181→  1181→
+  1182→  1182→    /* ===== DECORATIVE SEPARATORS ===== */
+  1183→  1183→    .r-sep-double {
+  1184→  1184→      border: none;
+  1185→  1185→      border-top: 2px double #0D7C66;
+  1186→  1186→      margin: 2mm 3mm;
+  1187→  1187→    }
+  1188→  1188→
+  1189→  1189→    .r-sep-dashed {
+  1190→  1190→      border: none;
+  1191→  1191→      border-top: 1px dashed #999;
+  1192→  1192→      margin: 2mm 3mm;
+  1193→  1193→    }
+  1194→  1194→
+  1195→  1195→    .r-sep-star {
+  1196→  1196→      text-align: center;
+  1197→  1197→      color: #0D7C66;
+  1198→  1198→      font-size: 9px;
+  1199→  1199→      margin: 2mm 3mm;
+  1200→  1200→      line-height: 1;
+  1201→  1201→      position: relative;
+  1202→  1202→    }
+  1203→  1203→
+  1204→  1204→    .r-sep-star::before,
+  1205→  1205→    .r-sep-star::after {
+  1206→  1206→      content: '';
+  1207→  1207→      position: absolute;
+  1208→  1208→      top: 50%;
+  1209→  1209→      width: calc(50% - 12px);
+  1210→  1210→      border-top: 1px solid #0D7C66;
+  1211→  1211→    }
+  1212→  1212→
+  1213→  1213→    .r-sep-star::before { right: 0; }
+  1214→  1214→    .r-sep-star::after { left: 0; }
+  1215→  1215→
+  1216→  1216→    .r-sep-thick {
+  1217→  1217→      border: none;
+  1218→  1218→      border-top: 2.5px solid #000;
+  1219→  1219→      margin: 2mm 3mm;
+  1220→  1220→    }
+  1221→  1221→
+  1222→  1222→    /* ===== INVOICE INFO TABLE ===== */
+  1223→  1223→    .r-info-table {
+  1224→  1224→      width: calc(100% - 6mm);
+  1225→  1225→      margin: 0 3mm;
+  1226→  1226→      border-collapse: collapse;
+  1227→  1227→      font-size: 9px;
+  1228→  1228→    }
+  1229→  1229→
+  1230→  1230→    .r-info-table tr {
+  1231→  1231→      border-bottom: 1px dotted #ccc;
+  1232→  1232→    }
+  1233→  1233→
+  1234→  1234→    .r-info-table tr:last-child {
+  1235→  1235→      border-bottom: none;
+  1236→  1236→    }
+  1237→  1237→
+  1238→  1238→    .r-info-table td {
+  1239→  1239→      padding: 1.5px 0;
+  1240→  1240→      vertical-align: top;
+  1241→  1241→    }
+  1242→  1242→
+  1243→  1243→    .r-info-label {
+  1244→  1244→      font-weight: 700;
+  1245→  1245→      color: #0D7C66;
+  1246→  1246→      width: 28%;
+  1247→  1247→      white-space: nowrap;
+  1248→  1248→    }
+  1249→  1249→
+  1250→  1250→    .r-info-value {
+  1251→  1251→      color: #000;
+  1252→  1252→      font-weight: 600;
+  1253→  1253→    }
+  1254→  1254→
+  1255→  1255→    /* ===== ITEMS TABLE ===== */
+  1256→  1256→    .r-items-table {
+  1257→  1257→      width: calc(100% - 6mm);
+  1258→  1258→      margin: 0 3mm;
+  1259→  1259→      border-collapse: collapse;
+  1260→  1260→      font-size: 9px;
+  1261→  1261→      border-top: 1.5px solid #0D7C66;
+  1262→  1262→      border-bottom: 1.5px solid #0D7C66;
+  1263→  1263→    }
+  1264→  1264→
+  1265→  1265→    .r-items-table thead tr {
+  1266→  1266→      background: #0D7C66;
+  1267→  1267→    }
+  1268→  1268→
+  1269→  1269→    .r-items-table thead th {
+  1270→  1270→      padding: 3px 2px;
+  1271→  1271→      color: #fff;
+  1272→  1272→      font-size: 8px;
+  1273→  1273→      font-weight: 700;
+  1274→  1274→      text-align: center;
+  1275→  1275→      border-left: 1px solid rgba(255,255,255,0.2);
+  1276→  1276→    }
+  1277→  1277→
+  1278→  1278→    .r-items-table thead th:last-child {
+  1279→  1279→      border-left: none;
+  1280→  1280→    }
+  1281→  1281→
+  1282→  1282→    .r-items-table thead th.r-th-name {
+  1283→  1283→      text-align: right;
+  1284→  1284→    }
+  1285→  1285→
+  1286→  1286→    .r-items-table tbody td {
+  1287→  1287→      padding: 2.5px 2px;
+  1288→  1288→      border-bottom: 1px dotted #ddd;
+  1289→  1289→    }
+  1290→  1290→
+  1291→  1291→    .r-items-table tbody tr:last-child td {
+  1292→  1292→      border-bottom: none;
+  1293→  1293→    }
+  1294→  1294→
+  1295→  1295→    .r-row-alt {
+  1296→  1296→      background: #f5f9f8;
+  1297→  1297→    }
+  1298→  1298→
+  1299→  1299→    .r-col-num {
+  1300→  1300→      text-align: center;
+  1301→  1301→      color: #888;
+  1302→  1302→      width: 8%;
+  1303→  1303→    }
+  1304→  1304→
+  1305→  1305→    .r-col-name {
+  1306→  1306→      text-align: right;
+  1307→  1307→      font-weight: 600;
+  1308→  1308→      width: 28%;
+  1309→  1309→    }
+  1310→  1310→
+  1311→  1311→    .r-col-qty {
+  1312→  1312→      text-align: center;
+  1313→  1313→      width: 14%;
+  1314→  1314→    }
+  1315→  1315→
+  1316→  1316→    .r-col-uc {
+  1317→  1317→      text-align: center;
+  1318→  1318→      color: #0D7C66;
+  1319→  1319→      font-weight: 600;
+  1320→  1320→      width: 10%;
+  1321→  1321→    }
+  1322→  1322→
+  1323→  1323→    .r-col-price {
+  1324→  1324→      text-align: center;
+  1325→  1325→      width: 18%;
+  1326→  1326→    }
+  1327→  1327→
+  1328→  1328→    .r-col-total {
+  1329→  1329→      text-align: left;
+  1330→  1330→      font-weight: 700;
+  1331→  1331→      color: #0D7C66;
+  1332→  1332→      width: 22%;
+  1333→  1333→    }
+  1334→  1334→
+  1335→  1335→    .r-sub-row {
+  1336→  1336→      font-size: 7.5px;
+  1337→  1337→      color: #0D7C66;
+  1338→  1338→      font-weight: 600;
+  1339→  1339→      padding: 0 2px !important;
+  1340→  1340→      border-bottom: 1px dotted #ddd !important;
+  1341→  1341→    }
+  1342→  1342→
+  1343→  1343→    /* ===== ITEMS COUNT ===== */
+  1344→  1344→    .r-items-count {
+  1345→  1345→      width: calc(100% - 6mm);
+  1346→  1346→      margin: 1mm 3mm 0;
+  1347→  1347→      display: flex;
+  1348→  1348→      justify-content: space-between;
+  1349→  1349→      font-size: 8px;
+  1350→  1350→      color: #888;
+  1351→  1351→    }
+  1352→  1352→
+  1353→  1353→    .r-items-count .r-pieces-count {
+  1354→  1354→      color: #0D7C66;
+  1355→  1355→      font-weight: 700;
+  1356→  1356→    }
+  1357→  1357→
+  1358→  1358→    /* ===== TOTALS SECTION ===== */
+  1359→  1359→    .r-totals {
+  1360→  1360→      width: calc(100% - 6mm);
+  1361→  1361→      margin: 0 3mm;
+  1362→  1362→    }
+  1363→  1363→
+  1364→  1364→    .r-total-row {
+  1365→  1365→      display: flex;
+  1366→  1366→      justify-content: space-between;
+  1367→  1367→      align-items: center;
+  1368→  1368→      padding: 2px 0;
+  1369→  1369→      font-size: 10px;
+  1370→  1370→    }
+  1371→  1371→
+  1372→  1372→    .r-total-label {
+  1373→  1373→      color: #555;
+  1374→  1374→    }
+  1375→  1375→
+  1376→  1376→    .r-total-val {
+  1377→  1377→      font-weight: 600;
+  1378→  1378→    }
+  1379→  1379→
+  1380→  1380→    /* ===== GRAND TOTAL BOX ===== */
+  1381→  1381→    .r-grand-total-box {
+  1382→  1382→      border: 2px solid #000;
+  1383→  1383→      padding: 3mm;
+  1384→  1384→      margin: 2mm 3mm;
+  1385→  1385→      text-align: center;
+  1386→  1386→      background: #0D7C66;
+  1387→  1387→      position: relative;
+  1388→  1388→    }
+  1389→  1389→
+  1390→  1390→    .r-grand-total-box::before {
+  1391→  1391→      content: '';
+  1392→  1392→      position: absolute;
+  1393→  1393→      top: 2px;
+  1394→  1394→      left: 2px;
+  1395→  1395→      right: 2px;
+  1396→  1396→      bottom: 2px;
+  1397→  1397→      border: 1px solid #D4A843;
+  1398→  1398→    }
+  1399→  1399→
+  1400→  1400→    .r-grand-label {
+  1401→  1401→      font-size: 11px;
+  1402→  1402→      font-weight: 700;
+  1403→  1403→      color: #fff;
+  1404→  1404→      display: block;
+  1405→  1405→    }
+  1406→  1406→
+  1407→  1407→    .r-grand-value {
+  1408→  1408→      font-size: 18px;
+  1409→  1409→      font-weight: 800;
+  1410→  1410→      color: #D4A843;
+  1411→  1411→      display: block;
+  1412→  1412→      margin-top: 1px;
+  1413→  1413→    }
+  1414→  1414→
+  1415→  1415→    /* ===== AMOUNT IN WORDS ===== */
+  1416→  1416→    .r-amount-words {
+  1417→  1417→      width: calc(100% - 6mm);
+  1418→  1418→      margin: 2mm 3mm;
+  1419→  1419→      padding: 2mm;
+  1420→  1420→      background: #f0faf7;
+  1421→  1421→      border: 1px solid #b8e0d5;
+  1422→  1422→      border-radius: 2px;
+  1423→  1423→      font-size: 8px;
+  1424→  1424→      color: #0D7C66;
+  1425→  1425→      font-weight: 600;
+  1426→  1426→      text-align: center;
+  1427→  1427→    }
+  1428→  1428→
+  1429→  1429→    /* ===== NOTES ===== */
+  1430→  1430→    .r-notes {
+  1431→  1431→      width: calc(100% - 6mm);
+  1432→  1432→      margin: 2mm 3mm;
+  1433→  1433→      padding: 2mm;
+  1434→  1434→      background: #FFF9E6;
+  1435→  1435→      border: 1px solid #E8D060;
+  1436→  1436→      border-radius: 2px;
+  1437→  1437→      font-size: 8px;
+  1438→  1438→      color: #6B5510;
+  1439→  1439→    }
+  1440→  1440→
+  1441→  1441→    .r-cancel {
+  1442→  1442→      width: calc(100% - 6mm);
+  1443→  1443→      margin: 2mm 3mm;
+  1444→  1444→      padding: 2mm;
+  1445→  1445→      background: #FFF0F0;
+  1446→  1446→      border: 1px solid #E8A0A0;
+  1447→  1447→      border-radius: 2px;
+  1448→  1448→      font-size: 8px;
+  1449→  1449→      color: #8B2020;
+  1450→  1450→    }
+  1451→  1451→
+  1452→  1452→    /* ===== REG INFO ===== */
+  1453→  1453→    .r-reg-info {
+  1454→  1454→      width: calc(100% - 6mm);
+  1455→  1455→      margin: 1mm 3mm 0;
+  1456→  1456→      text-align: center;
+  1457→  1457→      font-size: 7px;
+  1458→  1458→      color: #888;
+  1459→  1459→      line-height: 1.5;
+  1460→  1460→    }
+  1461→  1461→
+  1462→  1462→    /* ===== SIGNATURES ===== */
+  1463→  1463→    .r-signatures {
+  1464→  1464→      display: flex;
+  1465→  1465→      justify-content: space-between;
+  1466→  1466→      width: calc(100% - 6mm);
+  1467→  1467→      margin: 3mm 3mm 2mm;
+  1468→  1468→    }
+  1469→  1469→
+  1470→  1470→    .r-sig {
+  1471→  1471→      text-align: center;
+  1472→  1472→      width: 30%;
+  1473→  1473→    }
+  1474→  1474→
+  1475→  1475→    .r-sig-line {
+  1476→  1476→      border-bottom: 1px dashed #000;
+  1477→  1477→      margin-bottom: 2px;
+  1478→  1478→      height: 14mm;
+  1479→  1479→    }
+  1480→  1480→
+  1481→  1481→    .r-sig-label {
+  1482→  1482→      font-size: 8px;
+  1483→  1483→      font-weight: 700;
+  1484→  1484→      color: #0D7C66;
+  1485→  1485→    }
+  1486→  1486→
+  1487→  1487→    .r-sig-name {
+  1488→  1488→      font-size: 7px;
+  1489→  1489→      color: #666;
+  1490→  1490→    }
+  1491→  1491→
+  1492→  1492→    /* ===== FOOTER ===== */
+  1493→  1493→    .r-footer {
+  1494→  1494→      text-align: center;
+  1495→  1495→      margin: 0 3mm;
+  1496→  1496→      padding: 2mm 0 3mm;
+  1497→  1497→      border-top: 2px solid #0D7C66;
+  1498→  1498→    }
+  1499→  1499→
+  1500→  1500→    .r-footer-msg {
+  1501→  1501→      font-size: 9px;
+  1502→  1502→      color: #555;
+  1503→  1503→    }
+  1504→  1504→
+  1505→  1505→    .r-footer-brand {
+  1506→  1506→      font-size: 7px;
+  1507→  1507→      color: #999;
+  1508→  1508→      margin-top: 1px;
+  1509→  1509→    }
+  1510→  1510→
+  1511→  1511→    /* ===== BOTTOM BRAND BAR ===== */
+  1512→  1512→    .r-bottom-bar {
+  1513→  1513→      background: #0D7C66;
+  1514→  1514→      height: 3mm;
+  1515→  1515→    }
+  1516→  1516→
+  1517→  1517→    /* ===== WATERMARK ===== */
+  1518→  1518→    .r-watermark {
+  1519→  1519→      position: absolute;
+  1520→  1520→      top: 50%;
+  1521→  1521→      left: 50%;
+  1522→  1522→      transform: translate(-50%, -50%) rotate(-25deg);
+  1523→  1523→      font-size: 40px;
+  1524→  1524→      font-weight: 800;
+  1525→  1525→      color: rgba(220, 50, 50, 0.1);
+  1526→  1526→      pointer-events: none;
+  1527→  1527→      z-index: 10;
+  1528→  1528→      white-space: nowrap;
+  1529→  1529→    }
+  1530→  1530→
+  1531→  1531→    /* ===== PRINT MEDIA ===== */
+  1532→  1532→    @media print {
+  1533→  1533→      body { margin: 0; background: white !important; }
+  1534→  1534→      .r-container { padding: 0; width: 100%; }
+  1535→  1535→      .r-watermark { color: rgba(0,0,0,0.12) !important; }
+  1536→  1536→
+  1537→  1537→      /* ===== HIGH-CONTRAST B&W OVERRIDES ===== */
+  1538→  1538→      .r-brand-bar {
+  1539→  1539→        background: #000 !important;
+  1540→  1540→      }
+  1541→  1541→      .r-logo-text {
+  1542→  1542→        color: #fff !important;
+  1543→  1543→      }
+  1544→  1544→      .r-brand-bar img {
+  1545→  1545→        filter: brightness(0) invert(1) !important;
+  1546→  1546→      }
+  1547→  1547→      .r-brand-name {
+  1548→  1548→        color: #fff !important;
+  1549→  1549→      }
+  1550→  1550→      .r-brand-info {
+  1551→  1551→        color: rgba(255,255,255,0.8) !important;
+  1552→  1552→      }
+  1553→  1553→      .r-brand-bar::after {
+  1554→  1554→        background: #666 !important;
+  1555→  1555→      }
+  1556→  1556→      .r-branch-badge {
+  1557→  1557→        background: #eee !important;
+  1558→  1558→        border-color: #999 !important;
+  1559→  1559→        color: #000 !important;
+  1560→  1560→      }
+  1561→  1561→      .r-title-box {
+  1562→  1562→        border-color: #000 !important;
+  1563→  1563→        background: #f5f5f5 !important;
+  1564→  1564→      }
+  1565→  1565→      .r-title-text {
+  1566→  1566→        color: #000 !important;
+  1567→  1567→      }
+  1568→  1568→      .r-sep-double {
+  1569→  1569→        border-top-color: #000 !important;
+  1570→  1570→      }
+  1571→  1571→      .r-sep-star {
+  1572→  1572→        color: #000 !important;
+  1573→  1573→      }
+  1574→  1574→      .r-sep-star::before,
+  1575→  1575→      .r-sep-star::after {
+  1576→  1576→        border-top-color: #000 !important;
+  1577→  1577→      }
+  1578→  1578→      .r-sep-thick {
+  1579→  1579→        border-top-color: #000 !important;
+  1580→  1580→      }
+  1581→  1581→      .r-info-label {
+  1582→  1582→        color: #000 !important;
+  1583→  1583→        font-weight: 800 !important;
+  1584→  1584→      }
+  1585→  1585→      .r-info-value {
+  1586→  1586→        color: #000 !important;
+  1587→  1587→        font-weight: 700 !important;
+  1588→  1588→      }
+  1589→  1589→      .r-items-table {
+  1590→  1590→        border-top-color: #000 !important;
+  1591→  1591→        border-bottom-color: #000 !important;
+  1592→  1592→      }
+  1593→  1593→      .r-items-table thead tr {
+  1594→  1594→        background: #000 !important;
+  1595→  1595→      }
+  1596→  1596→      .r-items-table thead th {
+  1597→  1597→        color: #fff !important;
+  1598→  1598→        border-left-color: rgba(255,255,255,0.3) !important;
+  1599→  1599→      }
+  1600→  1600→      .r-items-table tbody td {
+  1601→  1601→        border-bottom-color: #999 !important;
+  1602→  1602→        color: #000 !important;
+  1603→  1603→      }
+  1604→  1604→      .r-row-alt {
+  1605→  1605→        background: #f0f0f0 !important;
+  1606→  1606→      }
+  1607→  1607→      .r-col-num {
+  1608→  1608→        color: #555 !important;
+  1609→  1609→      }
+  1610→  1610→      .r-col-name {
+  1611→  1611→        color: #000 !important;
+  1612→  1612→        font-weight: 700 !important;
+  1613→  1613→      }
+  1614→  1614→      .r-col-uc {
+  1615→  1615→        color: #000 !important;
+  1616→  1616→        font-weight: 700 !important;
+  1617→  1617→      }
+  1618→  1618→      .r-col-total {
+  1619→  1619→        color: #000 !important;
+  1620→  1620→        font-weight: 800 !important;
+  1621→  1621→      }
+  1622→  1622→      .r-sub-row {
+  1623→  1623→        color: #000 !important;
+  1624→  1624→        font-weight: 700 !important;
+  1625→  1625→      }
+  1626→  1626→      .r-items-count .r-pieces-count {
+  1627→  1627→        color: #000 !important;
+  1628→  1628→        font-weight: 800 !important;
+  1629→  1629→      }
+  1630→  1630→      .r-total-label {
+  1631→  1631→        color: #333 !important;
+  1632→  1632→      }
+  1633→  1633→      .r-total-val {
+  1634→  1634→        color: #000 !important;
+  1635→  1635→        font-weight: 700 !important;
+  1636→  1636→      }
+  1637→  1637→      .r-grand-total-box {
+  1638→  1638→        border-color: #000 !important;
+  1639→  1639→        background: #000 !important;
+  1640→  1640→      }
+  1641→  1641→      .r-grand-total-box::before {
+  1642→  1642→        border-color: #666 !important;
+  1643→  1643→      }
+  1644→  1644→      .r-grand-label {
+  1645→  1645→        color: #fff !important;
+  1646→  1646→      }
+  1647→  1647→      .r-grand-value {
+  1648→  1648→        color: #fff !important;
+  1649→  1649→      }
+  1650→  1650→      .r-amount-words {
+  1651→  1651→        background: #eee !important;
+  1652→  1652→        border-color: #999 !important;
+  1653→  1653→        color: #000 !important;
+  1654→  1654→        font-weight: 700 !important;
+  1655→  1655→      }
+  1656→  1656→      .r-notes {
+  1657→  1657→        background: #f5f5f5 !important;
+  1658→  1658→        border-color: #999 !important;
+  1659→  1659→        color: #000 !important;
+  1660→  1660→      }
+  1661→  1661→      .r-cancel {
+  1662→  1662→        background: #f0f0f0 !important;
+  1663→  1663→        border-color: #999 !important;
+  1664→  1664→        color: #000 !important;
+  1665→  1665→      }
+  1666→  1666→      .r-reg-info {
+  1667→  1667→        color: #333 !important;
+  1668→  1668→      }
+  1669→  1669→      .r-sig-label {
+  1670→  1670→        color: #000 !important;
+  1671→  1671→        font-weight: 800 !important;
+  1672→  1672→      }
+  1673→  1673→      .r-sig-name {
+  1674→  1674→        color: #333 !important;
+  1675→  1675→      }
+  1676→  1676→      .r-footer {
+  1677→  1677→        border-top-color: #000 !important;
+  1678→  1678→      }
+  1679→  1679→      .r-footer-msg {
+  1680→  1680→        color: #333 !important;
+  1681→  1681→      }
+  1682→  1682→      .r-footer-brand {
+  1683→  1683→        color: #666 !important;
+  1684→  1684→      }
+  1685→  1685→      .r-bottom-bar {
+  1686→  1686→        background: #000 !important;
+  1687→  1687→      }
+  1688→  1688→    }
+  1689→  1689→  </style>
+  1690→  1690→</head>
+  1691→  1691→<body>
+  1692→  1692→  <div class="r-container" style="position:relative;">
+  1693→  1693→    ${watermarkHtml}
+  1694→  1694→
+  1695→  1695→    <!-- ===== TOP BRAND BAR ===== -->
+  1696→  1696→    <div class="r-brand-bar">
+  1697→  1697→      <div class="r-brand-logo">${logoSection}</div>
+  1698→  1698→      <div class="r-brand-name">${factoryName}</div>
+  1699→  1699→      ${branchInfoHtml}
+  1700→  1700→      ${regInfoHtml}
+  1701→  1701→    </div>
+  1702→  1702→
+  1703→  1703→    <!-- ===== BRANCH NAME BADGE ===== -->
+  1704→  1704→    <div class="r-branch-badge">فرع ${branchName}</div>
+  1705→  1705→
+  1706→  1706→    <!-- ===== INVOICE TITLE BOX ===== -->
+  1707→  1707→    <div class="r-title-box">
+  1708→  1708→      <span class="r-title-text">فاتورة صرف</span>
+  1709→  1709→    </div>
+  1710→  1710→
+  1711→  1711→    <hr class="r-sep-double">
+  1712→  1712→
+  1713→  1713→    <!-- ===== INVOICE INFO ===== -->
+  1714→  1714→    <table class="r-info-table">
+  1715→  1715→      <tr>
+  1716→  1716→        <td class="r-info-label">رقم الفاتورة</td>
+  1717→  1717→        <td class="r-info-value">${invoice.invoice_number}</td>
+  1718→  1718→      </tr>
+  1719→  1719→      <tr>
+  1720→  1720→        <td class="r-info-label">التاريخ</td>
+  1721→  1721→        <td class="r-info-value">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</td>
+  1722→  1722→      </tr>
+  1723→  1723→      <tr>
+  1724→  1724→        <td class="r-info-label">الفرع</td>
+  1725→  1725→        <td class="r-info-value">${branchName}</td>
+  1726→  1726→      </tr>
+  1727→  1727→      ${customerName ? `<tr><td class="r-info-label">العميل</td><td class="r-info-value">${customerName}</td></tr>` : ''}
+  1728→  1728→      ${invoice.receiver_name ? `<tr><td class="r-info-label">المستلم</td><td class="r-info-value">${invoice.receiver_name}</td></tr>` : ''}
+  1729→  1729→      ${invoice.driver_name ? `<tr><td class="r-info-label">السائق</td><td class="r-info-value">${invoice.driver_name}${invoice.driver_phone ? ` (${invoice.driver_phone})` : ''}</td></tr>` : ''}
+  1730→  1730→    </table>
+  1731→  1731→
+  1732→  1732→    <hr class="r-sep-double">
+  1733→  1733→
+  1734→  1734→    <!-- ===== ITEMS TABLE ===== -->
+  1735→  1735→    <table class="r-items-table">
+  1736→  1736→      <thead>
+  1737→  1737→        <tr>
+  1738→  1738→          <th>#</th>
+  1739→  1739→          <th class="r-th-name">الصنف</th>
+  1740→  1740→          <th>الكمية</th>
+  1741→  1741→          ${showUnitCount ? '<th>عدد</th>' : ''}
+  1742→  1742→          <th>السعر</th>
+  1743→  1743→          <th>الإجمالي</th>
+  1744→  1744→        </tr>
+  1745→  1745→      </thead>
+  1746→  1746→      <tbody>
+  1747→  1747→        ${itemsRows}
+  1748→  1748→      </tbody>
+  1749→  1749→    </table>
+  1750→  1750→
+  1751→  1751→    <!-- Items count -->
+  1752→  1752→    <div class="r-items-count">
+  1753→  1753→      <span>أصناف: ${items.length}</span>
+  1754→  1754→      ${showUnitCount ? `<span class="r-pieces-count">قطع: ${totalPieces.toLocaleString('ar-EG')}</span>` : ''}
+  1755→  1755→    </div>
+  1756→  1756→
+  1757→  1757→    <div class="r-sep-star">✦</div>
+  1758→  1758→
+  1759→  1759→    <!-- ===== TOTALS ===== -->
+  1760→  1760→    <div class="r-totals">
+  1761→  1761→      <div class="r-total-row">
+  1762→  1762→        <span class="r-total-label">المجموع الفرعي</span>
+  1763→  1763→        <span class="r-total-val">${formatCurrency(invoice.subtotal)}</span>
+  1764→  1764→      </div>
+  1765→  1765→      ${taxRow}
+  1766→  1766→    </div>
+  1767→  1767→
+  1768→  1768→    <!-- ===== GRAND TOTAL BOX ===== -->
+  1769→  1769→    <div class="r-grand-total-box">
+  1770→  1770→      <span class="r-grand-label">الإجمالي النهائي</span>
+  1771→  1771→      <span class="r-grand-value">${formatCurrency(invoice.total)}</span>
+  1772→  1772→    </div>
+  1773→  1773→
+  1774→  1774→    <!-- ===== AMOUNT IN WORDS ===== -->
+  1775→  1775→    <div class="r-amount-words">
+  1776→  1776→      المبلغ: ${numberToArabicWords(Number(invoice.total))}
+  1777→  1777→    </div>
+  1778→  1778→
+  1779→  1779→    <hr class="r-sep-dashed">
+  1780→  1780→
+  1781→  1781→    <!-- ===== NOTES ===== -->
+  1782→  1782→    ${notesHtml}
+  1783→  1783→    ${cancelHtml}
+  1784→  1784→
+  1785→  1785→    <!-- ===== REG INFO ===== -->
+  1786→  1786→    ${regInfoParts.length > 0 ? `<div class="r-reg-info">${regInfoParts.join(' | ')}</div>` : ''}
+  1787→  1787→
+  1788→  1788→    ${showSignatures ? `<!-- ===== SIGNATURES ===== -->
+  1789→  1789→    <div class="r-signatures">
+  1790→  1790→      <div class="r-sig">
+  1791→  1791→        <div class="r-sig-label">المحاسب</div>
+  1792→  1792→        <div class="r-sig-line"></div>
+  1793→  1793→        <div class="r-sig-name">${userFullName}</div>
+  1794→  1794→      </div>
+  1795→  1795→      <div class="r-sig">
+  1796→  1796→        <div class="r-sig-label">المستلم</div>
+  1797→  1797→        <div class="r-sig-line"></div>
+  1798→  1798→        <div class="r-sig-name">${invoice.receiver_name || ''}</div>
+  1799→  1799→      </div>
+  1800→  1800→      <div class="r-sig">
+  1801→  1801→        <div class="r-sig-label">السائق</div>
+  1802→  1802→        <div class="r-sig-line"></div>
+  1803→  1803→        <div class="r-sig-name">${invoice.driver_name || ''}</div>
+  1804→  1804→      </div>
+  1805→  1805→    </div>
+  1806→  1806→
+  1807→  1807→    <hr class="r-sep-star">` : ''}
+  1808→  1808→
+  1809→  1809→    <!-- ===== FOOTER ===== -->
+  1810→  1810→    <div class="r-footer">
+  1811→  1811→      <p class="r-footer-msg">${invoiceFooter}</p>
+  1812→  1812→      <p class="r-footer-brand">${factoryName} - نظام علي الصادق</p>
+  1813→  1813→    </div>
+  1814→  1814→
+  1815→  1815→    <!-- ===== BOTTOM BRAND BAR ===== -->
+  1816→  1816→    <div class="r-bottom-bar"></div>
+  1817→  1817→  </div>
+  1818→  1818→</body>
+  1819→  1819→</html>`;
+  1820→  1820→}
+  1821→  1821→
