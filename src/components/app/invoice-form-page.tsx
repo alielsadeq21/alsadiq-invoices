@@ -788,7 +788,7 @@ export default function InvoiceFormPage() {
             <p className="text-muted-foreground text-sm mt-0.5">{invoiceNumber}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => handleSave(false)}
@@ -1019,7 +1019,7 @@ export default function InvoiceFormPage() {
                       </Button>
                     </div>
                     {/* Row 2: Quantity, unit_count, price */}
-                    <div className={`grid gap-2 ${showUnitCount ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <div className={`grid gap-2 ${showUnitCount ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
                       <div className="space-y-1">
                         <Label className="text-[10px] text-muted-foreground">الكمية</Label>
                         <Input

@@ -781,7 +781,7 @@ export default function ReturnsPage() {
 
       {/* Return Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-lg">
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div

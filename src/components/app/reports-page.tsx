@@ -1597,7 +1597,7 @@ export default function ReportsPage() {
                               {formatCurrency(net)}
                             </span>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                             <div><span className="text-muted-foreground">إيرادات:</span> <span className="text-emerald-600 font-medium">{formatCurrency(b.revenue)}</span></div>
                             <div><span className="text-muted-foreground">مرتجعات:</span> <span className="text-red-600 font-medium">{formatCurrency(b.returns)}</span></div>
                             <div><span className="text-muted-foreground">مصروفات:</span> <span className="text-amber-600 font-medium">{formatCurrency(b.expenses)}</span></div>

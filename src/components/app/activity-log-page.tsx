@@ -144,10 +144,10 @@ export default function ActivityLogPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="كل العمليات" />
             </SelectTrigger>
             <SelectContent>

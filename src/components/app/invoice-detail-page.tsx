@@ -486,7 +486,8 @@ export default function InvoiceDetailPage() {
       </div>
 
       {/* Professional Invoice - Printable Area */}
-      <div ref={printRef}>
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div ref={printRef} className="min-w-[600px] sm:min-w-0">
         <div className="bg-white text-gray-900 rounded-xl shadow-lg overflow-hidden" style={{ fontFamily: "'Cairo', sans-serif" }}>
 
           {/* === HEADER === */}
@@ -691,6 +692,7 @@ export default function InvoiceDetailPage() {
             </p>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Cancel Dialog */}

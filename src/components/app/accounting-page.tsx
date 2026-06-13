@@ -567,7 +567,7 @@ export default function AccountingPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canExport && (
               <Button variant="outline" onClick={handleExport} className="gap-2">
                 <ArrowUpDown className="w-4 h-4" />
