@@ -1,0 +1,2002 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState, useCallback } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { ChartOfAccount, JournalEntry, JournalEntryLine } from '@/lib/types';
+     7→import { formatCurrency, formatDate, getAccountTypeLabel, getAccountTypeColor } from '@/lib/utils';
+     8→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     9→import { Button } from '@/components/ui/button';
+    10→import { Input } from '@/components/ui/input';
+    11→import { Label } from '@/components/ui/label';
+    12→import { Badge } from '@/components/ui/badge';
+    13→import {
+    14→  Select,
+    15→  SelectContent,
+    16→  SelectItem,
+    17→  SelectTrigger,
+    18→  SelectValue,
+    19→} from '@/components/ui/select';
+    20→import {
+    21→  Table,
+    22→  TableBody,
+    23→  TableCell,
+    24→  TableHead,
+    25→  TableHeader,
+    26→  TableRow,
+    27→} from '@/components/ui/table';
+    28→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    29→import { ScrollArea } from '@/components/ui/scroll-area';
+    30→import { Separator } from '@/components/ui/separator';
+    31→import {
+    32→  BookOpen,
+    33→  FileText,
+    34→  Scale,
+    35→  TrendingUp,
+    36→  PieChart,
+    37→  Download,
+    38→  Search,
+    39→  Calendar,
+    40→  Printer,
+    41→  ChevronDown,
+    42→  ChevronUp,
+    43→  Loader2,
+    44→  X,
+    45→  CheckCircle2,
+    46→  AlertCircle,
+    47→  Hash,
+    48→  Landmark,
+    49→  CircleDollarSign,
+    50→} from 'lucide-react';
+    51→import { toast } from 'sonner';
+    52→import { motion } from 'framer-motion';
+    53→
+    54→// Extended line type for queries that include account_id
+    55→interface JournalEntryLineWithAccount extends JournalEntryLine {
+    56→  account_id: string | null;
+    57→}
+    58→
+    59→// Account balance summary for trial balance & reports
+    60→interface AccountBalanceSummary {
+    61→  account_id: string | null;
+    62→  account_name: string;
+    63→  account_type: string;
+    64→  total_debit: number;
+    65→  total_credit: number;
+    66→  net_balance: number;
+    67→}
+    68→
+    69→// Ledger line with running balance
+    70→interface LedgerLine {
+    71→  id: string;
+    72→  entry_number: string;
+    73→  entry_date: string;
+    74→  description: string | null;
+    75→  debit: number;
+    76→  credit: number;
+    77→  running_balance: number;
+    78→}
+    79→
+    80→export default function AccountingReportsPage() {
+    81→  const { hasPermission, isAdmin } = useAppStore();
+    82→
+    83→  const [activeTab, setActiveTab] = useState('journal');
+    84→  const [loading, setLoading] = useState(false);
+    85→
+    86→  // Permission checks
+    87→  const canView = hasPermission('accounting_reports', 'view');
+    88→  const canExport = hasPermission('accounting_reports', 'export');
+    89→
+    90→  // ==================== GENERAL JOURNAL STATE ====================
+    91→  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+    92→  const [journalLines, setJournalLines] = useState<Record<string, JournalEntryLine[]>>({});
+    93→  const [journalLoading, setJournalLoading] = useState(false);
+    94→  const [journalSearch, setJournalSearch] = useState('');
+    95→  const [journalDateFrom, setJournalDateFrom] = useState('');
+    96→  const [journalDateTo, setJournalDateTo] = useState('');
+    97→  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
+    98→
+    99→  // ==================== GENERAL LEDGER STATE ====================
+   100→  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+   101→  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+   102→  const [ledgerLines, setLedgerLines] = useState<LedgerLine[]>([]);
+   103→  const [ledgerLoading, setLedgerLoading] = useState(false);
+   104→  const [ledgerDateFrom, setLedgerDateFrom] = useState('');
+   105→  const [ledgerDateTo, setLedgerDateTo] = useState('');
+   106→
+   107→  // ==================== TRIAL BALANCE STATE ====================
+   108→  const [trialBalanceData, setTrialBalanceData] = useState<AccountBalanceSummary[]>([]);
+   109→  const [trialLoading, setTrialLoading] = useState(false);
+   110→  const [trialDateFrom, setTrialDateFrom] = useState('');
+   111→  const [trialDateTo, setTrialDateTo] = useState('');
+   112→
+   113→  // ==================== INCOME STATEMENT STATE ====================
+   114→  const [incomeData, setIncomeData] = useState<AccountBalanceSummary[]>([]);
+   115→  const [incomeLoading, setIncomeLoading] = useState(false);
+   116→  const [incomeDateFrom, setIncomeDateFrom] = useState('');
+   117→  const [incomeDateTo, setIncomeDateTo] = useState('');
+   118→
+   119→  // ==================== BALANCE SHEET STATE ====================
+   120→  const [balanceSheetData, setBalanceSheetData] = useState<AccountBalanceSummary[]>([]);
+   121→  const [balanceSheetLoading, setBalanceSheetLoading] = useState(false);
+   122→  const [balanceSheetDate, setBalanceSheetDate] = useState('');
+   123→
+   124→  // ==================== LOAD ACCOUNTS ====================
+   125→  useEffect(() => {
+   126→    loadAccounts();
+   127→  }, []);
+   128→
+   129→  const loadAccounts = async () => {
+   130→    try {
+   131→      const { data, error } = await supabase
+   132→        .from('chart_of_accounts')
+   133→        .select('*')
+   134→        .eq('is_active', true)
+   135→        .order('code', { ascending: true });
+   136→
+   137→      if (!error && data) {
+   138→        setAccounts(data as ChartOfAccount[]);
+   139→      }
+   140→    } catch (err) {
+   141→      console.error('Error loading accounts:', err);
+   142→    }
+   143→  };
+   144→
+   145→  // ==================== GENERAL JOURNAL ====================
+   146→  useEffect(() => {
+   147→    if (activeTab === 'journal') {
+   148→      loadJournalEntries();
+   149→    }
+   150→  }, [activeTab, journalSearch, journalDateFrom, journalDateTo]);
+   151→
+   152→  const loadJournalEntries = async () => {
+   153→    setJournalLoading(true);
+   154→    try {
+   155→      let query = supabase
+   156→        .from('journal_entries')
+   157→        .select('*')
+   158→        .eq('is_posted', true)
+   159→        .order('entry_date', { ascending: false });
+   160→
+   161→      if (journalSearch) {
+   162→        query = query.or(
+   163→          `entry_number.ilike.%${journalSearch}%,description.ilike.%${journalSearch}%`
+   164→        );
+   165→      }
+   166→      if (journalDateFrom) {
+   167→        query = query.gte('entry_date', journalDateFrom);
+   168→      }
+   169→      if (journalDateTo) {
+   170→        query = query.lte('entry_date', journalDateTo);
+   171→      }
+   172→
+   173→      const { data, error } = await query;
+   174→      if (!error && data) {
+   175→        const entries = data as JournalEntry[];
+   176→        setJournalEntries(entries);
+   177→
+   178→        // Load lines for all entries
+   179→        if (entries.length > 0) {
+   180→          const entryIds = entries.map((e) => e.id);
+   181→          const { data: linesData, error: linesError } = await supabase
+   182→            .from('journal_entry_lines')
+   183→            .select('*')
+   184→            .in('journal_entry_id', entryIds)
+   185→            .order('created_at', { ascending: true });
+   186→
+   187→          if (!linesError && linesData) {
+   188→            const linesMap: Record<string, JournalEntryLine[]> = {};
+   189→            (linesData as JournalEntryLine[]).forEach((line) => {
+   190→              if (!linesMap[line.journal_entry_id]) {
+   191→                linesMap[line.journal_entry_id] = [];
+   192→              }
+   193→              linesMap[line.journal_entry_id].push(line);
+   194→            });
+   195→            setJournalLines(linesMap);
+   196→          }
+   197→        }
+   198→      }
+   199→    } catch (err) {
+   200→      console.error('Error loading journal entries:', err);
+   201→      toast.error('حدث خطأ أثناء تحميل بيانات دفتر اليومية');
+   202→    } finally {
+   203→      setJournalLoading(false);
+   204→    }
+   205→  };
+   206→
+   207→  const toggleEntryExpand = (entryId: string) => {
+   208→    setExpandedEntries((prev) => {
+   209→      const next = new Set(prev);
+   210→      if (next.has(entryId)) {
+   211→        next.delete(entryId);
+   212→      } else {
+   213→        next.add(entryId);
+   214→      }
+   215→      return next;
+   216→    });
+   217→  };
+   218→
+   219→  // ==================== GENERAL LEDGER ====================
+   220→  useEffect(() => {
+   221→    if (activeTab === 'ledger' && selectedAccountId) {
+   222→      loadLedgerData();
+   223→    }
+   224→  }, [activeTab, selectedAccountId, ledgerDateFrom, ledgerDateTo]);
+   225→
+   226→  const loadLedgerData = async () => {
+   227→    if (!selectedAccountId) return;
+   228→
+   229→    const account = accounts.find((a) => a.id === selectedAccountId);
+   230→    if (!account) return;
+   231→
+   232→    setLedgerLoading(true);
+   233→    try {
+   234→      // Get journal entry lines for this account
+   235→      let entryQuery = supabase
+   236→        .from('journal_entries')
+   237→        .select('id, entry_number, entry_date, is_posted')
+   238→        .eq('is_posted', true);
+   239→
+   240→      if (ledgerDateFrom) {
+   241→        entryQuery = entryQuery.gte('entry_date', ledgerDateFrom);
+   242→      }
+   243→      if (ledgerDateTo) {
+   244→        entryQuery = entryQuery.lte('entry_date', ledgerDateTo);
+   245→      }
+   246→
+   247→      const { data: entries, error: entriesError } = await entryQuery;
+   248→
+   249→      if (entriesError || !entries) {
+   250→        throw entriesError;
+   251→      }
+   252→
+   253→      if (entries.length === 0) {
+   254→        setLedgerLines([]);
+   255→        setLedgerLoading(false);
+   256→        return;
+   257→      }
+   258→
+   259→      const entryIds = entries.map((e) => e.id);
+   260→
+   261→      // Get lines for these entries that match the account
+   262→      const { data: linesData, error: linesError } = await supabase
+   263→        .from('journal_entry_lines')
+   264→        .select('*')
+   265→        .in('journal_entry_id', entryIds)
+   266→        .order('created_at', { ascending: true });
+   267→
+   268→      if (!linesError && linesData) {
+   269→        // Filter lines by account name (matching by account_name since account_id may be null)
+   270→        const accountName = account.name;
+   271→        const filteredLines = (linesData as JournalEntryLineWithAccount[]).filter(
+   272→          (line) => line.account_name === accountName || line.account_id === account.id
+   273→        );
+   274→
+   275→        // Build entry map
+   276→        const entryMap = new Map(entries.map((e) => [e.id, e]));
+   277→
+   278→        // Build ledger lines with running balance
+   279→        const ledgerData: LedgerLine[] = [];
+   280→        let runningBalance = 0;
+   281→
+   282→        // Sort by entry date
+   283→        filteredLines.sort((a, b) => {
+   284→          const entryA = entryMap.get(a.journal_entry_id);
+   285→          const entryB = entryMap.get(b.journal_entry_id);
+   286→          if (entryA && entryB) {
+   287→            const dateCompare = entryA.entry_date.localeCompare(entryB.entry_date);
+   288→            if (dateCompare !== 0) return dateCompare;
+   289→          }
+   290→          return a.created_at.localeCompare(b.created_at);
+   291→        });
+   292→
+   293→        for (const line of filteredLines) {
+   294→          const entry = entryMap.get(line.journal_entry_id);
+   295→          // For asset/expense: debit increases, credit decreases
+   296→          // For liability/equity/revenue: credit increases, debit decreases
+   297→          const isDebitNature = account.account_type === 'asset' || account.account_type === 'expense';
+   298→          if (isDebitNature) {
+   299→            runningBalance += line.debit - line.credit;
+   300→          } else {
+   301→            runningBalance += line.credit - line.debit;
+   302→          }
+   303→
+   304→          ledgerData.push({
+   305→            id: line.id,
+   306→            entry_number: entry?.entry_number || '',
+   307→            entry_date: entry?.entry_date || '',
+   308→            description: line.description,
+   309→            debit: line.debit,
+   310→            credit: line.credit,
+   311→            running_balance: runningBalance,
+   312→          });
+   313→        }
+   314→
+   315→        setLedgerLines(ledgerData);
+   316→      }
+   317→    } catch (err) {
+   318→      console.error('Error loading ledger data:', err);
+   319→      toast.error('حدث خطأ أثناء تحميل بيانات دفتر الأستاذ');
+   320→    } finally {
+   321→      setLedgerLoading(false);
+   322→    }
+   323→  };
+   324→
+   325→  // ==================== TRIAL BALANCE ====================
+   326→  useEffect(() => {
+   327→    if (activeTab === 'trial') {
+   328→      loadTrialBalance();
+   329→    }
+   330→  }, [activeTab, trialDateFrom, trialDateTo]);
+   331→
+   332→  const loadTrialBalance = async () => {
+   333→    setTrialLoading(true);
+   334→    try {
+   335→      let entryQuery = supabase
+   336→        .from('journal_entries')
+   337→        .select('id')
+   338→        .eq('is_posted', true);
+   339→
+   340→      if (trialDateFrom) {
+   341→        entryQuery = entryQuery.gte('entry_date', trialDateFrom);
+   342→      }
+   343→      if (trialDateTo) {
+   344→        entryQuery = entryQuery.lte('entry_date', trialDateTo);
+   345→      }
+   346→
+   347→      const { data: entries, error: entriesError } = await entryQuery;
+   348→      if (entriesError || !entries || entries.length === 0) {
+   349→        setTrialBalanceData([]);
+   350→        setTrialLoading(false);
+   351→        return;
+   352→      }
+   353→
+   354→      const entryIds = entries.map((e) => e.id);
+   355→
+   356→      // Get all lines grouped by account
+   357→      const { data: linesData, error: linesError } = await supabase
+   358→        .from('journal_entry_lines')
+   359→        .select('account_name, account_id, debit, credit')
+   360→        .in('journal_entry_id', entryIds);
+   361→
+   362→      if (!linesError && linesData) {
+   363→        // Group by account_name
+   364→        const accountMap = new Map<
+   365→          string,
+   366→          {
+   367→            account_id: string | null;
+   368→            account_name: string;
+   369→            total_debit: number;
+   370→            total_credit: number;
+   371→          }
+   372→        >();
+   373→
+   374→        for (const line of linesData as JournalEntryLineWithAccount[]) {
+   375→          const key = line.account_name;
+   376→          const existing = accountMap.get(key);
+   377→          if (existing) {
+   378→            existing.total_debit += line.debit;
+   379→            existing.total_credit += line.credit;
+   380→          } else {
+   381→            accountMap.set(key, {
+   382→              account_id: line.account_id,
+   383→              account_name: line.account_name,
+   384→              total_debit: line.debit,
+   385→              total_credit: line.credit,
+   386→            });
+   387→          }
+   388→        }
+   389→
+   390→        // Map to account types
+   391→        const accountNameToType = new Map<string, string>();
+   392→        accounts.forEach((a) => {
+   393→          accountNameToType.set(a.name, a.account_type);
+   394→        });
+   395→
+   396→        const summary: AccountBalanceSummary[] = [];
+   397→        accountMap.forEach((value) => {
+   398→          const accountType = accountNameToType.get(value.account_name) || 'expense';
+   399→          summary.push({
+   400→            account_id: value.account_id,
+   401→            account_name: value.account_name,
+   402→            account_type: accountType,
+   403→            total_debit: value.total_debit,
+   404→            total_credit: value.total_credit,
+   405→            net_balance: value.total_debit - value.total_credit,
+   406→          });
+   407→        });
+   408→
+   409→        // Sort by account type then name
+   410→        const typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+   411→        summary.sort((a, b) => {
+   412→          const typeA = typeOrder.indexOf(a.account_type);
+   413→          const typeB = typeOrder.indexOf(b.account_type);
+   414→          if (typeA !== typeB) return typeA - typeB;
+   415→          return a.account_name.localeCompare(b.account_name, 'ar');
+   416→        });
+   417→
+   418→        setTrialBalanceData(summary);
+   419→      }
+   420→    } catch (err) {
+   421→      console.error('Error loading trial balance:', err);
+   422→      toast.error('حدث خطأ أثناء تحميل ميزان المراجعة');
+   423→    } finally {
+   424→      setTrialLoading(false);
+   425→    }
+   426→  };
+   427→
+   428→  // ==================== INCOME STATEMENT ====================
+   429→  useEffect(() => {
+   430→    if (activeTab === 'income') {
+   431→      loadIncomeStatement();
+   432→    }
+   433→  }, [activeTab, incomeDateFrom, incomeDateTo]);
+   434→
+   435→  const loadIncomeStatement = async () => {
+   436→    setIncomeLoading(true);
+   437→    try {
+   438→      let entryQuery = supabase
+   439→        .from('journal_entries')
+   440→        .select('id')
+   441→        .eq('is_posted', true);
+   442→
+   443→      if (incomeDateFrom) {
+   444→        entryQuery = entryQuery.gte('entry_date', incomeDateFrom);
+   445→      }
+   446→      if (incomeDateTo) {
+   447→        entryQuery = entryQuery.lte('entry_date', incomeDateTo);
+   448→      }
+   449→
+   450→      const { data: entries, error: entriesError } = await entryQuery;
+   451→      if (entriesError || !entries || entries.length === 0) {
+   452→        setIncomeData([]);
+   453→        setIncomeLoading(false);
+   454→        return;
+   455→      }
+   456→
+   457→      const entryIds = entries.map((e) => e.id);
+   458→
+   459→      const { data: linesData, error: linesError } = await supabase
+   460→        .from('journal_entry_lines')
+   461→        .select('account_name, account_id, debit, credit')
+   462→        .in('journal_entry_id', entryIds);
+   463→
+   464→      if (!linesError && linesData) {
+   465→        const accountMap = new Map<
+   466→          string,
+   467→          {
+   468→            account_id: string | null;
+   469→            account_name: string;
+   470→            total_debit: number;
+   471→            total_credit: number;
+   472→          }
+   473→        >();
+   474→
+   475→        for (const line of linesData as JournalEntryLineWithAccount[]) {
+   476→          const key = line.account_name;
+   477→          const existing = accountMap.get(key);
+   478→          if (existing) {
+   479→            existing.total_debit += line.debit;
+   480→            existing.total_credit += line.credit;
+   481→          } else {
+   482→            accountMap.set(key, {
+   483→              account_id: line.account_id,
+   484→              account_name: line.account_name,
+   485→              total_debit: line.debit,
+   486→              total_credit: line.credit,
+   487→            });
+   488→          }
+   489→        }
+   490→
+   491→        const accountNameToType = new Map<string, string>();
+   492→        accounts.forEach((a) => {
+   493→          accountNameToType.set(a.name, a.account_type);
+   494→        });
+   495→
+   496→        // Filter only revenue and expense accounts
+   497→        const summary: AccountBalanceSummary[] = [];
+   498→        accountMap.forEach((value) => {
+   499→          const accountType = accountNameToType.get(value.account_name);
+   500→          if (accountType === 'revenue' || accountType === 'expense') {
+   501→            summary.push({
+   502→              account_id: value.account_id,
+   503→              account_name: value.account_name,
+   504→              account_type: accountType || 'expense',
+   505→              total_debit: value.total_debit,
+   506→              total_credit: value.total_credit,
+   507→              net_balance: value.total_debit - value.total_credit,
+   508→            });
+   509→          }
+   510→        });
+   511→
+   512→        // Sort: revenue first, then expenses
+   513→        summary.sort((a, b) => {
+   514→          if (a.account_type === 'revenue' && b.account_type !== 'revenue') return -1;
+   515→          if (a.account_type !== 'revenue' && b.account_type === 'revenue') return 1;
+   516→          return a.account_name.localeCompare(b.account_name, 'ar');
+   517→        });
+   518→
+   519→        setIncomeData(summary);
+   520→      }
+   521→    } catch (err) {
+   522→      console.error('Error loading income statement:', err);
+   523→      toast.error('حدث خطأ أثناء تحميل قائمة الدخل');
+   524→    } finally {
+   525→      setIncomeLoading(false);
+   526→    }
+   527→  };
+   528→
+   529→  // ==================== BALANCE SHEET ====================
+   530→  useEffect(() => {
+   531→    if (activeTab === 'balance-sheet') {
+   532→      loadBalanceSheet();
+   533→    }
+   534→  }, [activeTab, balanceSheetDate]);
+   535→
+   536→  const loadBalanceSheet = async () => {
+   537→    setBalanceSheetLoading(true);
+   538→    try {
+   539→      let entryQuery = supabase
+   540→        .from('journal_entries')
+   541→        .select('id')
+   542→        .eq('is_posted', true);
+   543→
+   544→      if (balanceSheetDate) {
+   545→        entryQuery = entryQuery.lte('entry_date', balanceSheetDate);
+   546→      }
+   547→
+   548→      const { data: entries, error: entriesError } = await entryQuery;
+   549→      if (entriesError || !entries || entries.length === 0) {
+   550→        setBalanceSheetData([]);
+   551→        setBalanceSheetLoading(false);
+   552→        return;
+   553→      }
+   554→
+   555→      const entryIds = entries.map((e) => e.id);
+   556→
+   557→      const { data: linesData, error: linesError } = await supabase
+   558→        .from('journal_entry_lines')
+   559→        .select('account_name, account_id, debit, credit')
+   560→        .in('journal_entry_id', entryIds);
+   561→
+   562→      if (!linesError && linesData) {
+   563→        const accountMap = new Map<
+   564→          string,
+   565→          {
+   566→            account_id: string | null;
+   567→            account_name: string;
+   568→            total_debit: number;
+   569→            total_credit: number;
+   570→          }
+   571→        >();
+   572→
+   573→        for (const line of linesData as JournalEntryLineWithAccount[]) {
+   574→          const key = line.account_name;
+   575→          const existing = accountMap.get(key);
+   576→          if (existing) {
+   577→            existing.total_debit += line.debit;
+   578→            existing.total_credit += line.credit;
+   579→          } else {
+   580→            accountMap.set(key, {
+   581→              account_id: line.account_id,
+   582→              account_name: line.account_name,
+   583→              total_debit: line.debit,
+   584→              total_credit: line.credit,
+   585→            });
+   586→          }
+   587→        }
+   588→
+   589→        const accountNameToType = new Map<string, string>();
+   590→        accounts.forEach((a) => {
+   591→          accountNameToType.set(a.name, a.account_type);
+   592→        });
+   593→
+   594→        // Filter asset, liability, equity accounts
+   595→        const summary: AccountBalanceSummary[] = [];
+   596→        accountMap.forEach((value) => {
+   597→          const accountType = accountNameToType.get(value.account_name);
+   598→          if (
+   599→            accountType === 'asset' ||
+   600→            accountType === 'liability' ||
+   601→            accountType === 'equity'
+   602→          ) {
+   603→            summary.push({
+   604→              account_id: value.account_id,
+   605→              account_name: value.account_name,
+   606→              account_type: accountType || 'asset',
+   607→              total_debit: value.total_debit,
+   608→              total_credit: value.total_credit,
+   609→              net_balance: value.total_debit - value.total_credit,
+   610→            });
+   611→          }
+   612→        });
+   613→
+   614→        // Sort by type
+   615→        const typeOrder = ['asset', 'liability', 'equity'];
+   616→        summary.sort((a, b) => {
+   617→          const typeA = typeOrder.indexOf(a.account_type);
+   618→          const typeB = typeOrder.indexOf(b.account_type);
+   619→          if (typeA !== typeB) return typeA - typeB;
+   620→          return a.account_name.localeCompare(b.account_name, 'ar');
+   621→        });
+   622→
+   623→        setBalanceSheetData(summary);
+   624→      }
+   625→    } catch (err) {
+   626→      console.error('Error loading balance sheet:', err);
+   627→      toast.error('حدث خطأ أثناء تحميل الميزانية العمومية');
+   628→    } finally {
+   629→      setBalanceSheetLoading(false);
+   630→    }
+   631→  };
+   632→
+   633→  // ==================== COMPUTED VALUES ====================
+   634→  const totalJournalDebit = journalEntries.reduce((s, e) => s + e.total_debit, 0);
+   635→  const totalJournalCredit = journalEntries.reduce((s, e) => s + e.total_credit, 0);
+   636→
+   637→  const trialTotalDebit = trialBalanceData.reduce((s, a) => s + a.total_debit, 0);
+   638→  const trialTotalCredit = trialBalanceData.reduce((s, a) => s + a.total_credit, 0);
+   639→
+   640→  const revenueAccounts = incomeData.filter((a) => a.account_type === 'revenue');
+   641→  const expenseAccounts = incomeData.filter((a) => a.account_type === 'expense');
+   642→  const totalRevenue = revenueAccounts.reduce((s, a) => s + (a.total_credit - a.total_debit), 0);
+   643→  const totalExpenses = expenseAccounts.reduce((s, a) => s + (a.total_debit - a.total_credit), 0);
+   644→  const netProfit = totalRevenue - totalExpenses;
+   645→
+   646→  const assetAccounts = balanceSheetData.filter((a) => a.account_type === 'asset');
+   647→  const liabilityAccounts = balanceSheetData.filter((a) => a.account_type === 'liability');
+   648→  const equityAccounts = balanceSheetData.filter((a) => a.account_type === 'equity');
+   649→  const totalAssets = assetAccounts.reduce((s, a) => s + (a.total_debit - a.total_credit), 0);
+   650→  const totalLiabilities = liabilityAccounts.reduce((s, a) => s + (a.total_credit - a.total_debit), 0);
+   651→  const totalEquity = equityAccounts.reduce((s, a) => s + (a.total_credit - a.total_debit), 0);
+   652→
+   653→  // Balance sheet check: need to include net profit from income statement
+   654→  const balanceSheetNetProfit = (() => {
+   655→    // Recalculate net profit for balance sheet date range
+   656→    const revAccounts = balanceSheetData.filter(
+   657→      (a) => a.account_type === 'revenue'
+   658→    );
+   659→    const expAccounts = balanceSheetData.filter(
+   660→      (a) => a.account_type === 'expense'
+   661→    );
+   662→    const rev = revAccounts.reduce((s, a) => s + (a.total_credit - a.total_debit), 0);
+   663→    const exp = expAccounts.reduce((s, a) => s + (a.total_debit - a.total_credit), 0);
+   664→    return rev - exp;
+   665→  })();
+   666→  const liabilitiesEquityProfit = totalLiabilities + totalEquity + balanceSheetNetProfit;
+   667→  const balanceSheetBalanced = Math.abs(totalAssets - liabilitiesEquityProfit) < 0.01;
+   668→
+   669→  // ==================== HELPER: Account type border color ====================
+   670→  const getAccountTypeBorderColor = (type: string) => {
+   671→    const colors: Record<string, string> = {
+   672→      asset: '#3b82f6',
+   673→      liability: '#ef4444',
+   674→      equity: '#8b5cf6',
+   675→      revenue: '#10b981',
+   676→      expense: '#f59e0b',
+   677→    };
+   678→    return colors[type] || '#f59e0b';
+   679→  };
+   680→
+   681→  // ==================== EXPORT FUNCTIONS ====================
+   682→  const exportCSV = (headers: string[], rows: string[][], filename: string) => {
+   683→    const BOM = '\uFEFF';
+   684→    const csvRows = [headers.join(',')];
+   685→    rows.forEach((row) => {
+   686→      csvRows.push(row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','));
+   687→    });
+   688→    const blob = new Blob([BOM + csvRows.join('\n')], {
+   689→      type: 'text/csv;charset=utf-8;',
+   690→    });
+   691→    const url = URL.createObjectURL(blob);
+   692→    const link = document.createElement('a');
+   693→    link.href = url;
+   694→    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+   695→    link.click();
+   696→    URL.revokeObjectURL(url);
+   697→    toast.success('تم تصدير البيانات بنجاح');
+   698→  };
+   699→
+   700→  const exportJournal = () => {
+   701→    if (journalEntries.length === 0) {
+   702→      toast.error('لا توجد بيانات للتصدير');
+   703→      return;
+   704→    }
+   705→    const headers = ['رقم القيد', 'التاريخ', 'البيان', 'مدين', 'دائن', 'ملاحظات'];
+   706→    const rows: string[][] = [];
+   707→    journalEntries.forEach((entry) => {
+   708→      rows.push([
+   709→        entry.entry_number,
+   710→        entry.entry_date,
+   711→        entry.description,
+   712→        entry.total_debit.toFixed(2),
+   713→        entry.total_credit.toFixed(2),
+   714→        entry.notes || '',
+   715→      ]);
+   716→      const lines = journalLines[entry.id] || [];
+   717→      lines.forEach((line) => {
+   718→        rows.push([
+   719→          '',
+   720→          '',
+   721→          line.account_name,
+   722→          line.debit.toFixed(2),
+   723→          line.credit.toFixed(2),
+   724→          line.description || '',
+   725→        ]);
+   726→      });
+   727→      rows.push(['', '', '', '', '', '']);
+   728→    });
+   729→    exportCSV(headers, rows, 'دفتر_اليومية');
+   730→  };
+   731→
+   732→  const exportLedger = () => {
+   733→    if (ledgerLines.length === 0) {
+   734→      toast.error('لا توجد بيانات للتصدير');
+   735→      return;
+   736→    }
+   737→    const account = accounts.find((a) => a.id === selectedAccountId);
+   738→    const headers = ['رقم القيد', 'التاريخ', 'البيان', 'مدين', 'دائن', 'الرصيد'];
+   739→    const rows = ledgerLines.map((line) => [
+   740→      line.entry_number,
+   741→      line.entry_date,
+   742→      line.description || '',
+   743→      line.debit.toFixed(2),
+   744→      line.credit.toFixed(2),
+   745→      line.running_balance.toFixed(2),
+   746→    ]);
+   747→    exportCSV(headers, rows, `دفتر_الأستاذ_${account?.name || ''}`);
+   748→  };
+   749→
+   750→  const exportTrialBalance = () => {
+   751→    if (trialBalanceData.length === 0) {
+   752→      toast.error('لا توجد بيانات للتصدير');
+   753→      return;
+   754→    }
+   755→    const headers = ['اسم الحساب', 'نوع الحساب', 'إجمالي المدين', 'إجمالي الدائن', 'صافي الرصيد'];
+   756→    const rows = trialBalanceData.map((a) => [
+   757→      a.account_name,
+   758→      getAccountTypeLabel(a.account_type),
+   759→      a.total_debit.toFixed(2),
+   760→      a.total_credit.toFixed(2),
+   761→      a.net_balance.toFixed(2),
+   762→    ]);
+   763→    rows.push(['الإجمالي', '', trialTotalDebit.toFixed(2), trialTotalCredit.toFixed(2), '']);
+   764→    exportCSV(headers, rows, 'ميزان_المراجعة');
+   765→  };
+   766→
+   767→  const exportIncomeStatement = () => {
+   768→    if (incomeData.length === 0) {
+   769→      toast.error('لا توجد بيانات للتصدير');
+   770→      return;
+   771→    }
+   772→    const headers = ['اسم الحساب', 'نوع الحساب', 'إجمالي المدين', 'إجمالي الدائن', 'صافي الرصيد'];
+   773→    const rows = incomeData.map((a) => [
+   774→      a.account_name,
+   775→      getAccountTypeLabel(a.account_type),
+   776→      a.total_debit.toFixed(2),
+   777→      a.total_credit.toFixed(2),
+   778→      a.net_balance.toFixed(2),
+   779→    ]);
+   780→    rows.push(['', '', '', '', '']);
+   781→    rows.push(['صافي الربح/الخسارة', '', '', '', netProfit.toFixed(2)]);
+   782→    exportCSV(headers, rows, 'قائمة_الدخل');
+   783→  };
+   784→
+   785→  const exportBalanceSheet = () => {
+   786→    if (balanceSheetData.length === 0) {
+   787→      toast.error('لا توجد بيانات للتصدير');
+   788→      return;
+   789→    }
+   790→    const headers = ['اسم الحساب', 'نوع الحساب', 'إجمالي المدين', 'إجمالي الدائن', 'صافي الرصيد'];
+   791→    const rows = balanceSheetData.map((a) => [
+   792→      a.account_name,
+   793→      getAccountTypeLabel(a.account_type),
+   794→      a.total_debit.toFixed(2),
+   795→      a.total_credit.toFixed(2),
+   796→      a.net_balance.toFixed(2),
+   797→    ]);
+   798→    rows.push(['', '', '', '', '']);
+   799→    rows.push(['إجمالي الأصول', '', '', '', totalAssets.toFixed(2)]);
+   800→    rows.push(['إجمالي الخصوم', '', '', '', totalLiabilities.toFixed(2)]);
+   801→    rows.push(['إجمالي حقوق الملكية', '', '', '', totalEquity.toFixed(2)]);
+   802→    rows.push(['صافي الربح', '', '', '', balanceSheetNetProfit.toFixed(2)]);
+   803→    exportCSV(headers, rows, 'الميزانية_العمومية');
+   804→  };
+   805→
+   806→  const handlePrint = () => {
+   807→    window.print();
+   808→  };
+   809→
+   810→  // ==================== PERMISSION CHECK ====================
+   811→  if (!canView) {
+   812→    return (
+   813→      <div className="flex flex-col items-center justify-center py-20 px-4">
+   814→        <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   815→          <BookOpen className="w-12 h-12 text-white" />
+   816→        </div>
+   817→        <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
+   818→        <p className="text-muted-foreground text-sm text-center">
+   819→          ليس لديك صلاحية لعرض هذه الصفحة
+   820→        </p>
+   821→      </div>
+   822→    );
+   823→  }
+   824→
+   825→  // ==================== RENDER ====================
+   826→  return (
+   827→    <div className="space-y-6">
+   828→      {/* Header */}
+   829→      <motion.div
+   830→        initial={{ opacity: 0, y: -10 }}
+   831→        animate={{ opacity: 1, y: 0 }}
+   832→        transition={{ duration: 0.3 }}
+   833→      >
+   834→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   835→          <div className="flex items-center gap-3">
+   836→            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   837→              <BookOpen className="w-6 h-6 text-white" />
+   838→            </div>
+   839→            <div>
+   840→              <h1 className="text-2xl font-bold">التقارير المحاسبية</h1>
+   841→              <p className="text-muted-foreground text-sm mt-0.5">
+   842→                دفتر اليومية • دفتر الأستاذ • ميزان المراجعة • قائمة الدخل • الميزانية العمومية
+   843→              </p>
+   844→            </div>
+   845→          </div>
+   846→          <div className="flex items-center gap-2">
+   847→            {canExport && (
+   848→              <>
+   849→                <Button
+   850→                  variant="outline"
+   851→                  onClick={handlePrint}
+   852→                  className="gap-2"
+   853→                >
+   854→                  <Printer className="w-4 h-4" />
+   855→                  طباعة
+   856→                </Button>
+   857→                <Button
+   858→                  variant="outline"
+   859→                  onClick={() => {
+   860→                    if (activeTab === 'journal') exportJournal();
+   861→                    else if (activeTab === 'ledger') exportLedger();
+   862→                    else if (activeTab === 'trial') exportTrialBalance();
+   863→                    else if (activeTab === 'income') exportIncomeStatement();
+   864→                    else if (activeTab === 'balance-sheet') exportBalanceSheet();
+   865→                  }}
+   866→                  className="gap-2"
+   867→                >
+   868→                  <Download className="w-4 h-4" />
+   869→                  تصدير CSV
+   870→                </Button>
+   871→              </>
+   872→            )}
+   873→          </div>
+   874→        </div>
+   875→      </motion.div>
+   876→
+   877→      {/* Tabs */}
+   878→      <motion.div
+   879→        initial={{ opacity: 0, y: 10 }}
+   880→        animate={{ opacity: 1, y: 0 }}
+   881→        transition={{ duration: 0.3, delay: 0.05 }}
+   882→      >
+   883→        <Tabs value={activeTab} onValueChange={setActiveTab}>
+   884→          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-1">
+   885→            <TabsTrigger value="journal" className="gap-1.5 text-xs sm:text-sm py-2">
+   886→              <BookOpen className="w-4 h-4" />
+   887→              <span className="hidden sm:inline">دفتر اليومية</span>
+   888→              <span className="sm:hidden">اليومية</span>
+   889→            </TabsTrigger>
+   890→            <TabsTrigger value="ledger" className="gap-1.5 text-xs sm:text-sm py-2">
+   891→              <FileText className="w-4 h-4" />
+   892→              <span className="hidden sm:inline">دفتر الأستاذ</span>
+   893→              <span className="sm:hidden">الأستاذ</span>
+   894→            </TabsTrigger>
+   895→            <TabsTrigger value="trial" className="gap-1.5 text-xs sm:text-sm py-2">
+   896→              <Scale className="w-4 h-4" />
+   897→              <span className="hidden sm:inline">ميزان المراجعة</span>
+   898→              <span className="sm:hidden">المراجعة</span>
+   899→            </TabsTrigger>
+   900→            <TabsTrigger value="income" className="gap-1.5 text-xs sm:text-sm py-2">
+   901→              <TrendingUp className="w-4 h-4" />
+   902→              <span className="hidden sm:inline">قائمة الدخل</span>
+   903→              <span className="sm:hidden">الدخل</span>
+   904→            </TabsTrigger>
+   905→            <TabsTrigger value="balance-sheet" className="gap-1.5 text-xs sm:text-sm py-2 col-span-2 sm:col-span-1">
+   906→              <PieChart className="w-4 h-4" />
+   907→              <span className="hidden sm:inline">الميزانية العمومية</span>
+   908→              <span className="sm:hidden">الميزانية</span>
+   909→            </TabsTrigger>
+   910→          </TabsList>
+   911→
+   912→          {/* ==================== GENERAL JOURNAL TAB ==================== */}
+   913→          <TabsContent value="journal" className="space-y-4 mt-4">
+   914→            {/* Filters */}
+   915→            <Card className="border-0 shadow-md overflow-hidden">
+   916→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+   917→              <CardContent className="p-3 sm:p-4">
+   918→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+   919→                  <div className="relative">
+   920→                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   921→                    <Input
+   922→                      placeholder="بحث برقم القيد أو البيان..."
+   923→                      value={journalSearch}
+   924→                      onChange={(e) => setJournalSearch(e.target.value)}
+   925→                      className="pr-10"
+   926→                    />
+   927→                  </div>
+   928→                  <div>
+   929→                    <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+   930→                    <Input
+   931→                      type="date"
+   932→                      value={journalDateFrom}
+   933→                      onChange={(e) => setJournalDateFrom(e.target.value)}
+   934→                    />
+   935→                  </div>
+   936→                  <div>
+   937→                    <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+   938→                    <Input
+   939→                      type="date"
+   940→                      value={journalDateTo}
+   941→                      onChange={(e) => setJournalDateTo(e.target.value)}
+   942→                    />
+   943→                  </div>
+   944→                  <div className="flex items-end">
+   945→                    <Button
+   946→                      variant="ghost"
+   947→                      size="sm"
+   948→                      onClick={() => {
+   949→                        setJournalSearch('');
+   950→                        setJournalDateFrom('');
+   951→                        setJournalDateTo('');
+   952→                      }}
+   953→                      className="gap-1 text-muted-foreground hover:text-foreground"
+   954→                    >
+   955→                      <X className="w-3.5 h-3.5" />
+   956→                      مسح الفلاتر
+   957→                    </Button>
+   958→                  </div>
+   959→                </div>
+   960→              </CardContent>
+   961→            </Card>
+   962→
+   963→            {/* Summary Cards */}
+   964→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   965→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+   966→                <CardContent className="p-4">
+   967→                  <div className="flex items-center gap-2 mb-2">
+   968→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   969→                      <Hash className="w-4 h-4 text-white" />
+   970→                    </div>
+   971→                    <span className="text-xs text-muted-foreground">عدد القيود</span>
+   972→                  </div>
+   973→                  <p className="text-2xl font-bold">{journalEntries.length}</p>
+   974→                </CardContent>
+   975→              </Card>
+   976→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+   977→                <CardContent className="p-4">
+   978→                  <div className="flex items-center gap-2 mb-2">
+   979→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+   980→                      <TrendingUp className="w-4 h-4 text-white" />
+   981→                    </div>
+   982→                    <span className="text-xs text-muted-foreground">إجمالي المدين</span>
+   983→                  </div>
+   984→                  <p className="text-2xl font-bold text-emerald-600">
+   985→                    {formatCurrency(totalJournalDebit)}
+   986→                  </p>
+   987→                </CardContent>
+   988→              </Card>
+   989→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+   990→                <CardContent className="p-4">
+   991→                  <div className="flex items-center gap-2 mb-2">
+   992→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+   993→                      <TrendingUp className="w-4 h-4 text-white rotate-180" />
+   994→                    </div>
+   995→                    <span className="text-xs text-muted-foreground">إجمالي الدائن</span>
+   996→                  </div>
+   997→                  <p className="text-2xl font-bold text-orange-600">
+   998→                    {formatCurrency(totalJournalCredit)}
+   999→                  </p>
+  1000→                </CardContent>
+  1001→              </Card>
+  1002→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
+  1003→                <CardContent className="p-4">
+  1004→                  <div className="flex items-center gap-2 mb-2">
+  1005→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1006→                      <Scale className="w-4 h-4 text-white" />
+  1007→                    </div>
+  1008→                    <span className="text-xs text-muted-foreground">الفرق</span>
+  1009→                  </div>
+  1010→                  <p className="text-2xl font-bold">
+  1011→                    {formatCurrency(Math.abs(totalJournalDebit - totalJournalCredit))}
+  1012→                  </p>
+  1013→                </CardContent>
+  1014→              </Card>
+  1015→            </div>
+  1016→
+  1017→            {/* Journal Entries */}
+  1018→            <Card className="border-0 shadow-md overflow-hidden">
+  1019→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1020→              <CardContent className="p-0">
+  1021→                {journalLoading ? (
+  1022→                  <div className="flex items-center justify-center py-12">
+  1023→                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1024→                  </div>
+  1025→                ) : journalEntries.length === 0 ? (
+  1026→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1027→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1028→                      <BookOpen className="w-12 h-12 text-white/80" />
+  1029→                    </div>
+  1030→                    <h3 className="text-xl font-bold mb-2">لا توجد قيود مرحلة</h3>
+  1031→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1032→                      لم يتم العثور على قيود محاسبية مرحلة تطابق معايير البحث
+  1033→                    </p>
+  1034→                  </div>
+  1035→                ) : (
+  1036→                  <>
+  1037→                    {/* Mobile Card Layout */}
+  1038→                    <div className="sm:hidden divide-y">
+  1039→                      {journalEntries.map((entry) => {
+  1040→                        const isExpanded = expandedEntries.has(entry.id);
+  1041→                        const lines = journalLines[entry.id] || [];
+  1042→                        return (
+  1043→                          <div key={entry.id} className="p-4 space-y-3">
+  1044→                            <div
+  1045→                              className="flex items-center justify-between cursor-pointer"
+  1046→                              onClick={() => toggleEntryExpand(entry.id)}
+  1047→                            >
+  1048→                              <div className="flex items-center gap-2">
+  1049→                                <div className="w-7 h-7 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1050→                                  <FileText className="w-3.5 h-3.5 text-white" />
+  1051→                                </div>
+  1052→                                <span className="font-semibold text-sm">{entry.entry_number}</span>
+  1053→                              </div>
+  1054→                              {isExpanded ? (
+  1055→                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+  1056→                              ) : (
+  1057→                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+  1058→                              )}
+  1059→                            </div>
+  1060→                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+  1061→                              <Calendar className="w-3.5 h-3.5" />
+  1062→                              {formatDate(entry.entry_date)}
+  1063→                            </div>
+  1064→                            <p className="text-sm text-muted-foreground truncate">{entry.description}</p>
+  1065→                            <div className="flex items-center gap-4">
+  1066→                              <div>
+  1067→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1068→                                <p className="text-sm font-bold text-emerald-600">{formatCurrency(entry.total_debit)}</p>
+  1069→                              </div>
+  1070→                              <div>
+  1071→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1072→                                <p className="text-sm font-bold text-orange-600">{formatCurrency(entry.total_credit)}</p>
+  1073→                              </div>
+  1074→                            </div>
+  1075→                            {isExpanded && lines.length > 0 && (
+  1076→                              <div className="space-y-2 pt-2 border-t">
+  1077→                                {lines.map((line) => (
+  1078→                                  <div key={line.id} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg p-2">
+  1079→                                    <span className="text-muted-foreground">{line.account_name}</span>
+  1080→                                    <div className="flex items-center gap-3">
+  1081→                                      {line.debit > 0 && <span className="font-semibold text-emerald-600">{formatCurrency(line.debit)}</span>}
+  1082→                                      {line.credit > 0 && <span className="font-semibold text-orange-600">{formatCurrency(line.credit)}</span>}
+  1083→                                    </div>
+  1084→                                  </div>
+  1085→                                ))}
+  1086→                              </div>
+  1087→                            )}
+  1088→                          </div>
+  1089→                        );
+  1090→                      })}
+  1091→                    </div>
+  1092→
+  1093→                    {/* Desktop Table */}
+  1094→                    <div className="hidden sm:block">
+  1095→                      <ScrollArea className="max-h-[600px]">
+  1096→                        <Table>
+  1097→                          <TableHeader>
+  1098→                            <TableRow className="bg-muted/30">
+  1099→                              <TableHead className="text-right w-10"></TableHead>
+  1100→                              <TableHead className="text-right font-bold">رقم القيد</TableHead>
+  1101→                              <TableHead className="text-right font-bold">التاريخ</TableHead>
+  1102→                              <TableHead className="text-right font-bold">البيان</TableHead>
+  1103→                              <TableHead className="text-right font-bold">مدين</TableHead>
+  1104→                              <TableHead className="text-right font-bold">دائن</TableHead>
+  1105→                            </TableRow>
+  1106→                          </TableHeader>
+  1107→                          <TableBody>
+  1108→                            {journalEntries.map((entry) => {
+  1109→                              const isExpanded = expandedEntries.has(entry.id);
+  1110→                              const lines = journalLines[entry.id] || [];
+  1111→                              return (
+  1112→                                <>
+  1113→                                  <TableRow
+  1114→                                    key={entry.id}
+  1115→                                    className="cursor-pointer hover:bg-muted/50"
+  1116→                                    onClick={() => toggleEntryExpand(entry.id)}
+  1117→                                  >
+  1118→                                    <TableCell>
+  1119→                                      {isExpanded ? (
+  1120→                                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+  1121→                                      ) : (
+  1122→                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+  1123→                                      )}
+  1124→                                    </TableCell>
+  1125→                                    <TableCell className="font-medium">
+  1126→                                      {entry.entry_number}
+  1127→                                    </TableCell>
+  1128→                                    <TableCell>
+  1129→                                      {formatDate(entry.entry_date)}
+  1130→                                    </TableCell>
+  1131→                                    <TableCell className="max-w-[200px] truncate">
+  1132→                                      {entry.description}
+  1133→                                    </TableCell>
+  1134→                                    <TableCell className="font-semibold text-emerald-600">
+  1135→                                      {formatCurrency(entry.total_debit)}
+  1136→                                    </TableCell>
+  1137→                                    <TableCell className="font-semibold text-orange-600">
+  1138→                                      {formatCurrency(entry.total_credit)}
+  1139→                                    </TableCell>
+  1140→                                  </TableRow>
+  1141→                                  {isExpanded &&
+  1142→                                    lines.map((line) => (
+  1143→                                      <TableRow
+  1144→                                        key={line.id}
+  1145→                                        className="bg-muted/30"
+  1146→                                      >
+  1147→                                        <TableCell></TableCell>
+  1148→                                        <TableCell className="text-xs text-muted-foreground">
+  1149→                                          └
+  1150→                                        </TableCell>
+  1151→                                        <TableCell></TableCell>
+  1152→                                        <TableCell className="text-sm pr-6">
+  1153→                                          <span className="text-muted-foreground ml-1">
+  1154→                                            {line.account_name}
+  1155→                                          </span>
+  1156→                                          {line.description && (
+  1157→                                            <span className="text-xs text-muted-foreground">
+  1158→                                              ({line.description})
+  1159→                                            </span>
+  1160→                                          )}
+  1161→                                        </TableCell>
+  1162→                                        <TableCell className="text-sm">
+  1163→                                          {line.debit > 0 ? formatCurrency(line.debit) : ''}
+  1164→                                        </TableCell>
+  1165→                                        <TableCell className="text-sm">
+  1166→                                          {line.credit > 0 ? formatCurrency(line.credit) : ''}
+  1167→                                        </TableCell>
+  1168→                                      </TableRow>
+  1169→                                    ))}
+  1170→                                </>
+  1171→                              );
+  1172→                            })}
+  1173→                          </TableBody>
+  1174→                        </Table>
+  1175→                      </ScrollArea>
+  1176→                    </div>
+  1177→                  </>
+  1178→                )}
+  1179→              </CardContent>
+  1180→            </Card>
+  1181→          </TabsContent>
+  1182→
+  1183→          {/* ==================== GENERAL LEDGER TAB ==================== */}
+  1184→          <TabsContent value="ledger" className="space-y-4 mt-4">
+  1185→            {/* Account Selector & Filters */}
+  1186→            <Card className="border-0 shadow-md overflow-hidden">
+  1187→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1188→              <CardContent className="p-3 sm:p-4">
+  1189→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+  1190→                  <div>
+  1191→                    <Label className="text-xs text-muted-foreground mb-1 block">اختر الحساب</Label>
+  1192→                    <Select
+  1193→                      value={selectedAccountId}
+  1194→                      onValueChange={setSelectedAccountId}
+  1195→                    >
+  1196→                      <SelectTrigger>
+  1197→                        <SelectValue placeholder="اختر الحساب" />
+  1198→                      </SelectTrigger>
+  1199→                      <SelectContent>
+  1200→                        {accounts.map((account) => (
+  1201→                          <SelectItem key={account.id} value={account.id}>
+  1202→                            <span className="flex items-center gap-2">
+  1203→                              <Badge
+  1204→                                variant="secondary"
+  1205→                                className={`text-[10px] px-1.5 py-0 ${getAccountTypeColor(account.account_type)}`}
+  1206→                              >
+  1207→                                {account.code}
+  1208→                              </Badge>
+  1209→                              {account.name}
+  1210→                            </span>
+  1211→                          </SelectItem>
+  1212→                        ))}
+  1213→                      </SelectContent>
+  1214→                    </Select>
+  1215→                  </div>
+  1216→                  <div>
+  1217→                    <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+  1218→                    <Input
+  1219→                      type="date"
+  1220→                      value={ledgerDateFrom}
+  1221→                      onChange={(e) => setLedgerDateFrom(e.target.value)}
+  1222→                    />
+  1223→                  </div>
+  1224→                  <div>
+  1225→                    <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+  1226→                    <Input
+  1227→                      type="date"
+  1228→                      value={ledgerDateTo}
+  1229→                      onChange={(e) => setLedgerDateTo(e.target.value)}
+  1230→                    />
+  1231→                  </div>
+  1232→                  <div className="flex items-end">
+  1233→                    <Button
+  1234→                      variant="ghost"
+  1235→                      size="sm"
+  1236→                      onClick={() => {
+  1237→                        setLedgerDateFrom('');
+  1238→                        setLedgerDateTo('');
+  1239→                      }}
+  1240→                      className="gap-1 text-muted-foreground hover:text-foreground"
+  1241→                    >
+  1242→                      <X className="w-3.5 h-3.5" />
+  1243→                      مسح الفلاتر
+  1244→                    </Button>
+  1245→                  </div>
+  1246→                </div>
+  1247→              </CardContent>
+  1248→            </Card>
+  1249→
+  1250→            {/* Account Info Card */}
+  1251→            {selectedAccountId && (() => {
+  1252→              const account = accounts.find((a) => a.id === selectedAccountId);
+  1253→              if (!account) return null;
+  1254→              const totalDebit = ledgerLines.reduce((s, l) => s + l.debit, 0);
+  1255→              const totalCredit = ledgerLines.reduce((s, l) => s + l.credit, 0);
+  1256→              const currentBalance = ledgerLines.length > 0
+  1257→                ? ledgerLines[ledgerLines.length - 1].running_balance
+  1258→                : 0;
+  1259→              return (
+  1260→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+  1261→                  <Card className="border-0 shadow-md col-span-2 lg:col-span-1">
+  1262→                    <CardContent className="p-4">
+  1263→                      <div className="flex items-center gap-2 mb-2">
+  1264→                        <Badge
+  1265→                          variant="secondary"
+  1266→                          className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+  1267→                        >
+  1268→                          {account.code}
+  1269→                        </Badge>
+  1270→                        <Badge
+  1271→                          variant="secondary"
+  1272→                          className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+  1273→                        >
+  1274→                          {getAccountTypeLabel(account.account_type)}
+  1275→                        </Badge>
+  1276→                      </div>
+  1277→                      <p className="font-bold text-lg">{account.name}</p>
+  1278→                    </CardContent>
+  1279→                  </Card>
+  1280→                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1281→                    <CardContent className="p-4 text-center">
+  1282→                      <p className="text-sm text-muted-foreground">عدد الحركات</p>
+  1283→                      <p className="text-2xl font-bold mt-1">{ledgerLines.length}</p>
+  1284→                    </CardContent>
+  1285→                  </Card>
+  1286→                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1287→                    <CardContent className="p-4 text-center">
+  1288→                      <p className="text-sm text-muted-foreground">إجمالي المدين</p>
+  1289→                      <p className="text-2xl font-bold text-emerald-600 mt-1">
+  1290→                        {formatCurrency(totalDebit)}
+  1291→                      </p>
+  1292→                    </CardContent>
+  1293→                  </Card>
+  1294→                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1295→                    <CardContent className="p-4 text-center">
+  1296→                      <p className="text-sm text-muted-foreground">إجمالي الدائن</p>
+  1297→                      <p className="text-2xl font-bold text-orange-600 mt-1">
+  1298→                        {formatCurrency(totalCredit)}
+  1299→                      </p>
+  1300→                    </CardContent>
+  1301→                  </Card>
+  1302→                  <Card className="border-0 shadow-md hover:shadow-lg transition-shadow" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.08))' }}>
+  1303→                    <CardContent className="p-4 text-center">
+  1304→                      <p className="text-sm text-muted-foreground">الرصيد الحالي</p>
+  1305→                      <p className="text-2xl font-bold mt-1">
+  1306→                        {formatCurrency(Math.abs(currentBalance))}
+  1307→                        {currentBalance < 0 && (
+  1308→                          <span className="text-xs text-red-500 mr-1">(دائن)</span>
+  1309→                        )}
+  1310→                      </p>
+  1311→                    </CardContent>
+  1312→                  </Card>
+  1313→                </div>
+  1314→              );
+  1315→            })()}
+  1316→
+  1317→            {/* Ledger Table */}
+  1318→            <Card className="border-0 shadow-md overflow-hidden">
+  1319→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1320→              <CardContent className="p-0">
+  1321→                {!selectedAccountId ? (
+  1322→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1323→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1324→                      <FileText className="w-12 h-12 text-white/80" />
+  1325→                    </div>
+  1326→                    <h3 className="text-xl font-bold mb-2">اختر حساباً</h3>
+  1327→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1328→                      اختر حساباً من القائمة أعلاه لعرض حركاته في دفتر الأستاذ
+  1329→                    </p>
+  1330→                  </div>
+  1331→                ) : ledgerLoading ? (
+  1332→                  <div className="flex items-center justify-center py-12">
+  1333→                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1334→                  </div>
+  1335→                ) : ledgerLines.length === 0 ? (
+  1336→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1337→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #9ca3af, #6b7280)' }}>
+  1338→                      <FileText className="w-12 h-12 text-white/80" />
+  1339→                    </div>
+  1340→                    <h3 className="text-xl font-bold mb-2">لا توجد حركات</h3>
+  1341→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1342→                      لا توجد حركات مسجلة لهذا الحساب في الفترة المحددة
+  1343→                    </p>
+  1344→                  </div>
+  1345→                ) : (
+  1346→                  <>
+  1347→                    {/* Mobile Card Layout */}
+  1348→                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+  1349→                      {(() => {
+  1350→                        const account = accounts.find((a) => a.id === selectedAccountId);
+  1351→                        const borderColor = getAccountTypeBorderColor(account?.account_type || 'expense');
+  1352→                        return ledgerLines.map((line) => (
+  1353→                          <div
+  1354→                            key={line.id}
+  1355→                            className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+  1356→                            style={{ borderRightColor: borderColor, display: 'flex', flexDirection: 'column', gap: '8px' }}
+  1357→                          >
+  1358→                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+  1359→                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+  1360→                                <div className="w-7 h-7 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1361→                                  <Hash className="w-3.5 h-3.5 text-white" />
+  1362→                                </div>
+  1363→                                <span className="font-semibold text-sm">{line.entry_number}</span>
+  1364→                              </div>
+  1365→                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-xs text-muted-foreground">
+  1366→                                <Calendar className="w-3.5 h-3.5" />
+  1367→                                {formatDate(line.entry_date)}
+  1368→                              </div>
+  1369→                            </div>
+  1370→                            <p className="text-sm text-muted-foreground">{line.description || '—'}</p>
+  1371→                            <div style={{ display: 'flex', gap: '16px' }}>
+  1372→                              <div>
+  1373→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1374→                                <p className="text-sm font-bold text-emerald-600">{line.debit > 0 ? formatCurrency(line.debit) : '—'}</p>
+  1375→                              </div>
+  1376→                              <div>
+  1377→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1378→                                <p className="text-sm font-bold text-orange-600">{line.credit > 0 ? formatCurrency(line.credit) : '—'}</p>
+  1379→                              </div>
+  1380→                            </div>
+  1381→                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+  1382→                              <span className="text-xs text-muted-foreground">الرصيد</span>
+  1383→                              <span
+  1384→                                className={`font-bold ${
+  1385→                                  line.running_balance >= 0
+  1386→                                    ? 'text-emerald-700 dark:text-emerald-400'
+  1387→                                    : 'text-red-600'
+  1388→                                }`}
+  1389→                              >
+  1390→                                {formatCurrency(Math.abs(line.running_balance))}
+  1391→                                {line.running_balance < 0 && (
+  1392→                                  <span className="text-xs mr-1">(د)</span>
+  1393→                                )}
+  1394→                              </span>
+  1395→                            </div>
+  1396→                          </div>
+  1397→                        ));
+  1398→                      })()}
+  1399→                      {/* Mobile Total */}
+  1400→                      {ledgerLines.length > 0 && (() => {
+  1401→                        const totalDebit = ledgerLines.reduce((s, l) => s + l.debit, 0);
+  1402→                        const totalCredit = ledgerLines.reduce((s, l) => s + l.credit, 0);
+  1403→                        const finalBalance = ledgerLines[ledgerLines.length - 1]?.running_balance || 0;
+  1404→                        return (
+  1405→                          <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+  1406→                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  1407→                              <span>الإجمالي</span>
+  1408→                            </div>
+  1409→                            <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+  1410→                              <div>
+  1411→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1412→                                <p className="text-sm text-emerald-600">{formatCurrency(totalDebit)}</p>
+  1413→                              </div>
+  1414→                              <div>
+  1415→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1416→                                <p className="text-sm text-orange-600">{formatCurrency(totalCredit)}</p>
+  1417→                              </div>
+  1418→                              <div>
+  1419→                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">الرصيد</p>
+  1420→                                <p className="text-sm">{formatCurrency(Math.abs(finalBalance))}</p>
+  1421→                              </div>
+  1422→                            </div>
+  1423→                          </div>
+  1424→                        );
+  1425→                      })()}
+  1426→                    </div>
+  1427→
+  1428→                    {/* Desktop Table */}
+  1429→                    <div className="hidden sm:block">
+  1430→                      <ScrollArea className="max-h-[500px]">
+  1431→                        <Table>
+  1432→                          <TableHeader>
+  1433→                            <TableRow className="bg-muted/30">
+  1434→                              <TableHead className="text-right font-bold">رقم القيد</TableHead>
+  1435→                              <TableHead className="text-right font-bold">التاريخ</TableHead>
+  1436→                              <TableHead className="text-right font-bold">البيان</TableHead>
+  1437→                              <TableHead className="text-right font-bold">مدين</TableHead>
+  1438→                              <TableHead className="text-right font-bold">دائن</TableHead>
+  1439→                              <TableHead className="text-right font-bold">الرصيد</TableHead>
+  1440→                            </TableRow>
+  1441→                          </TableHeader>
+  1442→                          <TableBody>
+  1443→                            {ledgerLines.map((line) => (
+  1444→                              <TableRow key={line.id}>
+  1445→                                <TableCell className="font-medium">
+  1446→                                  {line.entry_number}
+  1447→                                </TableCell>
+  1448→                                <TableCell>
+  1449→                                  {formatDate(line.entry_date)}
+  1450→                                </TableCell>
+  1451→                                <TableCell className="max-w-[200px] truncate">
+  1452→                                  {line.description || '—'}
+  1453→                                </TableCell>
+  1454→                                <TableCell className="font-semibold text-emerald-600">
+  1455→                                  {line.debit > 0 ? formatCurrency(line.debit) : '—'}
+  1456→                                </TableCell>
+  1457→                                <TableCell className="font-semibold text-orange-600">
+  1458→                                  {line.credit > 0 ? formatCurrency(line.credit) : '—'}
+  1459→                                </TableCell>
+  1460→                                <TableCell
+  1461→                                  className={`font-bold ${
+  1462→                                    line.running_balance >= 0
+  1463→                                      ? 'text-emerald-700 dark:text-emerald-400'
+  1464→                                      : 'text-red-600'
+  1465→                                  }`}
+  1466→                                >
+  1467→                                  {formatCurrency(Math.abs(line.running_balance))}
+  1468→                                  {line.running_balance < 0 && (
+  1469→                                    <span className="text-xs mr-1">(د)</span>
+  1470→                                  )}
+  1471→                                </TableCell>
+  1472→                              </TableRow>
+  1473→                            ))}
+  1474→                            {/* Totals Row */}
+  1475→                            <TableRow className="bg-muted/50 font-bold">
+  1476→                              <TableCell colSpan={3} className="text-left">
+  1477→                                الإجمالي
+  1478→                              </TableCell>
+  1479→                              <TableCell className="text-emerald-600">
+  1480→                                {formatCurrency(
+  1481→                                  ledgerLines.reduce((s, l) => s + l.debit, 0)
+  1482→                                )}
+  1483→                              </TableCell>
+  1484→                              <TableCell className="text-orange-600">
+  1485→                                {formatCurrency(
+  1486→                                  ledgerLines.reduce((s, l) => s + l.credit, 0)
+  1487→                                )}
+  1488→                              </TableCell>
+  1489→                              <TableCell>
+  1490→                                {formatCurrency(
+  1491→                                  Math.abs(
+  1492→                                    ledgerLines[ledgerLines.length - 1]?.running_balance || 0
+  1493→                                  )
+  1494→                                )}
+  1495→                              </TableCell>
+  1496→                            </TableRow>
+  1497→                          </TableBody>
+  1498→                        </Table>
+  1499→                      </ScrollArea>
+  1500→                    </div>
+  1501→                  </>
+  1502→                )}
+  1503→              </CardContent>
+  1504→            </Card>
+  1505→          </TabsContent>
+  1506→
+  1507→          {/* ==================== TRIAL BALANCE TAB ==================== */}
+  1508→          <TabsContent value="trial" className="space-y-4 mt-4">
+  1509→            {/* Filters */}
+  1510→            <Card className="border-0 shadow-md overflow-hidden">
+  1511→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1512→              <CardContent className="p-3 sm:p-4">
+  1513→                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  1514→                  <div>
+  1515→                    <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+  1516→                    <Input
+  1517→                      type="date"
+  1518→                      value={trialDateFrom}
+  1519→                      onChange={(e) => setTrialDateFrom(e.target.value)}
+  1520→                    />
+  1521→                  </div>
+  1522→                  <div>
+  1523→                    <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+  1524→                    <Input
+  1525→                      type="date"
+  1526→                      value={trialDateTo}
+  1527→                      onChange={(e) => setTrialDateTo(e.target.value)}
+  1528→                    />
+  1529→                  </div>
+  1530→                  <div className="flex items-end">
+  1531→                    <Button
+  1532→                      variant="ghost"
+  1533→                      size="sm"
+  1534→                      onClick={() => {
+  1535→                        setTrialDateFrom('');
+  1536→                        setTrialDateTo('');
+  1537→                      }}
+  1538→                      className="gap-1 text-muted-foreground hover:text-foreground"
+  1539→                    >
+  1540→                      <X className="w-3.5 h-3.5" />
+  1541→                      مسح الفلاتر
+  1542→                    </Button>
+  1543→                  </div>
+  1544→                </div>
+  1545→              </CardContent>
+  1546→            </Card>
+  1547→
+  1548→            {/* Summary Cards */}
+  1549→            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+  1550→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1551→                <CardContent className="p-4">
+  1552→                  <div className="flex items-center gap-2 mb-2">
+  1553→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1554→                      <Landmark className="w-4 h-4 text-white" />
+  1555→                    </div>
+  1556→                    <span className="text-xs text-muted-foreground">عدد الحسابات</span>
+  1557→                  </div>
+  1558→                  <p className="text-2xl font-bold">
+  1559→                    {trialBalanceData.length}
+  1560→                  </p>
+  1561→                </CardContent>
+  1562→              </Card>
+  1563→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1564→                <CardContent className="p-4">
+  1565→                  <div className="flex items-center gap-2 mb-2">
+  1566→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+  1567→                      <TrendingUp className="w-4 h-4 text-white" />
+  1568→                    </div>
+  1569→                    <span className="text-xs text-muted-foreground">إجمالي المدين</span>
+  1570→                  </div>
+  1571→                  <p className="text-2xl font-bold text-emerald-600">
+  1572→                    {formatCurrency(trialTotalDebit)}
+  1573→                  </p>
+  1574→                </CardContent>
+  1575→              </Card>
+  1576→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1577→                <CardContent className="p-4">
+  1578→                  <div className="flex items-center gap-2 mb-2">
+  1579→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+  1580→                      <CircleDollarSign className="w-4 h-4 text-white" />
+  1581→                    </div>
+  1582→                    <span className="text-xs text-muted-foreground">إجمالي الدائن</span>
+  1583→                  </div>
+  1584→                  <p className="text-2xl font-bold text-orange-600">
+  1585→                    {formatCurrency(trialTotalCredit)}
+  1586→                  </p>
+  1587→                </CardContent>
+  1588→              </Card>
+  1589→            </div>
+  1590→
+  1591→            {/* Balance Check */}
+  1592→            {trialBalanceData.length > 0 && (
+  1593→              <div
+  1594→                className={`flex items-center gap-2 p-3 rounded-lg border ${
+  1595→                  Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1596→                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+  1597→                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+  1598→                }`}
+  1599→              >
+  1600→                {Math.abs(trialTotalDebit - trialTotalCredit) < 0.01 ? (
+  1601→                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+  1602→                ) : (
+  1603→                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+  1604→                )}
+  1605→                <span
+  1606→                  className={`text-sm font-medium ${
+  1607→                    Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1608→                      ? 'text-emerald-700 dark:text-emerald-400'
+  1609→                      : 'text-red-700 dark:text-red-400'
+  1610→                  }`}
+  1611→                >
+  1612→                  {Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1613→                    ? 'ميزان المراجعة متوازن - إجمالي المدين يساوي إجمالي الدائن'
+  1614→                    : `ميزان المراجعة غير متوازن - الفرق: ${formatCurrency(Math.abs(trialTotalDebit - trialTotalCredit))}`}
+  1615→                </span>
+  1616→              </div>
+  1617→            )}
+  1618→
+  1619→            {/* Trial Balance Table */}
+  1620→            <Card className="border-0 shadow-md overflow-hidden">
+  1621→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1622→              <CardContent className="p-0">
+  1623→                {trialLoading ? (
+  1624→                  <div className="flex items-center justify-center py-12">
+  1625→                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1626→                  </div>
+  1627→                ) : trialBalanceData.length === 0 ? (
+  1628→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1629→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1630→                      <Scale className="w-12 h-12 text-white/80" />
+  1631→                    </div>
+  1632→                    <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
+  1633→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1634→                      لم يتم العثور على بيانات حسابات في الفترة المحددة
+  1635→                    </p>
+  1636→                  </div>
+  1637→                ) : (
+  1638→                  <>
+  1639→                    {/* Mobile Card Layout */}
+  1640→                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+  1641→                      {(() => {
+  1642→                        let currentType = '';
+  1643→                        const cards: React.ReactNode[] = [];
+  1644→                        trialBalanceData.forEach((account, index) => {
+  1645→                          // Add type group header
+  1646→                          if (account.account_type !== currentType) {
+  1647→                            currentType = account.account_type;
+  1648→                            cards.push(
+  1649→                              <div key={`type-${account.account_type}-${index}`} className="pt-2 first:pt-0">
+  1650→                                <Badge
+  1651→                                  variant="secondary"
+  1652→                                  className={`text-xs ${getAccountTypeColor(account.account_type)}`}
+  1653→                                >
+  1654→                                  {getAccountTypeLabel(account.account_type)}
+  1655→                                </Badge>
+  1656→                              </div>
+  1657→                            );
+  1658→                          }
+  1659→                          cards.push(
+  1660→                            <div
+  1661→                              key={account.account_name}
+  1662→                              className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+  1663→                              style={{ borderRightColor: getAccountTypeBorderColor(account.account_type), display: 'flex', flexDirection: 'column', gap: '8px' }}
+  1664→                            >
+  1665→                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+  1666→                                <span className="font-semibold text-sm">{account.account_name}</span>
+  1667→                                <Badge
+  1668→                                  variant="secondary"
+  1669→                                  className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+  1670→                                >
+  1671→                                  {getAccountTypeLabel(account.account_type)}
+  1672→                                </Badge>
+  1673→                              </div>
+  1674→                              <div style={{ display: 'flex', gap: '16px' }}>
+  1675→                                <div>
+  1676→                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1677→                                  <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+  1678→                                </div>
+  1679→                                <div>
+  1680→                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1681→                                  <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+  1682→                                </div>
+  1683→                              </div>
+  1684→                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+  1685→                                <span className="text-xs text-muted-foreground">صافي الرصيد</span>
+  1686→                                <span
+  1687→                                  className={`font-bold ${
+  1688→                                    account.net_balance >= 0
+  1689→                                      ? 'text-emerald-700 dark:text-emerald-400'
+  1690→                                      : 'text-red-600'
+  1691→                                  }`}
+  1692→                                >
+  1693→                                  {formatCurrency(Math.abs(account.net_balance))}
+  1694→                                  {account.net_balance < 0 && (
+  1695→                                    <span className="text-xs mr-1">(د)</span>
+  1696→                                  )}
+  1697→                                </span>
+  1698→                              </div>
+  1699→                            </div>
+  1700→                          );
+  1701→                        });
+  1702→                        return cards;
+  1703→                      })()}
+  1704→                      {/* Mobile Grand Total */}
+  1705→                      {trialBalanceData.length > 0 && (
+  1706→                        <div className="rounded-xl p-3 font-bold" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+  1707→                          <span className="text-sm">الإجمالي الكلي</span>
+  1708→                          <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+  1709→                            <div>
+  1710→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1711→                              <p className="text-sm text-emerald-600">{formatCurrency(trialTotalDebit)}</p>
+  1712→                            </div>
+  1713→                            <div>
+  1714→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1715→                              <p className="text-sm text-orange-600">{formatCurrency(trialTotalCredit)}</p>
+  1716→                            </div>
+  1717→                            <div>
+  1718→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">الفرق</p>
+  1719→                              <p className={`text-sm ${Math.abs(trialTotalDebit - trialTotalCredit) < 0.01 ? 'text-emerald-600' : 'text-red-600'}`}>
+  1720→                                {formatCurrency(Math.abs(trialTotalDebit - trialTotalCredit))}
+  1721→                              </p>
+  1722→                            </div>
+  1723→                          </div>
+  1724→                        </div>
+  1725→                      )}
+  1726→                    </div>
+  1727→
+  1728→                    {/* Desktop Table */}
+  1729→                    <div className="hidden sm:block">
+  1730→                      <ScrollArea className="max-h-[500px]">
+  1731→                        <Table>
+  1732→                          <TableHeader>
+  1733→                            <TableRow className="bg-muted/30">
+  1734→                              <TableHead className="text-right font-bold">اسم الحساب</TableHead>
+  1735→                              <TableHead className="text-right font-bold hidden sm:table-cell">نوع الحساب</TableHead>
+  1736→                              <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+  1737→                              <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+  1738→                              <TableHead className="text-right font-bold">صافي الرصيد</TableHead>
+  1739→                            </TableRow>
+  1740→                          </TableHeader>
+  1741→                          <TableBody>
+  1742→                            {(() => {
+  1743→                              let currentType = '';
+  1744→                              const rows: React.ReactNode[] = [];
+  1745→                              trialBalanceData.forEach((account, index) => {
+  1746→                                // Add type group header
+  1747→                                if (account.account_type !== currentType) {
+  1748→                                  currentType = account.account_type;
+  1749→                                  rows.push(
+  1750→                                    <TableRow key={`type-${account.account_type}-${index}`} className="bg-muted/30">
+  1751→                                      <TableCell
+  1752→                                        colSpan={5}
+  1753→                                        className="font-bold text-sm"
+  1754→                                      >
+  1755→                                        <Badge
+  1756→                                          variant="secondary"
+  1757→                                          className={`text-xs ${getAccountTypeColor(account.account_type)}`}
+  1758→                                        >
+  1759→                                          {getAccountTypeLabel(account.account_type)}
+  1760→                                        </Badge>
+  1761→                                      </TableCell>
+  1762→                                    </TableRow>
+  1763→                                  );
+  1764→                                }
+  1765→                                rows.push(
+  1766→                                  <TableRow key={account.account_name}>
+  1767→                                    <TableCell className="font-medium pr-6">
+  1768→                                      {account.account_name}
+  1769→                                    </TableCell>
+  1770→                                    <TableCell className="hidden sm:table-cell">
+  1771→                                      <Badge
+  1772→                                        variant="secondary"
+  1773→                                        className={`text-[10px] ${getAccountTypeColor(account.account_type)}`}
+  1774→                                      >
+  1775→                                        {getAccountTypeLabel(account.account_type)}
+  1776→                                      </Badge>
+  1777→                                    </TableCell>
+  1778→                                    <TableCell className="text-emerald-600">
+  1779→                                      {formatCurrency(account.total_debit)}
+  1780→                                    </TableCell>
+  1781→                                    <TableCell className="text-orange-600">
+  1782→                                      {formatCurrency(account.total_credit)}
+  1783→                                    </TableCell>
+  1784→                                    <TableCell
+  1785→                                      className={`font-bold ${
+  1786→                                        account.net_balance >= 0
+  1787→                                          ? 'text-emerald-700 dark:text-emerald-400'
+  1788→                                          : 'text-red-600'
+  1789→                                      }`}
+  1790→                                    >
+  1791→                                      {formatCurrency(Math.abs(account.net_balance))}
+  1792→                                      {account.net_balance < 0 && (
+  1793→                                        <span className="text-xs mr-1">(د)</span>
+  1794→                                      )}
+  1795→                                    </TableCell>
+  1796→                                  </TableRow>
+  1797→                                );
+  1798→                              });
+  1799→                              return rows;
+  1800→                            })()}
+  1801→                            {/* Grand Total Row */}
+  1802→                            <TableRow className="font-bold border-t-2" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.1), rgba(217,119,6,0.1))' }}>
+  1803→                              <TableCell colSpan={2} className="text-lg">
+  1804→                                الإجمالي الكلي
+  1805→                              </TableCell>
+  1806→                              <TableCell className="text-emerald-600 text-lg">
+  1807→                                {formatCurrency(trialTotalDebit)}
+  1808→                              </TableCell>
+  1809→                              <TableCell className="text-orange-600 text-lg">
+  1810→                                {formatCurrency(trialTotalCredit)}
+  1811→                              </TableCell>
+  1812→                              <TableCell
+  1813→                                className={`text-lg ${
+  1814→                                  Math.abs(trialTotalDebit - trialTotalCredit) < 0.01
+  1815→                                    ? 'text-emerald-600'
+  1816→                                    : 'text-red-600'
+  1817→                                }`}
+  1818→                              >
+  1819→                                {formatCurrency(
+  1820→                                  Math.abs(trialTotalDebit - trialTotalCredit)
+  1821→                                )}
+  1822→                              </TableCell>
+  1823→                            </TableRow>
+  1824→                          </TableBody>
+  1825→                        </Table>
+  1826→                      </ScrollArea>
+  1827→                    </div>
+  1828→                  </>
+  1829→                )}
+  1830→              </CardContent>
+  1831→            </Card>
+  1832→          </TabsContent>
+  1833→
+  1834→          {/* ==================== INCOME STATEMENT TAB ==================== */}
+  1835→          <TabsContent value="income" className="space-y-4 mt-4">
+  1836→            {/* Filters */}
+  1837→            <Card className="border-0 shadow-md overflow-hidden">
+  1838→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1839→              <CardContent className="p-3 sm:p-4">
+  1840→                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  1841→                  <div>
+  1842→                    <Label className="text-xs text-muted-foreground mb-1 block">من تاريخ</Label>
+  1843→                    <Input
+  1844→                      type="date"
+  1845→                      value={incomeDateFrom}
+  1846→                      onChange={(e) => setIncomeDateFrom(e.target.value)}
+  1847→                    />
+  1848→                  </div>
+  1849→                  <div>
+  1850→                    <Label className="text-xs text-muted-foreground mb-1 block">إلى تاريخ</Label>
+  1851→                    <Input
+  1852→                      type="date"
+  1853→                      value={incomeDateTo}
+  1854→                      onChange={(e) => setIncomeDateTo(e.target.value)}
+  1855→                    />
+  1856→                  </div>
+  1857→                  <div className="flex items-end">
+  1858→                    <Button
+  1859→                      variant="ghost"
+  1860→                      size="sm"
+  1861→                      onClick={() => {
+  1862→                        setIncomeDateFrom('');
+  1863→                        setIncomeDateTo('');
+  1864→                      }}
+  1865→                      className="gap-1 text-muted-foreground hover:text-foreground"
+  1866→                    >
+  1867→                      <X className="w-3.5 h-3.5" />
+  1868→                      مسح الفلاتر
+  1869→                    </Button>
+  1870→                  </div>
+  1871→                </div>
+  1872→              </CardContent>
+  1873→            </Card>
+  1874→
+  1875→            {/* Summary Cards */}
+  1876→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  1877→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1878→                <CardContent className="p-4">
+  1879→                  <div className="flex items-center gap-2 mb-2">
+  1880→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+  1881→                      <TrendingUp className="w-4 h-4 text-white" />
+  1882→                    </div>
+  1883→                    <span className="text-xs text-muted-foreground">الإيرادات</span>
+  1884→                  </div>
+  1885→                  <p className="text-2xl font-bold text-emerald-600">
+  1886→                    {formatCurrency(totalRevenue)}
+  1887→                  </p>
+  1888→                  <p className="text-xs text-muted-foreground mt-1">
+  1889→                    {revenueAccounts.length} حساب
+  1890→                  </p>
+  1891→                </CardContent>
+  1892→              </Card>
+  1893→              <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+  1894→                <CardContent className="p-4">
+  1895→                  <div className="flex items-center gap-2 mb-2">
+  1896→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+  1897→                      <TrendingUp className="w-4 h-4 text-white rotate-180" />
+  1898→                    </div>
+  1899→                    <span className="text-xs text-muted-foreground">المصروفات</span>
+  1900→                  </div>
+  1901→                  <p className="text-2xl font-bold text-red-600">
+  1902→                    {formatCurrency(totalExpenses)}
+  1903→                  </p>
+  1904→                  <p className="text-xs text-muted-foreground mt-1">
+  1905→                    {expenseAccounts.length} حساب
+  1906→                  </p>
+  1907→                </CardContent>
+  1908→              </Card>
+  1909→              <Card
+  1910→                className={`border-0 shadow-md hover:shadow-lg transition-shadow ${
+  1911→                  netProfit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'
+  1912→                }`}
+  1913→              >
+  1914→                <CardContent className="p-4">
+  1915→                  <div className="flex items-center gap-2 mb-2">
+  1916→                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: netProfit >= 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+  1917→                      <Scale className="w-4 h-4 text-white" />
+  1918→                    </div>
+  1919→                    <span className="text-xs text-muted-foreground">
+  1920→                      {netProfit >= 0 ? 'صافي الربح' : 'صافي الخسارة'}
+  1921→                    </span>
+  1922→                  </div>
+  1923→                  <p
+  1924→                    className={`text-2xl font-bold ${
+  1925→                      netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
+  1926→                    }`}
+  1927→                  >
+  1928→                    {formatCurrency(Math.abs(netProfit))}
+  1929→                  </p>
+  1930→                  <Badge
+  1931→                    variant="secondary"
+  1932→                    className={`mt-1 ${
+  1933→                      netProfit >= 0
+  1934→                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+  1935→                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+  1936→                    }`}
+  1937→                  >
+  1938→                    {netProfit >= 0 ? 'ربح' : 'خسارة'}
+  1939→                  </Badge>
+  1940→                </CardContent>
+  1941→              </Card>
+  1942→            </div>
+  1943→
+  1944→            {/* Income Statement Detail */}
+  1945→            <Card className="border-0 shadow-md overflow-hidden">
+  1946→              <div className="h-1" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #b45309)' }} />
+  1947→              <CardContent className="p-0">
+  1948→                {incomeLoading ? (
+  1949→                  <div className="flex items-center justify-center py-12">
+  1950→                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  1951→                  </div>
+  1952→                ) : incomeData.length === 0 ? (
+  1953→                  <div className="flex flex-col items-center justify-center py-20 px-4">
+  1954→                    <div className="w-24 h-24 rounded-full flex items-center justify-center mb-5" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+  1955→                      <TrendingUp className="w-12 h-12 text-white/80" />
+  1956→                    </div>
+  1957→                    <h3 className="text-xl font-bold mb-2">لا توجد بيانات</h3>
+  1958→                    <p className="text-muted-foreground text-sm text-center max-w-xs">
+  1959→                      لم يتم العثور على بيانات إيرادات أو مصروفات في الفترة المحددة
+  1960→                    </p>
+  1961→                  </div>
+  1962→                ) : (
+  1963→                  <>
+  1964→                    {/* Mobile Card Layout */}
+  1965→                    <div className="sm:hidden space-y-2 p-3 max-h-[500px] overflow-y-auto">
+  1966→                      {/* Revenue Section */}
+  1967→                      <div className="pt-1">
+  1968→                        <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+  1969→                          الإيرادات
+  1970→                        </Badge>
+  1971→                      </div>
+  1972→                      {revenueAccounts.map((account) => (
+  1973→                        <div
+  1974→                          key={account.account_name}
+  1975→                          className="rounded-xl border shadow-sm hover:shadow-md bg-card p-3 border-r-4"
+  1976→                          style={{ borderRightColor: getAccountTypeBorderColor('revenue'), display: 'flex', flexDirection: 'column', gap: '8px' }}
+  1977→                        >
+  1978→                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+  1979→                            <span className="font-semibold text-sm">{account.account_name}</span>
+  1980→                            <Badge
+  1981→                              variant="secondary"
+  1982→                              className={`text-[10px] ${getAccountTypeColor('revenue')}`}
+  1983→                            >
+  1984→                              إيرادات
+  1985→                            </Badge>
+  1986→                          </div>
+  1987→                          <div style={{ display: 'flex', gap: '16px' }}>
+  1988→                            <div>
+  1989→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">مدين</p>
+  1990→                              <p className="text-sm font-bold text-emerald-600">{formatCurrency(account.total_debit)}</p>
+  1991→                            </div>
+  1992→                            <div>
+  1993→                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">دائن</p>
+  1994→                              <p className="text-sm font-bold text-orange-600">{formatCurrency(account.total_credit)}</p>
+  1995→                            </div>
+  1996→                          </div>
+  1997→                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="pt-1 border-t">
+  1998→                            <span className="text-xs text-muted-foreground">الرصيد</span>
+  1999→                            <span className="font-bold text-emerald-600">
+  2000→                              {formatCurrency(account.total_credit - account.total_debit)}
+
+[showing lines 1-2000 of 2654; use offset=2001 with limit to continue reading]
