@@ -864,15 +864,15 @@
    864→
    865→      {/* ─── Add/Edit Dialog ────────────────────────────────────────────────── */}
    866→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-   867→        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] overflow-y-auto">
-   868→          <DialogHeader>
+   867→        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] flex flex-col p-0">
+   868→          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
    869→            <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
    870→              <Package className="w-5 h-5 text-primary" />
    871→              {editingProduct ? 'تعديل الصنف' : 'إضافة صنف جديد'}
    872→            </DialogTitle>
    873→          </DialogHeader>
    874→
-   875→          <div className="space-y-6 py-2">
+   875→          <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-2">
    876→            {/* ─── Section 1: Basic Info ────────────────────────────── */}
    877→            <div>
    878→              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -1159,7 +1159,7 @@
   1159→            </div>
   1160→          </div>
   1161→
-  1162→          <DialogFooter className="gap-2">
+  1162→          <DialogFooter className="px-6 pb-6 pt-3 shrink-0 border-t gap-2">
   1163→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
   1164→              إلغاء
   1165→            </Button>
@@ -1182,7 +1182,7 @@
   1182→
   1183→      {/* ─── New Category Dialog ──────────────────────────────────────────── */}
   1184→      <Dialog open={newCatDialog} onOpenChange={setNewCatDialog}>
-  1185→        <DialogContent className="max-w-sm">
+  1185→        <DialogContent className="w-[90vw] max-w-sm">
   1186→          <DialogHeader>
   1187→            <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
   1188→              <FolderPlus className="w-5 h-5 text-primary" />
