@@ -1,0 +1,834 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState, useCallback } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { Branch, AccountStatementEntry } from '@/lib/types';
+     7→import { formatCurrency, formatDate, numberToArabicWords } from '@/lib/utils';
+     8→import { Card, CardContent } from '@/components/ui/card';
+     9→import { Button } from '@/components/ui/button';
+    10→import { Input } from '@/components/ui/input';
+    11→import { Label } from '@/components/ui/label';
+    12→import {
+    13→  Select,
+    14→  SelectContent,
+    15→  SelectItem,
+    16→  SelectTrigger,
+    17→  SelectValue,
+    18→} from '@/components/ui/select';
+    19→import {
+    20→  Table,
+    21→  TableBody,
+    22→  TableCell,
+    23→  TableHead,
+    24→  TableHeader,
+    25→  TableRow,
+    26→} from '@/components/ui/table';
+    27→import {
+    28→  FileText,
+    29→  Printer,
+    30→  FileDown,
+    31→  FileSpreadsheet,
+    32→  Search,
+    33→  ArrowDownToLine,
+    34→  ArrowUpFromLine,
+    35→  Scale,
+    36→  ScrollText,
+    37→  Receipt,
+    38→  RotateCcw,
+    39→  TrendingUp,
+    40→  TrendingDown,
+    41→  CalendarRange,
+    42→  Building2,
+    43→} from 'lucide-react';
+    44→import { toast } from 'sonner';
+    45→import { motion } from 'framer-motion';
+    46→
+    47→export default function AccountStatementPage() {
+    48→  const { settings, user, isAdmin } = useAppStore();
+    49→  const [branches, setBranches] = useState<Branch[]>([]);
+    50→  const [selectedBranch, setSelectedBranch] = useState('');
+    51→  const [dateFrom, setDateFrom] = useState('');
+    52→  const [dateTo, setDateTo] = useState('');
+    53→  const [typeFilter, setTypeFilter] = useState('all');
+    54→  const [entries, setEntries] = useState<AccountStatementEntry[]>([]);
+    55→  const [loading, setLoading] = useState(false);
+    56→  const [generated, setGenerated] = useState(false);
+    57→
+    58→  // Summary
+    59→  const [totalDebit, setTotalDebit] = useState(0);
+    60→  const [totalCredit, setTotalCredit] = useState(0);
+    61→  const [netBalance, setNetBalance] = useState(0);
+    62→
+    63→  // Branch name for display
+    64→  const [branchName, setBranchName] = useState('');
+    65→
+    66→  useEffect(() => {
+    67→    loadBranches();
+    68→  }, []);
+    69→
+    70→  const loadBranches = async () => {
+    71→    let query = supabase.from('branches').select('*').eq('is_active', true).order('name');
+    72→    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+    73→    const { data } = await query;
+    74→    if (data) {
+    75→      setBranches(data as Branch[]);
+    76→      // Auto-select branch for non-admin users
+    77→      if (!isAdmin && user?.branch_id && data.length > 0) {
+    78→        setSelectedBranch(user.branch_id);
+    79→      }
+    80→    }
+    81→  };
+    82→
+    83→  const generateStatement = useCallback(async () => {
+    84→    if (!selectedBranch) {
+    85→      toast.error('يرجى اختيار الفرع');
+    86→      return;
+    87→    }
+    88→    if (!dateFrom || !dateTo) {
+    89→      toast.error('يرجى تحديد فترة الكشف');
+    90→      return;
+    91→    }
+    92→
+    93→    setLoading(true);
+    94→    setGenerated(false);
+    95→
+    96→    try {
+    97→      const allEntries: AccountStatementEntry[] = [];
+    98→
+    99→      // 1. Load invoices for this branch in the date range
+   100→      let invoiceQuery = supabase
+   101→        .from('invoices')
+   102→        .select('id, invoice_number, invoice_date, total, status')
+   103→        .eq('branch_id', selectedBranch)
+   104→        .gte('invoice_date', dateFrom)
+   105→        .lte('invoice_date', dateTo)
+   106→        .neq('status', 'cancelled')
+   107→        .order('invoice_date', { ascending: true });
+   108→
+   109→      const { data: invoices, error: invError } = await invoiceQuery;
+   110→      if (invError) throw invError;
+   111→
+   112→      if (invoices) {
+   113→        for (const inv of invoices) {
+   114→          allEntries.push({
+   115→            date: inv.invoice_date,
+   116→            description: inv.status === 'partially_returned'
+   117→              ? 'فاتورة مبيعات (مرتجع جزئي)'
+   118→              : inv.status === 'fully_returned'
+   119→              ? 'فاتورة مبيعات (مرتجع كلي)'
+   120→              : 'فاتورة مبيعات',
+   121→            reference: inv.invoice_number,
+   122→            debit: inv.total,
+   123→            credit: 0,
+   124→            balance: 0,
+   125→            type: 'invoice',
+   126→          });
+   127→        }
+   128→      }
+   129→
+   130→      // 2. Load returns for this branch in the date range
+   131→      let returnQuery = supabase
+   132→        .from('returns')
+   133→        .select('id, return_number, return_date, total')
+   134→        .eq('branch_id', selectedBranch)
+   135→        .gte('return_date', dateFrom)
+   136→        .lte('return_date', dateTo)
+   137→        .order('return_date', { ascending: true });
+   138→
+   139→      const { data: returns, error: retError } = await returnQuery;
+   140→      if (retError) throw retError;
+   141→
+   142→      if (returns) {
+   143→        for (const ret of returns) {
+   144→          allEntries.push({
+   145→            date: ret.return_date,
+   146→            description: 'مرتجع',
+   147→            reference: ret.return_number,
+   148→            debit: 0,
+   149→            credit: ret.total,
+   150→            balance: 0,
+   151→            type: 'return',
+   152→          });
+   153→        }
+   154→      }
+   155→
+   156→      // 3. Load payments for this branch in the date range
+   157→      let paymentQuery = supabase
+   158→        .from('payments')
+   159→        .select('id, payment_number, payment_date, amount, payment_method')
+   160→        .eq('branch_id', selectedBranch)
+   161→        .gte('payment_date', dateFrom)
+   162→        .lte('payment_date', dateTo)
+   163→        .order('payment_date', { ascending: true });
+   164→
+   165→      const { data: payments, error: payError } = await paymentQuery;
+   166→      if (payError) throw payError;
+   167→
+   168→      if (payments) {
+   169→        for (const pay of payments) {
+   170→          allEntries.push({
+   171→            date: pay.payment_date,
+   172→            description: `إيصال قبض (${pay.payment_method || ''})`,
+   173→            reference: pay.payment_number,
+   174→            debit: 0,
+   175→            credit: pay.amount,
+   176→            balance: 0,
+   177→            type: 'payment',
+   178→          });
+   179→        }
+   180→      }
+   181→
+   182→      // 4. Sort all entries by date
+   183→      allEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+   184→
+   185→      // 5. Calculate running balance
+   186→      let runningBalance = 0;
+   187→      let dTotal = 0;
+   188→      let cTotal = 0;
+   189→
+   190→      for (const entry of allEntries) {
+   191→        runningBalance += entry.debit - entry.credit;
+   192→        entry.balance = runningBalance;
+   193→        dTotal += entry.debit;
+   194→        cTotal += entry.credit;
+   195→      }
+   196→
+   197→      // 6. Apply type filter
+   198→      let filtered = allEntries;
+   199→      if (typeFilter !== 'all') {
+   200→        filtered = allEntries.filter(e => e.type === typeFilter);
+   201→      }
+   202→
+   203→      setEntries(filtered);
+   204→      setTotalDebit(dTotal);
+   205→      setTotalCredit(cTotal);
+   206→      setNetBalance(dTotal - cTotal);
+   207→      setGenerated(true);
+   208→
+   209→      // Get branch name
+   210→      const branch = branches.find(b => b.id === selectedBranch);
+   211→      setBranchName(branch?.name || '');
+   212→
+   213→    } catch (err) {
+   214→      console.error(err);
+   215→      toast.error('حدث خطأ أثناء إنشاء كشف الحساب');
+   216→    } finally {
+   217→      setLoading(false);
+   218→    }
+   219→  }, [selectedBranch, dateFrom, dateTo, typeFilter, branches]);
+   220→
+   221→  const handlePrint = () => {
+   222→    const html = generateStatementHTML();
+   223→    const printWindow = window.open('', '_blank', 'width=800,height=1000');
+   224→    if (!printWindow) {
+   225→      toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة');
+   226→      return;
+   227→    }
+   228→    printWindow.document.write(html);
+   229→    printWindow.document.close();
+   230→    setTimeout(() => {
+   231→      printWindow.focus();
+   232→      printWindow.print();
+   233→    }, 1000);
+   234→  };
+   235→
+   236→  const handleDownloadPDF = async () => {
+   237→    try {
+   238→      const { default: jsPDF } = await import('jspdf');
+   239→      const { default: html2canvas } = await import('html2canvas');
+   240→
+   241→      const container = document.createElement('div');
+   242→      container.style.position = 'absolute';
+   243→      container.style.left = '-9999px';
+   244→      container.style.top = '0';
+   245→      container.style.width = '750px';
+   246→      container.style.background = '#fff';
+   247→      container.style.padding = '20px';
+   248→      document.body.appendChild(container);
+   249→
+   250→      container.innerHTML = generateStatementHTML().replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+   251→
+   252→      await new Promise(resolve => setTimeout(resolve, 500));
+   253→
+   254→      const canvas = await html2canvas(container, {
+   255→        scale: 2,
+   256→        useCORS: true,
+   257→        logging: false,
+   258→      });
+   259→
+   260→      document.body.removeChild(container);
+   261→
+   262→      const imgData = canvas.toDataURL('image/png');
+   263→      const pdf = new jsPDF('p', 'mm', 'a4');
+   264→      const pdfWidth = pdf.internal.pageSize.getWidth();
+   265→      const pdfHeight = pdf.internal.pageSize.getHeight();
+   266→
+   267→      const imgWidth = pdfWidth - 10;
+   268→      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+   269→
+   270→      // If content is longer than one page, split across pages
+   271→      let yOffset = 0;
+   272→      let page = 0;
+   273→      while (yOffset < imgHeight) {
+   274→        if (page > 0) pdf.addPage();
+   275→        pdf.addImage(imgData, 'PNG', 5, 5 - yOffset * (imgWidth / canvas.width), imgWidth, imgHeight);
+   276→        yOffset += (pdfHeight - 10) / (imgWidth / canvas.width);
+   277→        page++;
+   278→      }
+   279→
+   280→      pdf.save(`account-statement-${branchName}-${dateFrom}-to-${dateTo}.pdf`);
+   281→      toast.success('تم تحميل كشف الحساب كـ PDF');
+   282→    } catch (err) {
+   283→      console.error(err);
+   284→      toast.error('حدث خطأ أثناء تحميل PDF');
+   285→    }
+   286→  };
+   287→
+   288→  const handleDownloadExcel = async () => {
+   289→    try {
+   290→      const XLSX = await import('xlsx');
+   291→      const wsData = [
+   292→        ['كشف حساب الفرع: ' + branchName],
+   293→        ['الفترة: ' + formatDate(dateFrom) + ' إلى ' + formatDate(dateTo)],
+   294→        [],
+   295→        ['التاريخ', 'البيان', 'رقم المرجع', 'مدين (عليه)', 'دائن (له)', 'الرصيد'],
+   296→      ];
+   297→
+   298→      for (const entry of entries) {
+   299→        wsData.push([
+   300→          entry.date,
+   301→          entry.description,
+   302→          entry.reference,
+   303→          entry.debit > 0 ? String(entry.debit) : '',
+   304→          entry.credit > 0 ? String(entry.credit) : '',
+   305→          String(entry.balance),
+   306→        ]);
+   307→      }
+   308→
+   309→      wsData.push([]);
+   310→      wsData.push(['', '', 'الإجمالي', String(totalDebit), String(totalCredit), String(netBalance)]);
+   311→
+   312→      const wb = XLSX.utils.book_new();
+   313→      const ws = XLSX.utils.aoa_to_sheet(wsData);
+   314→
+   315→      // Set column widths
+   316→      ws['!cols'] = [
+   317→        { wch: 15 }, { wch: 25 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+   318→      ];
+   319→
+   320→      XLSX.utils.book_append_sheet(wb, ws, 'كشف الحساب');
+   321→      XLSX.writeFile(wb, `account-statement-${branchName}-${dateFrom}-to-${dateTo}.xlsx`);
+   322→
+   323→      toast.success('تم تحميل كشف الحساب كـ Excel');
+   324→    } catch (err) {
+   325→      console.error(err);
+   326→      toast.error('حدث خطأ أثناء تحميل Excel');
+   327→    }
+   328→  };
+   329→
+   330→  const generateStatementHTML = (): string => {
+   331→    const factoryName = settings?.factory_name || 'مصنع الصادق';
+   332→    const factoryAddress = settings?.address || '';
+   333→    const factoryPhone = settings?.phone || '';
+   334→
+   335→    let rowsHTML = '';
+   336→    for (const entry of entries) {
+   337→      const debitCell = entry.debit > 0 ? formatCurrency(entry.debit) : '—';
+   338→      const creditCell = entry.credit > 0 ? formatCurrency(entry.credit) : '—';
+   339→      const balanceColor = entry.balance > 0 ? '#dc2626' : entry.balance < 0 ? '#16a34a' : '#666';
+   340→      const typeIcon = entry.type === 'invoice' ? '📄' : entry.type === 'payment' ? '💰' : '↩️';
+   341→
+   342→      rowsHTML += `
+   343→        <tr>
+   344→          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px;">${formatDate(entry.date)}</td>
+   345→          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px;">${typeIcon} ${entry.description}</td>
+   346→          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; font-weight: 600;">${entry.reference}</td>
+   347→          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; text-align: left; color: #dc2626;">${entry.debit > 0 ? formatCurrency(entry.debit) : '—'}</td>
+   348→          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; text-align: left; color: #16a34a;">${entry.credit > 0 ? formatCurrency(entry.credit) : '—'}</td>
+   349→          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; text-align: left; font-weight: 700; color: ${balanceColor};">${formatCurrency(Math.abs(entry.balance))}${entry.balance > 0 ? ' ع' : entry.balance < 0 ? ' ل' : ''}</td>
+   350→        </tr>
+   351→      `;
+   352→    }
+   353→
+   354→    return `<!DOCTYPE html>
+   355→<html dir="rtl" lang="ar">
+   356→<head>
+   357→  <meta charset="UTF-8">
+   358→  <title>كشف حساب - ${branchName}</title>
+   359→  <style>
+   360→    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+   361→    * { margin: 0; padding: 0; box-sizing: border-box; }
+   362→    body { font-family: 'Cairo', sans-serif; direction: rtl; color: #1a1a1a; background: #fff; padding: 15mm; }
+   363→    .statement { max-width: 750px; margin: 0 auto; }
+   364→    .header { background: #0D7C66; color: white; padding: 20px 24px; border-radius: 12px 12px 0 0; text-align: center; }
+   365→    .header h1 { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+   366→    .header .factory-info { font-size: 13px; opacity: 0.85; }
+   367→    .divider { height: 3px; background: #D4A843; }
+   368→    .sub-header { padding: 16px 24px; background: #f8faf9; border-bottom: 1px solid #e5e7eb; }
+   369→    .sub-header h2 { font-size: 18px; font-weight: 700; color: #0D7C66; }
+   370→    .sub-header .period { font-size: 13px; color: #666; margin-top: 4px; }
+   371→    table { width: 100%; border-collapse: collapse; }
+   372→    thead th { background: #0D7C66; color: white; padding: 10px 12px; font-size: 13px; font-weight: 700; text-align: right; }
+   373→    thead th:nth-child(4), thead th:nth-child(5), thead th:nth-child(6) { text-align: left; }
+   374→    .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; padding: 16px; background: #f0faf7; border: 2px solid #0D7C66; border-radius: 10px; }
+   375→    .summary-item { text-align: center; }
+   376→    .summary-label { font-size: 12px; color: #666; }
+   377→    .summary-value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+   378→    .summary-debit .summary-value { color: #dc2626; }
+   379→    .summary-credit .summary-value { color: #16a34a; }
+   380→    .summary-net .summary-value { color: #0D7C66; }
+   381→    .amount-words { margin-top: 12px; padding: 10px; background: #fff; border: 1px dashed #0D7C66; border-radius: 6px; font-size: 13px; color: #555; text-align: center; font-weight: 600; }
+   382→    .footer { margin-top: 20px; padding: 12px 0; border-top: 1px solid #eee; display: flex; justify-content: space-between; }
+   383→    .signature-box { text-align: center; }
+   384→    .signature-label { font-size: 12px; color: #666; }
+   385→    .signature-line { width: 140px; border-bottom: 1px solid #999; margin-top: 30px; }
+   386→    @media print { body { padding: 5mm; } }
+   387→  </style>
+   388→</head>
+   389→<body>
+   390→  <div class="statement">
+   391→    <div class="header">
+   392→      <h1>كشف حساب فرع</h1>
+   393→      <div class="factory-info">${factoryName}${factoryAddress ? ' - ' + factoryAddress : ''}${factoryPhone ? ' | ' + factoryPhone : ''}</div>
+   394→    </div>
+   395→    <div class="divider"></div>
+   396→    <div class="sub-header">
+   397→      <h2>${branchName}</h2>
+   398→      <div class="period">الفترة من ${formatDate(dateFrom)} إلى ${formatDate(dateTo)}</div>
+   399→    </div>
+   400→    <table>
+   401→      <thead>
+   402→        <tr>
+   403→          <th>التاريخ</th>
+   404→          <th>البيان</th>
+   405→          <th>رقم المرجع</th>
+   406→          <th>مدين (عليه)</th>
+   407→          <th>دائن (له)</th>
+   408→          <th>الرصيد</th>
+   409→        </tr>
+   410→      </thead>
+   411→      <tbody>
+   412→        ${rowsHTML || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#999;">لا توجد حركات في هذه الفترة</td></tr>'}
+   413→      </tbody>
+   414→    </table>
+   415→    <div class="summary">
+   416→      <div class="summary-item summary-debit">
+   417→        <div class="summary-label">إجمالي المدين (عليه)</div>
+   418→        <div class="summary-value">${formatCurrency(totalDebit)}</div>
+   419→      </div>
+   420→      <div class="summary-item summary-credit">
+   421→        <div class="summary-label">إجمالي الدائن (له)</div>
+   422→        <div class="summary-value">${formatCurrency(totalCredit)}</div>
+   423→      </div>
+   424→      <div class="summary-item summary-net">
+   425→        <div class="summary-label">الرصيد الصافي</div>
+   426→        <div class="summary-value">${formatCurrency(Math.abs(netBalance))} ${netBalance > 0 ? '(عليه)' : netBalance < 0 ? '(له)' : ''}</div>
+   427→      </div>
+   428→    </div>
+   429→    <div class="amount-words">
+   430→      الرصيد: ${numberToArabicWords(Math.abs(netBalance))} ${netBalance > 0 ? '(مدين/عليه)' : netBalance < 0 ? '(دائن/له)' : ''}
+   431→    </div>
+   432→    <div class="footer">
+   433→      <div class="signature-box">
+   434→        <div class="signature-label">المحاسب</div>
+   435→        <div class="signature-line"></div>
+   436→      </div>
+   437→      <div class="signature-box">
+   438→        <div class="signature-label">مسؤول الفرع</div>
+   439→        <div class="signature-line"></div>
+   440→      </div>
+   441→    </div>
+   442→  </div>
+   443→</body>
+   444→</html>`;
+   445→  };
+   446→
+   447→  const getTypeLabel = (type: string) => {
+   448→    const labels: Record<string, string> = {
+   449→      invoice: 'فاتورة',
+   450→      payment: 'إيصال قبض',
+   451→      return: 'مرتجع',
+   452→    };
+   453→    return labels[type] || type;
+   454→  };
+   455→
+   456→  const getTypeBadgeColor = (type: string) => {
+   457→    const colors: Record<string, string> = {
+   458→      invoice: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+   459→      payment: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+   460→      return: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+   461→    };
+   462→    return colors[type] || '';
+   463→  };
+   464→
+   465→  const getTypeGradient = (type: string) => {
+   466→    const gradients: Record<string, string> = {
+   467→      invoice: 'from-red-500 to-rose-600',
+   468→      payment: 'from-emerald-500 to-teal-600',
+   469→      return: 'from-amber-500 to-orange-600',
+   470→    };
+   471→    return gradients[type] || 'from-gray-500 to-gray-600';
+   472→  };
+   473→
+   474→  const getTypeIcon = (type: string) => {
+   475→    switch (type) {
+   476→      case 'invoice': return Receipt;
+   477→      case 'payment': return ArrowDownToLine;
+   478→      case 'return': return RotateCcw;
+   479→      default: return FileText;
+   480→    }
+   481→  };
+   482→
+   483→  const getTypeBorderColor = (type: string) => {
+   484→    const colors: Record<string, string> = {
+   485→      invoice: 'border-r-red-500',
+   486→      payment: 'border-r-emerald-500',
+   487→      return: 'border-r-amber-500',
+   488→    };
+   489→    return colors[type] || 'border-r-gray-500';
+   490→  };
+   491→
+   492→  return (
+   493→    <div className="space-y-4 sm:space-y-6">
+   494→      {/* Header */}
+   495→      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }} className="sm:flex-row sm:items-center sm:justify-between">
+   496→        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+   497→          <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-teal-500/25">
+   498→            <ScrollText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+   499→          </div>
+   500→          <div>
+   501→            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">كشف حساب الفرع</h1>
+   502→            <p className="text-muted-foreground text-[11px] sm:text-sm mt-0.5">
+   503→              عرض تفصيلي لكل حركات الفرع من فواتير ومرتجعات ومدفوعات
+   504→            </p>
+   505→          </div>
+   506→        </div>
+   507→        {generated && (
+   508→          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }} className="sm:flex-row sm:items-center text-xs text-muted-foreground">
+   509→            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="bg-muted/60 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+   510→              <Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+   511→              <span className="font-medium text-foreground text-[11px] sm:text-xs">{branchName}</span>
+   512→            </div>
+   513→            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="bg-muted/60 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+   514→              <CalendarRange className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+   515→              <span className="font-medium text-foreground text-[11px] sm:text-xs">{formatDate(dateFrom)} — {formatDate(dateTo)}</span>
+   516→            </div>
+   517→          </div>
+   518→        )}
+   519→      </div>
+   520→
+   521→      {/* Filters */}
+   522→      <Card className="border-0 shadow-lg overflow-hidden relative">
+   523→        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-teal-500 via-emerald-500 to-teal-600" />
+   524→        <CardContent className="p-3 sm:p-5 pt-4 sm:pt-6">
+   525→          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }} className="sm:grid-cols-2 lg:grid-cols-5 sm:gap-3">
+   526→            <div>
+   527→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+   528→                <Building2 className="w-3 h-3" />
+   529→                الفرع *
+   530→              </Label>
+   531→              <Select value={selectedBranch} onValueChange={setSelectedBranch} disabled={!isAdmin && !!user?.branch_id}>
+   532→                <SelectTrigger className="h-9 text-xs sm:text-sm">
+   533→                  <SelectValue placeholder="اختر الفرع" />
+   534→                </SelectTrigger>
+   535→                <SelectContent>
+   536→                  {branches.map((b) => (
+   537→                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   538→                  ))}
+   539→                </SelectContent>
+   540→              </Select>
+   541→            </div>
+   542→            <div>
+   543→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+   544→                <CalendarRange className="w-3 h-3" />
+   545→                من تاريخ *
+   546→              </Label>
+   547→              <Input
+   548→                type="date"
+   549→                value={dateFrom}
+   550→                onChange={(e) => setDateFrom(e.target.value)}
+   551→                className="h-9 text-xs sm:text-sm"
+   552→              />
+   553→            </div>
+   554→            <div>
+   555→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+   556→                <CalendarRange className="w-3 h-3" />
+   557→                إلى تاريخ *
+   558→              </Label>
+   559→              <Input
+   560→                type="date"
+   561→                value={dateTo}
+   562→                onChange={(e) => setDateTo(e.target.value)}
+   563→                className="h-9 text-xs sm:text-sm"
+   564→              />
+   565→            </div>
+   566→            <div>
+   567→              <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+   568→                <FileText className="w-3 h-3" />
+   569→                نوع الحركة
+   570→              </Label>
+   571→              <Select value={typeFilter} onValueChange={setTypeFilter}>
+   572→                <SelectTrigger className="h-9 text-xs sm:text-sm">
+   573→                  <SelectValue />
+   574→                </SelectTrigger>
+   575→                <SelectContent>
+   576→                  <SelectItem value="all">الكل</SelectItem>
+   577→                  <SelectItem value="invoice">فواتير فقط</SelectItem>
+   578→                  <SelectItem value="payment">إيصالات قبض فقط</SelectItem>
+   579→                  <SelectItem value="return">مرتجعات فقط</SelectItem>
+   580→                </SelectContent>
+   581→              </Select>
+   582→            </div>
+   583→            <div style={{ display: 'flex', alignItems: 'flex-end' }} className="col-span-1 sm:col-span-2 lg:col-span-1">
+   584→              <Button
+   585→                onClick={generateStatement}
+   586→                disabled={loading}
+   587→                className="w-full gap-2 h-10 sm:h-9 text-sm sm:text-xs md:text-sm bg-gradient-to-l from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-md shadow-teal-500/20 transition-all duration-200"
+   588→              >
+   589→                <Search className="w-4 h-4" />
+   590→                {loading ? 'جاري التحليل...' : 'عرض الكشف'}
+   591→              </Button>
+   592→            </div>
+   593→          </div>
+   594→        </CardContent>
+   595→      </Card>
+   596→
+   597→      {/* Statement Results */}
+   598→      {generated && (
+   599→        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   600→          {/* Action Buttons */}
+   601→          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }} className="mb-4">
+   602→            <Button
+   603→              onClick={handlePrint}
+   604→              variant="outline"
+   605→              className="gap-2 text-xs sm:text-sm h-8 sm:h-9 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700 dark:hover:bg-teal-950/30 dark:hover:border-teal-700 dark:hover:text-teal-400 transition-all duration-200"
+   606→            >
+   607→              <Printer className="w-3.5 h-3.5" />
+   608→              طباعة
+   609→            </Button>
+   610→            <Button
+   611→              onClick={handleDownloadPDF}
+   612→              variant="outline"
+   613→              className="gap-2 text-xs sm:text-sm h-8 sm:h-9 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 dark:hover:bg-rose-950/30 dark:hover:border-rose-700 dark:hover:text-rose-400 transition-all duration-200"
+   614→            >
+   615→              <FileDown className="w-3.5 h-3.5" />
+   616→              تحميل PDF
+   617→            </Button>
+   618→            <Button
+   619→              onClick={handleDownloadExcel}
+   620→              variant="outline"
+   621→              className="gap-2 text-xs sm:text-sm h-8 sm:h-9 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 dark:hover:bg-emerald-950/30 dark:hover:border-emerald-700 dark:hover:text-emerald-400 transition-all duration-200"
+   622→            >
+   623→              <FileSpreadsheet className="w-3.5 h-3.5" />
+   624→              تحميل Excel
+   625→            </Button>
+   626→          </div>
+   627→
+   628→          {/* Summary Cards */}
+   629→          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }} className="sm:grid-cols-3 sm:gap-5 mb-4">
+   630→            <Card className="border-0 shadow-lg overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+   631→              <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-red-500 to-rose-500" />
+   632→              <CardContent className="p-4 sm:p-5 bg-gradient-to-bl from-red-50/80 via-white to-white dark:from-red-950/30 dark:via-card dark:to-card">
+   633→                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+   634→                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-md shadow-red-500/25 group-hover:shadow-lg group-hover:shadow-red-500/30 transition-all duration-300">
+   635→                    <TrendingUp className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-white" />
+   636→                  </div>
+   637→                  <div>
+   638→                    <p className="text-[10px] sm:text-xs font-medium text-red-600/70 dark:text-red-400/70 uppercase tracking-wide">إجمالي المدين (عليه)</p>
+   639→                    <p className="text-lg sm:text-2xl font-extrabold text-red-600 dark:text-red-400 mt-0.5">{formatCurrency(totalDebit)}</p>
+   640→                  </div>
+   641→                </div>
+   642→              </CardContent>
+   643→            </Card>
+   644→            <Card className="border-0 shadow-lg overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+   645→              <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-emerald-500 to-teal-500" />
+   646→              <CardContent className="p-4 sm:p-5 bg-gradient-to-bl from-emerald-50/80 via-white to-white dark:from-emerald-950/30 dark:via-card dark:to-card">
+   647→                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+   648→                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/25 group-hover:shadow-lg group-hover:shadow-emerald-500/30 transition-all duration-300">
+   649→                    <TrendingDown className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-white" />
+   650→                  </div>
+   651→                  <div>
+   652→                    <p className="text-[10px] sm:text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wide">إجمالي الدائن (له)</p>
+   653→                    <p className="text-lg sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">{formatCurrency(totalCredit)}</p>
+   654→                  </div>
+   655→                </div>
+   656→              </CardContent>
+   657→            </Card>
+   658→            <Card className="border-0 shadow-lg overflow-hidden group transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+   659→              <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-teal-500 to-emerald-600" />
+   660→              <CardContent className="p-4 sm:p-5 bg-gradient-to-bl from-teal-50/80 via-white to-white dark:from-teal-950/30 dark:via-card dark:to-card">
+   661→                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+   662→                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${netBalance > 0 ? 'from-red-500 to-rose-600' : netBalance < 0 ? 'from-emerald-500 to-teal-600' : 'from-teal-500 to-emerald-700'} flex items-center justify-center shadow-md ${netBalance > 0 ? 'shadow-red-500/25' : netBalance < 0 ? 'shadow-emerald-500/25' : 'shadow-teal-500/25'} group-hover:shadow-lg transition-all duration-300`}>
+   663→                    <Scale className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-white" />
+   664→                  </div>
+   665→                  <div>
+   666→                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">الرصيد الصافي</p>
+   667→                    <p className={`text-lg sm:text-2xl font-extrabold mt-0.5 ${netBalance > 0 ? 'text-red-600 dark:text-red-400' : netBalance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-teal-700 dark:text-teal-400'}`}>
+   668→                      {formatCurrency(Math.abs(netBalance))}
+   669→                      <span className="text-[10px] sm:text-sm font-semibold mr-1 opacity-75">
+   670→                        {netBalance > 0 ? '(عليه)' : netBalance < 0 ? '(له)' : ''}
+   671→                      </span>
+   672→                    </p>
+   673→                  </div>
+   674→                </div>
+   675→              </CardContent>
+   676→            </Card>
+   677→          </div>
+   678→
+   679→          {/* Amount in words */}
+   680→          {netBalance !== 0 && (
+   681→            <Card className="border-0 shadow-md mb-4 overflow-hidden">
+   682→              <div className="h-0.5 bg-gradient-to-l from-teal-400 via-emerald-400 to-teal-500" />
+   683→              <CardContent className="p-3 bg-gradient-to-l from-teal-50/50 via-transparent to-emerald-50/50 dark:from-teal-950/20 dark:via-transparent dark:to-emerald-950/20">
+   684→                <p className="text-xs sm:text-sm text-center text-muted-foreground">
+   685→                  الرصيد: <span className="font-bold text-foreground">{numberToArabicWords(Math.abs(netBalance))}</span>
+   686→                  <span className="mr-1 font-medium">{netBalance > 0 ? '(مدين/عليه)' : netBalance < 0 ? '(دائن/له)' : ''}</span>
+   687→                </p>
+   688→              </CardContent>
+   689→            </Card>
+   690→          )}
+   691→
+   692→          {/* Transactions - Mobile Card Layout */}
+   693→          <Card className="border-0 shadow-lg sm:hidden overflow-hidden">
+   694→            <CardContent className="p-0">
+   695→              {entries.length === 0 ? (
+   696→                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} className="py-16 px-4">
+   697→                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center mb-4 shadow-inner">
+   698→                    <FileText className="w-10 h-10 text-muted-foreground/40" />
+   699→                  </div>
+   700→                  <h3 className="text-lg font-bold mb-1.5">لا توجد حركات</h3>
+   701→                  <p className="text-muted-foreground text-sm text-center max-w-[240px]">
+   702→                    لا توجد حركات مسجلة لهذا الفرع في الفترة المحددة
+   703→                  </p>
+   704→                </div>
+   705→              ) : (
+   706→                <div>
+   707→                  {entries.map((entry, idx) => {
+   708→                    const TypeIcon = getTypeIcon(entry.type);
+   709→                    return (
+   710→                      <motion.div
+   711→                        key={idx}
+   712→                        initial={{ opacity: 0, x: 10 }}
+   713→                        animate={{ opacity: 1, x: 0 }}
+   714→                        transition={{ delay: idx * 0.03, duration: 0.2 }}
+   715→                        className={`border-r-4 ${getTypeBorderColor(entry.type)} border-b last:border-b-0 transition-colors duration-200 hover:bg-muted/30`}
+   716→                      >
+   717→                        <div className="p-3.5">
+   718→                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mb-2">
+   719→                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+   720→                              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getTypeGradient(entry.type)} flex items-center justify-center shadow-sm`}>
+   721→                                <TypeIcon className="w-4 h-4 text-white" />
+   722→                              </div>
+   723→                              <div>
+   724→                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold ${getTypeBadgeColor(entry.type)}`}>
+   725→                                  {getTypeLabel(entry.type)}
+   726→                                </span>
+   727→                                <span className="text-xs font-bold mr-1.5">{entry.reference}</span>
+   728→                              </div>
+   729→                            </div>
+   730→                            <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-2 py-0.5 rounded-full">{formatDate(entry.date)}</span>
+   731→                          </div>
+   732→                          <p className="text-[11px] text-muted-foreground mb-2.5 mr-10">{entry.description}</p>
+   733→                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="mr-10">
+   734→                            <div style={{ display: 'flex', gap: '12px' }} className="text-[11px]">
+   735→                              {entry.debit > 0 && (
+   736→                                <span className="text-red-600 dark:text-red-400 font-bold">عليه: {formatCurrency(entry.debit)}</span>
+   737→                              )}
+   738→                              {entry.credit > 0 && (
+   739→                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">له: {formatCurrency(entry.credit)}</span>
+   740→                              )}
+   741→                            </div>
+   742→                            <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${entry.balance > 0 ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30' : entry.balance < 0 ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' : 'bg-muted/50'}`}>
+   743→                              {formatCurrency(Math.abs(entry.balance))}
+   744→                              <span className="text-[9px] font-semibold mr-0.5 opacity-80">
+   745→                                {entry.balance > 0 ? 'ع' : entry.balance < 0 ? 'ل' : ''}
+   746→                              </span>
+   747→                            </span>
+   748→                          </div>
+   749→                        </div>
+   750→                      </motion.div>
+   751→                    );
+   752→                  })}
+   753→                </div>
+   754→              )}
+   755→            </CardContent>
+   756→          </Card>
+   757→
+   758→          {/* Transactions - Desktop Table Layout */}
+   759→          <Card className="border-0 shadow-lg hidden sm:block overflow-hidden">
+   760→            <CardContent className="p-0">
+   761→              {entries.length === 0 ? (
+   762→                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} className="py-20 px-4">
+   763→                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center mb-5 shadow-inner">
+   764→                    <FileText className="w-12 h-12 text-muted-foreground/40" />
+   765→                  </div>
+   766→                  <h3 className="text-xl font-bold mb-2">لا توجد حركات</h3>
+   767→                  <p className="text-muted-foreground text-sm text-center max-w-[300px]">
+   768→                    لا توجد حركات مسجلة لهذا الفرع في الفترة المحددة
+   769→                  </p>
+   770→                </div>
+   771→              ) : (
+   772→                <div>
+   773→                  {/* Gradient accent bar */}
+   774→                  <div className="h-1.5 bg-gradient-to-l from-teal-500 via-emerald-500 to-teal-600" />
+   775→                  <div style={{ overflowX: 'auto' }}>
+   776→                    <Table>
+   777→                      <TableHeader>
+   778→                        <TableRow className="bg-gradient-to-l from-muted/80 to-muted/40 hover:from-muted/80 hover:to-muted/40">
+   779→                          <TableHead className="text-right font-bold text-foreground/80">التاريخ</TableHead>
+   780→                          <TableHead className="text-right font-bold text-foreground/80">البيان</TableHead>
+   781→                          <TableHead className="text-right font-bold text-foreground/80">رقم المرجع</TableHead>
+   782→                          <TableHead className="text-left font-bold text-foreground/80">مدين (عليه)</TableHead>
+   783→                          <TableHead className="text-left font-bold text-foreground/80">دائن (له)</TableHead>
+   784→                          <TableHead className="text-left font-bold text-foreground/80">الرصيد</TableHead>
+   785→                        </TableRow>
+   786→                      </TableHeader>
+   787→                      <TableBody>
+   788→                        {entries.map((entry, idx) => (
+   789→                          <TableRow key={idx} className="transition-colors duration-150 hover:bg-muted/40">
+   790→                            <TableCell className="text-sm font-medium">{formatDate(entry.date)}</TableCell>
+   791→                            <TableCell>
+   792→                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+   793→                                <div className={`w-7 h-7 rounded-md bg-gradient-to-br ${getTypeGradient(entry.type)} flex items-center justify-center shadow-sm`}>
+   794→                                  {(() => {
+   795→                                    const Icon = getTypeIcon(entry.type);
+   796→                                    return <Icon className="w-3.5 h-3.5 text-white" />;
+   797→                                  })()}
+   798→                                </div>
+   799→                                <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold ${getTypeBadgeColor(entry.type)}`}>
+   800→                                  {getTypeLabel(entry.type)}
+   801→                                </span>
+   802→                                <span className="text-sm text-muted-foreground">{entry.description}</span>
+   803→                              </div>
+   804→                            </TableCell>
+   805→                            <TableCell className="font-bold text-sm">{entry.reference}</TableCell>
+   806→                            <TableCell className="text-left font-bold text-red-600 dark:text-red-400">
+   807→                              {entry.debit > 0 ? formatCurrency(entry.debit) : <span className="text-muted-foreground/40">—</span>}
+   808→                            </TableCell>
+   809→                            <TableCell className="text-left font-bold text-emerald-600 dark:text-emerald-400">
+   810→                              {entry.credit > 0 ? formatCurrency(entry.credit) : <span className="text-muted-foreground/40">—</span>}
+   811→                            </TableCell>
+   812→                            <TableCell className="text-left">
+   813→                              <span className={`font-extrabold px-2 py-1 rounded-md text-sm ${entry.balance > 0 ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30' : entry.balance < 0 ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' : ''}`}>
+   814→                                {formatCurrency(Math.abs(entry.balance))}
+   815→                                <span className="text-[10px] font-semibold mr-1 opacity-75">
+   816→                                  {entry.balance > 0 ? 'ع' : entry.balance < 0 ? 'ل' : ''}
+   817→                                </span>
+   818→                              </span>
+   819→                            </TableCell>
+   820→                          </TableRow>
+   821→                        ))}
+   822→                      </TableBody>
+   823→                    </Table>
+   824→                  </div>
+   825→                </div>
+   826→              )}
+   827→            </CardContent>
+   828→          </Card>
+   829→        </motion.div>
+   830→      )}
+   831→    </div>
+   832→  );
+   833→}
+   834→

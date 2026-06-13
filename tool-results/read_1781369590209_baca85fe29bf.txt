@@ -1,0 +1,915 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import { hashPassword } from '@/lib/auth';
+     7→import { formatDateTime } from '@/lib/utils';
+     8→import type { User, Role, Branch } from '@/lib/types';
+     9→import { Card, CardContent } from '@/components/ui/card';
+    10→import { Button } from '@/components/ui/button';
+    11→import { Input } from '@/components/ui/input';
+    12→import { Label } from '@/components/ui/label';
+    13→import { Badge } from '@/components/ui/badge';
+    14→import { Switch } from '@/components/ui/switch';
+    15→import { Checkbox } from '@/components/ui/checkbox';
+    16→import { ScrollArea } from '@/components/ui/scroll-area';
+    17→import {
+    18→  Dialog,
+    19→  DialogContent,
+    20→  DialogHeader,
+    21→  DialogTitle,
+    22→  DialogFooter,
+    23→} from '@/components/ui/dialog';
+    24→import {
+    25→  AlertDialog,
+    26→  AlertDialogAction,
+    27→  AlertDialogCancel,
+    28→  AlertDialogContent,
+    29→  AlertDialogDescription,
+    30→  AlertDialogFooter,
+    31→  AlertDialogHeader,
+    32→  AlertDialogTitle,
+    33→} from '@/components/ui/alert-dialog';
+    34→import {
+    35→  Select,
+    36→  SelectContent,
+    37→  SelectItem,
+    38→  SelectTrigger,
+    39→  SelectValue,
+    40→} from '@/components/ui/select';
+    41→import {
+    42→  Table,
+    43→  TableBody,
+    44→  TableCell,
+    45→  TableHead,
+    46→  TableHeader,
+    47→  TableRow,
+    48→} from '@/components/ui/table';
+    49→import {
+    50→  Users,
+    51→  Plus,
+    52→  Search,
+    53→  Edit,
+    54→  KeyRound,
+    55→  Shield,
+    56→  UserCheck,
+    57→  UserX,
+    58→  Filter,
+    59→  Loader2,
+    60→  Mail,
+    61→  Building2,
+    62→} from 'lucide-react';
+    63→import { toast } from 'sonner';
+    64→import { motion } from 'framer-motion';
+    65→
+    66→interface UserRow {
+    67→  id: string;
+    68→  username: string;
+    69→  full_name: string;
+    70→  role_id: string | null;
+    71→  branch_id: string | null;
+    72→  is_active: boolean;
+    73→  must_change_password: boolean;
+    74→  last_login: string | null;
+    75→  created_at: string;
+    76→  roles: { id: string; name: string; display_name: string } | null;
+    77→  branches: { id: string; name: string } | null;
+    78→}
+    79→
+    80→export default function UsersPage() {
+    81→  const { user: currentUser, isAdmin } = useAppStore();
+    82→
+    83→  const [users, setUsers] = useState<UserRow[]>([]);
+    84→  const [roles, setRoles] = useState<Role[]>([]);
+    85→  const [branches, setBranches] = useState<Branch[]>([]);
+    86→  const [search, setSearch] = useState('');
+    87→  const [roleFilter, setRoleFilter] = useState('all');
+    88→  const [statusFilter, setStatusFilter] = useState('all');
+    89→  const [loading, setLoading] = useState(true);
+    90→  const [saving, setSaving] = useState(false);
+    91→
+    92→  // Add/Edit dialog
+    93→  const [dialogOpen, setDialogOpen] = useState(false);
+    94→  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+    95→  const [form, setForm] = useState({
+    96→    full_name: '',
+    97→    username: '',
+    98→    password: '',
+    99→    confirmPassword: '',
+   100→    role_id: '',
+   101→    branch_id: '',
+   102→    is_active: true,
+   103→    must_change_password: false,
+   104→  });
+   105→
+   106→  // Toggle active confirmation
+   107→  const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
+   108→  const [togglingUser, setTogglingUser] = useState<UserRow | null>(null);
+   109→
+   110→  // Reset password dialog
+   111→  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+   112→  const [resettingUser, setResettingUser] = useState<UserRow | null>(null);
+   113→  const [resetForm, setResetForm] = useState({ password: '', confirmPassword: '' });
+   114→
+   115→  useEffect(() => {
+   116→    if (!isAdmin) return;
+   117→    loadData();
+   118→  }, [isAdmin]);
+   119→
+   120→  const loadData = async () => {
+   121→    setLoading(true);
+   122→    try {
+   123→      const [usersRes, rolesRes, branchesRes] = await Promise.all([
+   124→        supabase
+   125→          .from('users')
+   126→          .select('id, username, full_name, role_id, branch_id, is_active, must_change_password, last_login, created_at, roles(id, name, display_name), branches(id, name)')
+   127→          .order('created_at', { ascending: false }),
+   128→        supabase.from('roles').select('*').order('display_name'),
+   129→        supabase.from('branches').select('*').eq('is_active', true).order('name'),
+   130→      ]);
+   131→
+   132→      if (usersRes.data) setUsers(usersRes.data as unknown as UserRow[]);
+   133→      if (rolesRes.data) setRoles(rolesRes.data as Role[]);
+   134→      if (branchesRes.data) setBranches(branchesRes.data as Branch[]);
+   135→    } catch (err) {
+   136→      console.error(err);
+   137→      toast.error('حدث خطأ أثناء تحميل البيانات');
+   138→    } finally {
+   139→      setLoading(false);
+   140→    }
+   141→  };
+   142→
+   143→  const logAction = async (action: string, details: Record<string, unknown>) => {
+   144→    try {
+   145→      await supabase.from('audit_log').insert({ action, details });
+   146→    } catch {
+   147→      // Silent fail for audit logging
+   148→    }
+   149→  };
+   150→
+   151→  const openAddDialog = () => {
+   152→    setEditingUser(null);
+   153→    setForm({
+   154→      full_name: '',
+   155→      username: '',
+   156→      password: '',
+   157→      confirmPassword: '',
+   158→      role_id: '',
+   159→      branch_id: '',
+   160→      is_active: true,
+   161→      must_change_password: true,
+   162→    });
+   163→    setDialogOpen(true);
+   164→  };
+   165→
+   166→  const openEditDialog = (user: UserRow) => {
+   167→    setEditingUser(user);
+   168→    const roleName = user.roles?.name;
+   169→    setForm({
+   170→      full_name: user.full_name,
+   171→      username: user.username,
+   172→      password: '',
+   173→      confirmPassword: '',
+   174→      role_id: user.role_id || '',
+   175→      branch_id: user.branch_id || '',
+   176→      is_active: user.is_active,
+   177→      must_change_password: user.must_change_password,
+   178→    });
+   179→    setDialogOpen(true);
+   180→  };
+   181→
+   182→  const selectedRoleName = (): string | null => {
+   183→    if (!form.role_id) return null;
+   184→    const role = roles.find(r => r.id === form.role_id);
+   185→    return role?.name || null;
+   186→  };
+   187→
+   188→  const handleSave = async () => {
+   189→    if (!form.full_name.trim()) {
+   190→      toast.error('يرجى إدخال الاسم الكامل');
+   191→      return;
+   192→    }
+   193→    if (!form.username.trim()) {
+   194→      toast.error('يرجى إدخال اسم المستخدم');
+   195→      return;
+   196→    }
+   197→    if (!editingUser) {
+   198→      if (!form.password) {
+   199→        toast.error('يرجى إدخال كلمة المرور');
+   200→        return;
+   201→      }
+   202→      if (form.password.length < 4) {
+   203→        toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+   204→        return;
+   205→      }
+   206→      if (form.password !== form.confirmPassword) {
+   207→        toast.error('كلمة المرور وتأكيدها غير متطابقتين');
+   208→        return;
+   209→      }
+   210→    }
+   211→
+   212→    setSaving(true);
+   213→    try {
+   214→      if (editingUser) {
+   215→        // Update user
+   216→        const updates: Record<string, unknown> = {
+   217→          full_name: form.full_name.trim(),
+   218→          role_id: form.role_id || null,
+   219→          branch_id: selectedRoleName() === 'admin' ? null : (form.branch_id || null),
+   220→          is_active: form.is_active,
+   221→          must_change_password: form.must_change_password,
+   222→          updated_at: new Date().toISOString(),
+   223→        };
+   224→
+   225→        const { error } = await supabase
+   226→          .from('users')
+   227→          .update(updates)
+   228→          .eq('id', editingUser.id);
+   229→
+   230→        if (error) throw error;
+   231→
+   232→        await logAction('update_user', {
+   233→          user_id: editingUser.id,
+   234→          user_name: form.full_name.trim(),
+   235→          updated_by: currentUser?.id,
+   236→        });
+   237→
+   238→        toast.success('تم تحديث المستخدم بنجاح');
+   239→      } else {
+   240→        // Check username uniqueness
+   241→        const { data: existing } = await supabase
+   242→          .from('users')
+   243→          .select('id')
+   244→          .eq('username', form.username.trim())
+   245→          .maybeSingle();
+   246→
+   247→        if (existing) {
+   248→          toast.error('اسم المستخدم موجود بالفعل');
+   249→          setSaving(false);
+   250→          return;
+   251→        }
+   252→
+   253→        const hashedPassword = await hashPassword(form.password);
+   254→
+   255→        const { error } = await supabase.from('users').insert({
+   256→          full_name: form.full_name.trim(),
+   257→          username: form.username.trim(),
+   258→          password_hash: hashedPassword,
+   259→          role_id: form.role_id || null,
+   260→          branch_id: selectedRoleName() === 'admin' ? null : (form.branch_id || null),
+   261→          is_active: form.is_active,
+   262→          must_change_password: form.must_change_password,
+   263→          created_by: currentUser?.id,
+   264→        });
+   265→
+   266→        if (error) throw error;
+   267→
+   268→        await logAction('create_user', {
+   269→          user_name: form.full_name.trim(),
+   270→          username: form.username.trim(),
+   271→          created_by: currentUser?.id,
+   272→        });
+   273→
+   274→        toast.success('تم إضافة المستخدم بنجاح');
+   275→      }
+   276→
+   277→      setDialogOpen(false);
+   278→      loadData();
+   279→    } catch (err) {
+   280→      console.error(err);
+   281→      toast.error('حدث خطأ أثناء الحفظ');
+   282→    } finally {
+   283→      setSaving(false);
+   284→    }
+   285→  };
+   286→
+   287→  const handleToggleActive = async () => {
+   288→    if (!togglingUser) return;
+   289→
+   290→    // Prevent deactivating current admin
+   291→    if (togglingUser.id === currentUser?.id && togglingUser.is_active) {
+   292→      toast.error('لا يمكنك تعطيل حسابك الخاص');
+   293→      setToggleDialogOpen(false);
+   294→      setTogglingUser(null);
+   295→      return;
+   296→    }
+   297→
+   298→    try {
+   299→      const newStatus = !togglingUser.is_active;
+   300→      const { error } = await supabase
+   301→        .from('users')
+   302→        .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+   303→        .eq('id', togglingUser.id);
+   304→
+   305→      if (error) throw error;
+   306→
+   307→      await logAction(newStatus ? 'activate_user' : 'deactivate_user', {
+   308→        user_id: togglingUser.id,
+   309→        user_name: togglingUser.full_name,
+   310→        action_by: currentUser?.id,
+   311→      });
+   312→
+   313→      toast.success(newStatus ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم');
+   314→      setToggleDialogOpen(false);
+   315→      setTogglingUser(null);
+   316→      loadData();
+   317→    } catch (err) {
+   318→      console.error(err);
+   319→      toast.error('حدث خطأ أثناء تغيير الحالة');
+   320→    }
+   321→  };
+   322→
+   323→  const openResetPasswordDialog = (user: UserRow) => {
+   324→    setResettingUser(user);
+   325→    setResetForm({ password: '', confirmPassword: '' });
+   326→    setResetDialogOpen(true);
+   327→  };
+   328→
+   329→  const handleResetPassword = async () => {
+   330→    if (!resettingUser) return;
+   331→    if (!resetForm.password) {
+   332→      toast.error('يرجى إدخال كلمة المرور الجديدة');
+   333→      return;
+   334→    }
+   335→    if (resetForm.password.length < 4) {
+   336→      toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+   337→      return;
+   338→    }
+   339→    if (resetForm.password !== resetForm.confirmPassword) {
+   340→      toast.error('كلمة المرور وتأكيدها غير متطابقتين');
+   341→      return;
+   342→    }
+   343→
+   344→    setSaving(true);
+   345→    try {
+   346→      const hashedPassword = await hashPassword(resetForm.password);
+   347→      const { error } = await supabase
+   348→        .from('users')
+   349→        .update({
+   350→          password_hash: hashedPassword,
+   351→          must_change_password: true,
+   352→          updated_at: new Date().toISOString(),
+   353→        })
+   354→        .eq('id', resettingUser.id);
+   355→
+   356→      if (error) throw error;
+   357→
+   358→      await logAction('reset_password', {
+   359→        user_id: resettingUser.id,
+   360→        user_name: resettingUser.full_name,
+   361→        reset_by: currentUser?.id,
+   362→      });
+   363→
+   364→      toast.success('تم إعادة تعيين كلمة المرور بنجاح');
+   365→      setResetDialogOpen(false);
+   366→      setResettingUser(null);
+   367→    } catch (err) {
+   368→      console.error(err);
+   369→      toast.error('حدث خطأ أثناء إعادة تعيين كلمة المرور');
+   370→    } finally {
+   371→      setSaving(false);
+   372→    }
+   373→  };
+   374→
+   375→  // Filtering
+   376→  const filteredUsers = users.filter((u) => {
+   377→    const matchSearch =
+   378→      u.full_name.includes(search) ||
+   379→      u.username.includes(search);
+   380→    const matchRole = roleFilter === 'all' || u.role_id === roleFilter;
+   381→    const matchStatus =
+   382→      statusFilter === 'all' ||
+   383→      (statusFilter === 'active' && u.is_active) ||
+   384→      (statusFilter === 'inactive' && !u.is_active);
+   385→    return matchSearch && matchRole && matchStatus;
+   386→  });
+   387→
+   388→  if (!isAdmin) {
+   389→    return (
+   390→      <div className="flex flex-col items-center justify-center py-20 px-4">
+   391→        <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+   392→          <Shield className="w-10 h-10 text-white" />
+   393→        </div>
+   394→        <h3 className="text-xl font-bold mb-2">غير مصرح بالوصول</h3>
+   395→        <p className="text-muted-foreground text-sm text-center">
+   396→          هذه الصفحة متاحة للمدير فقط
+   397→        </p>
+   398→      </div>
+   399→    );
+   400→  }
+   401→
+   402→  return (
+   403→    <div className="space-y-6">
+   404→      {/* Header */}
+   405→      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   406→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   407→          <div className="flex items-center gap-3">
+   408→            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   409→              <Users className="w-6 h-6 text-white" />
+   410→            </div>
+   411→            <div>
+   412→              <h1 className="text-2xl font-bold">إدارة المستخدمين</h1>
+   413→              <p className="text-muted-foreground text-sm mt-0.5">
+   414→                إجمالي المستخدمين: <span className="font-semibold text-foreground">{users.length}</span> | نشط: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{users.filter(u => u.is_active).length}</span>
+   415→              </p>
+   416→            </div>
+   417→          </div>
+   418→          <Button onClick={openAddDialog} className="gap-2 shadow-lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   419→            <Plus className="w-4 h-4" />
+   420→            إضافة مستخدم
+   421→          </Button>
+   422→        </div>
+   423→      </motion.div>
+   424→
+   425→      {/* Search & Filters */}
+   426→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   427→        <Card className="border-0 shadow-md overflow-hidden">
+   428→          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb, #1d4ed8)' }} />
+   429→          <CardContent className="p-4">
+   430→            <div className="flex flex-col sm:flex-row gap-3">
+   431→              <div className="relative flex-1">
+   432→                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   433→                <Input
+   434→                  placeholder="بحث بالاسم أو اسم المستخدم..."
+   435→                  value={search}
+   436→                  onChange={(e) => setSearch(e.target.value)}
+   437→                  className="pr-10"
+   438→                />
+   439→              </div>
+   440→              <div className="flex gap-2">
+   441→                <Select value={roleFilter} onValueChange={setRoleFilter}>
+   442→                  <SelectTrigger className="w-[160px]">
+   443→                    <Filter className="w-4 h-4 ml-1" />
+   444→                    <SelectValue placeholder="الدور" />
+   445→                  </SelectTrigger>
+   446→                  <SelectContent>
+   447→                    <SelectItem value="all">كل الأدوار</SelectItem>
+   448→                    {roles.map((role) => (
+   449→                      <SelectItem key={role.id} value={role.id}>
+   450→                        {role.display_name}
+   451→                      </SelectItem>
+   452→                    ))}
+   453→                  </SelectContent>
+   454→                </Select>
+   455→                <Select value={statusFilter} onValueChange={setStatusFilter}>
+   456→                  <SelectTrigger className="w-[130px]">
+   457→                    <SelectValue placeholder="الحالة" />
+   458→                  </SelectTrigger>
+   459→                  <SelectContent>
+   460→                    <SelectItem value="all">كل الحالات</SelectItem>
+   461→                    <SelectItem value="active">نشط</SelectItem>
+   462→                    <SelectItem value="inactive">معطل</SelectItem>
+   463→                  </SelectContent>
+   464→                </Select>
+   465→              </div>
+   466→            </div>
+   467→          </CardContent>
+   468→        </Card>
+   469→      </motion.div>
+   470→
+   471→      {/* Users Table */}
+   472→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
+   473→        <Card className="border-0 shadow-md overflow-hidden">
+   474→          <CardContent className="p-0">
+   475→            {loading ? (
+   476→              <div className="flex flex-col items-center justify-center py-16">
+   477→                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   478→                  <Loader2 className="w-6 h-6 animate-spin text-white" />
+   479→                </div>
+   480→                <p className="text-muted-foreground text-sm">جاري تحميل المستخدمين...</p>
+   481→              </div>
+   482→            ) : filteredUsers.length === 0 ? (
+   483→              <div className="flex flex-col items-center justify-center py-20 px-4">
+   484→                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #93c5fd, #3b82f6)' }}>
+   485→                  <Users className="w-10 h-10 text-white" />
+   486→                </div>
+   487→                <h3 className="text-xl font-bold mb-2">لا يوجد مستخدمون</h3>
+   488→                <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+   489→                  لم يتم إضافة أي مستخدمين بعد. أضف مستخدماً لبدء إدارة الصلاحيات.
+   490→                </p>
+   491→                <Button onClick={openAddDialog} className="gap-2 shadow-lg" size="lg" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   492→                  <Plus className="w-5 h-5" />
+   493→                  إضافة مستخدم جديد
+   494→                </Button>
+   495→              </div>
+   496→            ) : (
+   497→              <>
+   498→                {/* Desktop Table */}
+   499→                <div className="hidden sm:block">
+   500→                  <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb, #1d4ed8)' }} />
+   501→                  <ScrollArea className="max-h-[calc(100vh-320px)]">
+   502→                    <Table>
+   503→                      <TableHeader>
+   504→                        <TableRow className="bg-muted/30">
+   505→                          <TableHead className="text-right">الاسم الكامل</TableHead>
+   506→                          <TableHead className="text-right">اسم المستخدم</TableHead>
+   507→                          <TableHead className="text-right hidden md:table-cell">الدور</TableHead>
+   508→                          <TableHead className="text-right hidden lg:table-cell">الفرع</TableHead>
+   509→                          <TableHead className="text-center">الحالة</TableHead>
+   510→                          <TableHead className="text-center hidden lg:table-cell">آخر دخول</TableHead>
+   511→                          <TableHead className="text-center">الإجراءات</TableHead>
+   512→                        </TableRow>
+   513→                      </TableHeader>
+   514→                      <TableBody>
+   515→                        {filteredUsers.map((u) => {
+   516→                          const isCurrentUser = u.id === currentUser?.id;
+   517→                          const isAdminUser = u.roles?.name === 'admin';
+   518→                          return (
+   519→                            <TableRow key={u.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+   520→                              <TableCell>
+   521→                                <div className="flex items-center gap-2">
+   522→                                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${u.is_active ? '' : 'bg-muted'}`} style={u.is_active ? { background: 'linear-gradient(135deg, #93c5fd, #3b82f6)' } : {}}>
+   523→                                    <span className={`text-sm font-bold ${u.is_active ? 'text-white' : 'text-muted-foreground'}`}>
+   524→                                      {u.full_name.charAt(0)}
+   525→                                    </span>
+   526→                                  </div>
+   527→                                  <div>
+   528→                                    <span className="font-medium text-sm">{u.full_name}</span>
+   529→                                    {isCurrentUser && (
+   530→                                      <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>(أنت)</span>
+   531→                                    )}
+   532→                                  </div>
+   533→                                </div>
+   534→                              </TableCell>
+   535→                              <TableCell className="text-muted-foreground text-sm">
+   536→                                {u.username}
+   537→                              </TableCell>
+   538→                              <TableCell className="hidden md:table-cell">
+   539→                                {u.roles?.display_name ? (
+   540→                                  <Badge variant="secondary" className="text-[11px] text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   541→                                    {u.roles.display_name}
+   542→                                  </Badge>
+   543→                                ) : (
+   544→                                  <span className="text-muted-foreground text-sm">—</span>
+   545→                                )}
+   546→                              </TableCell>
+   547→                              <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+   548→                                <div className="flex items-center gap-1">
+   549→                                  <Building2 className="w-3.5 h-3.5" />
+   550→                                  {isAdminUser ? 'الكل' : (u.branches?.name || '—')}
+   551→                                </div>
+   552→                              </TableCell>
+   553→                              <TableCell className="text-center">
+   554→                                <Badge
+   555→                                  variant="secondary"
+   556→                                  className={
+   557→                                    u.is_active
+   558→                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+   559→                                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+   560→                                  }
+   561→                                >
+   562→                                  {u.is_active ? 'نشط' : 'معطل'}
+   563→                                </Badge>
+   564→                              </TableCell>
+   565→                              <TableCell className="text-center hidden lg:table-cell text-muted-foreground text-xs whitespace-nowrap">
+   566→                                {u.last_login ? formatDateTime(u.last_login) : '—'}
+   567→                              </TableCell>
+   568→                              <TableCell>
+   569→                                <div className="flex items-center justify-center gap-1">
+   570→                                  <Button
+   571→                                    variant="ghost"
+   572→                                    size="icon"
+   573→                                    className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+   574→                                    onClick={() => openEditDialog(u)}
+   575→                                    title="تعديل"
+   576→                                  >
+   577→                                    <Edit className="w-4 h-4 text-blue-600" />
+   578→                                  </Button>
+   579→                                  <Button
+   580→                                    variant="ghost"
+   581→                                    size="icon"
+   582→                                    className="h-8 w-8 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+   583→                                    onClick={() => openResetPasswordDialog(u)}
+   584→                                    title="إعادة تعيين كلمة المرور"
+   585→                                  >
+   586→                                    <KeyRound className="w-4 h-4 text-amber-600" />
+   587→                                  </Button>
+   588→                                  {!(isCurrentUser && u.is_active) && (
+   589→                                    <Button
+   590→                                      variant="ghost"
+   591→                                      size="icon"
+   592→                                      className={`h-8 w-8 ${u.is_active ? 'text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-emerald-600 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+   593→                                      onClick={() => {
+   594→                                        setTogglingUser(u);
+   595→                                        setToggleDialogOpen(true);
+   596→                                      }}
+   597→                                      title={u.is_active ? 'تعطيل' : 'تفعيل'}
+   598→                                    >
+   599→                                      {u.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+   600→                                    </Button>
+   601→                                  )}
+   602→                                </div>
+   603→                              </TableCell>
+   604→                            </TableRow>
+   605→                          );
+   606→                        })}
+   607→                      </TableBody>
+   608→                    </Table>
+   609→                  </ScrollArea>
+   610→                </div>
+   611→
+   612→                {/* Mobile Card Layout */}
+   613→                <div className="sm:hidden divide-y">
+   614→                  {filteredUsers.map((u) => {
+   615→                    const isCurrentUser = u.id === currentUser?.id;
+   616→                    const isAdminUser = u.roles?.name === 'admin';
+   617→                    return (
+   618→                      <motion.div
+   619→                        key={u.id}
+   620→                        initial={{ opacity: 0, x: -10 }}
+   621→                        animate={{ opacity: 1, x: 0 }}
+   622→                        className="p-3 border-r-4 hover:bg-muted/30 transition-all"
+   623→                        style={{ borderRightColor: u.is_active ? '#3b82f6' : '#94a3b8' }}
+   624→                      >
+   625→                        <div className="flex items-start justify-between gap-2">
+   626→                          <div className="flex items-center gap-2">
+   627→                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${u.is_active ? '' : 'bg-muted'}`} style={u.is_active ? { background: 'linear-gradient(135deg, #93c5fd, #3b82f6)' } : {}}>
+   628→                              <span className={`text-sm font-bold ${u.is_active ? 'text-white' : 'text-muted-foreground'}`}>
+   629→                                {u.full_name.charAt(0)}
+   630→                              </span>
+   631→                            </div>
+   632→                            <div>
+   633→                              <p className="font-medium text-sm">
+   634→                                {u.full_name}
+   635→                                {isCurrentUser && (
+   636→                                  <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>(أنت)</span>
+   637→                                )}
+   638→                              </p>
+   639→                              <p className="text-xs text-muted-foreground">{u.username}</p>
+   640→                            </div>
+   641→                          </div>
+   642→                          <Badge
+   643→                            variant="secondary"
+   644→                            className={
+   645→                              u.is_active
+   646→                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]'
+   647→                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-[10px]'
+   648→                            }
+   649→                          >
+   650→                            {u.is_active ? 'نشط' : 'معطل'}
+   651→                          </Badge>
+   652→                        </div>
+   653→                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+   654→                          {u.roles?.display_name && (
+   655→                            <Badge variant="secondary" className="text-[10px] text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   656→                              {u.roles.display_name}
+   657→                            </Badge>
+   658→                          )}
+   659→                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+   660→                            <Building2 className="w-3 h-3" />
+   661→                            {isAdminUser ? 'الكل' : (u.branches?.name || '—')}
+   662→                          </span>
+   663→                        </div>
+   664→                        <div className="mt-2 flex items-center justify-between">
+   665→                          <span className="text-[10px] text-muted-foreground">
+   666→                            آخر دخول: {u.last_login ? formatDateTime(u.last_login) : '—'}
+   667→                          </span>
+   668→                          <div className="flex items-center gap-1">
+   669→                            <Button
+   670→                              variant="ghost"
+   671→                              size="icon"
+   672→                              className="h-7 w-7 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+   673→                              onClick={() => openEditDialog(u)}
+   674→                            >
+   675→                              <Edit className="w-3.5 h-3.5 text-blue-600" />
+   676→                            </Button>
+   677→                            <Button
+   678→                              variant="ghost"
+   679→                              size="icon"
+   680→                              className="h-7 w-7 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+   681→                              onClick={() => openResetPasswordDialog(u)}
+   682→                            >
+   683→                              <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+   684→                            </Button>
+   685→                            {!(isCurrentUser && u.is_active) && (
+   686→                              <Button
+   687→                                variant="ghost"
+   688→                                size="icon"
+   689→                                className={`h-7 w-7 ${u.is_active ? 'text-destructive hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+   690→                                onClick={() => {
+   691→                                  setTogglingUser(u);
+   692→                                  setToggleDialogOpen(true);
+   693→                                }}
+   694→                              >
+   695→                                {u.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+   696→                              </Button>
+   697→                            )}
+   698→                          </div>
+   699→                        </div>
+   700→                      </motion.div>
+   701→                    );
+   702→                  })}
+   703→                </div>
+   704→              </>
+   705→            )}
+   706→          </CardContent>
+   707→        </Card>
+   708→      </motion.div>
+   709→
+   710→      {/* Add/Edit User Dialog */}
+   711→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   712→        <DialogContent className="w-[95vw] sm:max-w-lg">
+   713→          <DialogHeader>
+   714→            <DialogTitle className="flex items-center gap-2">
+   715→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   716→                <Users className="w-4 h-4 text-white" />
+   717→              </div>
+   718→              {editingUser ? 'تعديل المستخدم' : 'إضافة مستخدم جديد'}
+   719→            </DialogTitle>
+   720→          </DialogHeader>
+   721→          <div className="space-y-4 py-4">
+   722→            <div className="space-y-2">
+   723→              <Label htmlFor="user-fullname">الاسم الكامل *</Label>
+   724→              <Input
+   725→                id="user-fullname"
+   726→                value={form.full_name}
+   727→                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+   728→                placeholder="مثال: أحمد محمد"
+   729→              />
+   730→            </div>
+   731→            <div className="space-y-2">
+   732→              <Label htmlFor="user-username">اسم المستخدم *</Label>
+   733→              <Input
+   734→                id="user-username"
+   735→                value={form.username}
+   736→                onChange={(e) => setForm({ ...form, username: e.target.value })}
+   737→                placeholder="مثال: ahmed"
+   738→                disabled={!!editingUser}
+   739→              />
+   740→            </div>
+   741→            {!editingUser && (
+   742→              <>
+   743→                <div className="space-y-2">
+   744→                  <Label htmlFor="user-password">كلمة المرور *</Label>
+   745→                  <Input
+   746→                    id="user-password"
+   747→                    type="password"
+   748→                    value={form.password}
+   749→                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+   750→                    placeholder="أدخل كلمة المرور"
+   751→                  />
+   752→                </div>
+   753→                <div className="space-y-2">
+   754→                  <Label htmlFor="user-confirm-password">تأكيد كلمة المرور *</Label>
+   755→                  <Input
+   756→                    id="user-confirm-password"
+   757→                    type="password"
+   758→                    value={form.confirmPassword}
+   759→                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+   760→                    placeholder="أعد إدخال كلمة المرور"
+   761→                  />
+   762→                </div>
+   763→              </>
+   764→            )}
+   765→            <div className="space-y-2">
+   766→              <Label htmlFor="user-role">الدور</Label>
+   767→              <Select
+   768→                value={form.role_id}
+   769→                onValueChange={(value) => {
+   770→                  setForm({ ...form, role_id: value === '_none' ? '' : value });
+   771→                }}
+   772→              >
+   773→                <SelectTrigger id="user-role">
+   774→                  <SelectValue placeholder="اختر الدور" />
+   775→                </SelectTrigger>
+   776→                <SelectContent>
+   777→                  <SelectItem value="_none">بدون دور</SelectItem>
+   778→                  {roles.map((role) => (
+   779→                    <SelectItem key={role.id} value={role.id}>
+   780→                      {role.display_name}
+   781→                    </SelectItem>
+   782→                  ))}
+   783→                </SelectContent>
+   784→              </Select>
+   785→            </div>
+   786→            {selectedRoleName() !== 'admin' && (
+   787→              <div className="space-y-2">
+   788→                <Label htmlFor="user-branch">الفرع</Label>
+   789→                <Select
+   790→                  value={form.branch_id}
+   791→                  onValueChange={(value) => {
+   792→                    setForm({ ...form, branch_id: value === '_none' ? '' : value });
+   793→                  }}
+   794→                >
+   795→                  <SelectTrigger id="user-branch">
+   796→                    <SelectValue placeholder="اختر الفرع" />
+   797→                  </SelectTrigger>
+   798→                  <SelectContent>
+   799→                    <SelectItem value="_none">بدون فرع</SelectItem>
+   800→                    {branches.map((branch) => (
+   801→                      <SelectItem key={branch.id} value={branch.id}>
+   802→                        {branch.name}
+   803→                      </SelectItem>
+   804→                    ))}
+   805→                  </SelectContent>
+   806→                </Select>
+   807→              </div>
+   808→            )}
+   809→            <div className="flex items-center gap-2">
+   810→              <Switch
+   811→                id="user-active"
+   812→                checked={form.is_active}
+   813→                onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
+   814→              />
+   815→              <Label htmlFor="user-active">مستخدم نشط</Label>
+   816→            </div>
+   817→            <div className="flex items-center gap-2">
+   818→              <Checkbox
+   819→                id="user-must-change"
+   820→                checked={form.must_change_password}
+   821→                onCheckedChange={(checked) => setForm({ ...form, must_change_password: !!checked })}
+   822→              />
+   823→              <Label htmlFor="user-must-change" className="text-sm cursor-pointer">
+   824→                تغيير كلمة المرور عند أول تسجيل دخول
+   825→              </Label>
+   826→            </div>
+   827→          </div>
+   828→          <DialogFooter>
+   829→            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+   830→              إلغاء
+   831→            </Button>
+   832→            <Button onClick={handleSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+   833→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+   834→              {editingUser ? 'تحديث' : 'إضافة'}
+   835→            </Button>
+   836→          </DialogFooter>
+   837→        </DialogContent>
+   838→      </Dialog>
+   839→
+   840→      {/* Toggle Active Confirmation */}
+   841→      <AlertDialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
+   842→        <AlertDialogContent>
+   843→          <AlertDialogHeader>
+   844→            <AlertDialogTitle className="flex items-center gap-2">
+   845→              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${togglingUser?.is_active ? '' : ''}`} style={{ background: togglingUser?.is_active ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)' }}>
+   846→                {togglingUser?.is_active ? <UserX className="w-4 h-4 text-white" /> : <UserCheck className="w-4 h-4 text-white" />}
+   847→              </div>
+   848→              {togglingUser?.is_active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
+   849→            </AlertDialogTitle>
+   850→            <AlertDialogDescription>
+   851→              {togglingUser?.is_active
+   852→                ? `هل أنت متأكد من تعطيل المستخدم "${togglingUser?.full_name}"؟ لن يتمكن من تسجيل الدخول.`
+   853→                : `هل أنت متأكد من تفعيل المستخدم "${togglingUser?.full_name}"؟`}
+   854→            </AlertDialogDescription>
+   855→          </AlertDialogHeader>
+   856→          <AlertDialogFooter>
+   857→            <AlertDialogCancel onClick={() => setTogglingUser(null)}>إلغاء</AlertDialogCancel>
+   858→            <AlertDialogAction
+   859→              onClick={handleToggleActive}
+   860→              className={togglingUser?.is_active ? 'bg-destructive hover:bg-destructive/90' : ''}
+   861→            >
+   862→              {togglingUser?.is_active ? 'تعطيل' : 'تفعيل'}
+   863→            </AlertDialogAction>
+   864→          </AlertDialogFooter>
+   865→        </AlertDialogContent>
+   866→      </AlertDialog>
+   867→
+   868→      {/* Reset Password Dialog */}
+   869→      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+   870→        <DialogContent className="w-[95vw] sm:max-w-md">
+   871→          <DialogHeader>
+   872→            <DialogTitle className="flex items-center gap-2">
+   873→              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   874→                <KeyRound className="w-4 h-4 text-white" />
+   875→              </div>
+   876→              إعادة تعيين كلمة المرور - {resettingUser?.full_name}
+   877→            </DialogTitle>
+   878→          </DialogHeader>
+   879→          <div className="space-y-4 py-4">
+   880→            <div className="space-y-2">
+   881→              <Label htmlFor="reset-password">كلمة المرور الجديدة *</Label>
+   882→              <Input
+   883→                id="reset-password"
+   884→                type="password"
+   885→                value={resetForm.password}
+   886→                onChange={(e) => setResetForm({ ...resetForm, password: e.target.value })}
+   887→                placeholder="أدخل كلمة المرور الجديدة"
+   888→              />
+   889→            </div>
+   890→            <div className="space-y-2">
+   891→              <Label htmlFor="reset-confirm-password">تأكيد كلمة المرور *</Label>
+   892→              <Input
+   893→                id="reset-confirm-password"
+   894→                type="password"
+   895→                value={resetForm.confirmPassword}
+   896→                onChange={(e) => setResetForm({ ...resetForm, confirmPassword: e.target.value })}
+   897→                placeholder="أعد إدخال كلمة المرور"
+   898→              />
+   899→            </div>
+   900→          </div>
+   901→          <DialogFooter>
+   902→            <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+   903→              إلغاء
+   904→            </Button>
+   905→            <Button onClick={handleResetPassword} disabled={saving} style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+   906→              {saving && <Loader2 className="w-4 h-4 animate-spin ml-1" />}
+   907→              إعادة تعيين
+   908→            </Button>
+   909→          </DialogFooter>
+   910→        </DialogContent>
+   911→      </Dialog>
+   912→    </div>
+   913→  );
+   914→}
+   915→
