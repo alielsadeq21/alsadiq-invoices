@@ -864,65 +864,69 @@ export default function ProductsPage() {
 
       {/* ─── Add/Edit Dialog ────────────────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90dvh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Package className="w-5 h-5 text-primary" />
-              {editingProduct ? 'تعديل الصنف' : 'إضافة صنف جديد'}
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[92dvh] p-0 gap-0" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* ─── Fixed Header ─── */}
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0 border-b">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))' }}>
+                <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-base sm:text-lg font-bold">{editingProduct ? 'تعديل الصنف' : 'إضافة صنف جديد'}</DialogTitle>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{editingProduct ? 'قم بتعديل بيانات الصنف' : 'أدخل بيانات الصنف الجديد'}</p>
+              </div>
+            </div>
+          </div>
 
-          <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-2">
+          {/* ─── Scrollable Content ─── */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-5" style={{ minHeight: 0 }}>
             {/* ─── Section 1: Basic Info ────────────────────────────── */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                 <Hash className="w-4 h-4 text-primary" />
                 <span className="text-sm font-bold">البيانات الأساسية</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Name */}
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="product-name">اسم الصنف *</Label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="product-name" className="text-xs sm:text-sm">اسم الصنف *</Label>
                   <Input
                     id="product-name"
                     value={form.name}
                     onChange={(e) => updateForm('name', e.target.value)}
                     placeholder="مثال: كنافة نابلسية"
+                    className="h-10"
                   />
                 </div>
 
                 {/* Code */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-code">كود الصنف</Label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Input
-                      id="product-code"
-                      value={form.code}
-                      onChange={(e) => updateForm('code', e.target.value)}
-                      placeholder="PRD-0001"
-                      className="font-mono"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-code" className="text-xs sm:text-sm">كود الصنف</Label>
+                  <Input
+                    id="product-code"
+                    value={form.code}
+                    onChange={(e) => updateForm('code', e.target.value)}
+                    placeholder="PRD-0001"
+                    className="font-mono h-10"
+                  />
                   <p className="text-[10px] text-muted-foreground">يتولد تلقائياً - يمكنك تعديله</p>
                 </div>
 
                 {/* Barcode */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-barcode">الباركود</Label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Input
-                      id="product-barcode"
-                      value={form.barcode}
-                      onChange={(e) => updateForm('barcode', e.target.value)}
-                      placeholder="امسح أو أدخل الباركود"
-                      className="font-mono"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-barcode" className="text-xs sm:text-sm">الباركود</Label>
+                  <Input
+                    id="product-barcode"
+                    value={form.barcode}
+                    onChange={(e) => updateForm('barcode', e.target.value)}
+                    placeholder="امسح أو أدخل الباركود"
+                    className="font-mono h-10"
+                  />
                 </div>
 
                 {/* Description */}
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="product-desc">وصف الصنف</Label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="product-desc" className="text-xs sm:text-sm">وصف الصنف</Label>
                   <Textarea
                     id="product-desc"
                     value={form.description}
@@ -939,14 +943,14 @@ export default function ProductsPage() {
 
             {/* ─── Section 2: Classification ────────────────────────── */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                 <Tag className="w-4 h-4 text-primary" />
                 <span className="text-sm font-bold">التصنيف</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Category */}
-                <div className="space-y-2">
-                  <Label>الفئة</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs sm:text-sm">الفئة</Label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <Select value={form.category} onValueChange={(v) => updateForm('category', v)}>
                       <SelectTrigger className="text-xs">
@@ -971,13 +975,14 @@ export default function ProductsPage() {
                 </div>
 
                 {/* Subcategory */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-subcategory">القسم</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-subcategory" className="text-xs sm:text-sm">القسم</Label>
                   <Input
                     id="product-subcategory"
                     value={form.subcategory}
                     onChange={(e) => updateForm('subcategory', e.target.value)}
                     placeholder="مثال: كنافة، بقلاوة..."
+                    className="h-10"
                   />
                 </div>
               </div>
@@ -987,14 +992,14 @@ export default function ProductsPage() {
 
             {/* ─── Section 3: Pricing & Units ───────────────────────── */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                 <DollarSign className="w-4 h-4 text-primary" />
                 <span className="text-sm font-bold">التسعير والوحدات</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {/* Selling price */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-price">سعر البيع (ج.م) *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-price" className="text-xs sm:text-sm">سعر البيع (ج.م) *</Label>
                   <Input
                     id="product-price"
                     type="number"
@@ -1004,13 +1009,13 @@ export default function ProductsPage() {
                     placeholder="0.00"
                     min="0"
                     step="0.01"
-                    className="text-left font-bold"
+                    className="text-left font-bold h-10"
                   />
                 </div>
 
                 {/* Cost price */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-cost">سعر التكلفة (ج.م)</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-cost" className="text-xs sm:text-sm">سعر التكلفة (ج.م)</Label>
                   <Input
                     id="product-cost"
                     type="number"
@@ -1020,13 +1025,13 @@ export default function ProductsPage() {
                     placeholder="0.00"
                     min="0"
                     step="0.01"
-                    className="text-left"
+                    className="text-left h-10"
                   />
                 </div>
 
                 {/* Unit type */}
-                <div className="space-y-2">
-                  <Label>وحدة القياس</Label>
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <Label className="text-xs sm:text-sm">وحدة القياس</Label>
                   <Select value={form.unit_type} onValueChange={(v) => updateForm('unit_type', v)}>
                     <SelectTrigger className="text-xs">
                       <SelectValue />
@@ -1040,8 +1045,8 @@ export default function ProductsPage() {
                 </div>
 
                 {/* Unit count */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-unit-count">عدد الوحدات في الكرتونة</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-unit-count" className="text-xs sm:text-sm">عدد/وحدة</Label>
                   <Input
                     id="product-unit-count"
                     type="number"
@@ -1051,14 +1056,13 @@ export default function ProductsPage() {
                     placeholder="1"
                     min="1"
                     step="1"
-                    className="text-center"
+                    className="text-center h-10"
                   />
-                  <p className="text-[10px] text-muted-foreground">مثلاً: الكرتونة فيها 24 قطعة</p>
                 </div>
 
                 {/* Min stock */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-min-stock">الحد الأدنى للمخزون</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-min-stock" className="text-xs sm:text-sm">الحد الأدنى</Label>
                   <Input
                     id="product-min-stock"
                     type="number"
@@ -1068,15 +1072,14 @@ export default function ProductsPage() {
                     placeholder="0"
                     min="0"
                     step="1"
-                    className="text-center"
+                    className="text-center h-10"
                   />
-                  <p className="text-[10px] text-muted-foreground">أقل كمية قبل التنبيه</p>
                 </div>
 
                 {/* Profit margin indicator */}
-                <div className="space-y-2">
-                  <Label>هامش الربح</Label>
-                  <div className="h-9 rounded-md border bg-muted/30 flex items-center justify-center px-3">
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <Label className="text-xs sm:text-sm">هامش الربح</Label>
+                  <div className="h-10 rounded-md border bg-muted/30 flex items-center justify-center px-3">
                     {form.unit_price > 0 && form.cost_price > 0 ? (
                       <span className={cn(
                         "text-sm font-bold",
@@ -1101,15 +1104,15 @@ export default function ProductsPage() {
               <>
                 <Separator />
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                     <Layers className="w-4 h-4 text-primary" />
                     <span className="text-sm font-bold">المخزون الأولي</span>
                     <Badge variant="outline" className="text-[10px]">اختياري</Badge>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
                     {/* Initial quantity */}
-                    <div className="space-y-2">
-                      <Label htmlFor="product-initial-qty">الكمية الأولية</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-initial-qty" className="text-xs sm:text-sm">الكمية الأولية</Label>
                       <Input
                         id="product-initial-qty"
                         type="number"
@@ -1119,13 +1122,13 @@ export default function ProductsPage() {
                         placeholder="0"
                         min="0"
                         step="1"
-                        className="text-center"
+                        className="text-center h-10"
                       />
                     </div>
 
                     {/* Branch */}
-                    <div className="space-y-2">
-                      <Label>الفرع</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs sm:text-sm">الفرع</Label>
                       <Select
                         value={form.initial_branch_id || 'all'}
                         onValueChange={(v) => updateForm('initial_branch_id', v === 'all' ? '' : v)}
@@ -1155,34 +1158,37 @@ export default function ProductsPage() {
                 checked={form.is_active}
                 onCheckedChange={(checked) => updateForm('is_active', checked)}
               />
-              <Label htmlFor="product-active" className="cursor-pointer">صنف نشط</Label>
+              <Label htmlFor="product-active" className="cursor-pointer text-sm">صنف نشط</Label>
             </div>
           </div>
 
-          <DialogFooter className="px-6 pb-6 pt-3 shrink-0 border-t gap-2">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="text-primary-foreground"
-              style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري الحفظ...
-                </>
-              ) : editingProduct ? 'تحديث' : 'إضافة'}
-            </Button>
-          </DialogFooter>
+          {/* ─── Fixed Footer ─── */}
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-3 shrink-0 border-t bg-background">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-10 px-4">
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="h-10 px-6 text-primary-foreground shadow-lg"
+                style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
+              >
+                {saving ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جاري الحفظ...
+                  </span>
+                ) : editingProduct ? 'تحديث الصنف' : 'إضافة الصنف'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* ─── New Category Dialog ──────────────────────────────────────────── */}
       <Dialog open={newCatDialog} onOpenChange={setNewCatDialog}>
-        <DialogContent className="w-[90vw] max-w-sm">
+        <DialogContent className="w-[90vw] max-w-sm" style={{ overflow: 'hidden' }}>
           <DialogHeader>
             <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <FolderPlus className="w-5 h-5 text-primary" />
@@ -1196,21 +1202,27 @@ export default function ProductsPage() {
                 placeholder="مثال: حلويات شرقية"
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
-                className="mt-1.5"
+                className="mt-1.5 h-10"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); }}
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewCatDialog(false)}>
+          <DialogFooter style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: '0.5rem' }}>
+            <Button variant="outline" onClick={() => setNewCatDialog(false)} className="h-10 px-4">
               إلغاء
             </Button>
             <Button
-              className="text-primary-foreground"
+              className="h-10 px-6 text-primary-foreground shadow-lg"
               onClick={handleAddCategory}
               disabled={savingCategory}
               style={{ background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))' }}
             >
-              {savingCategory ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إضافة'}
+              {savingCategory ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  جاري الحفظ...
+                </span>
+              ) : 'إضافة الفئة'}
             </Button>
           </DialogFooter>
         </DialogContent>
