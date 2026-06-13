@@ -400,7 +400,7 @@ export default function InvoiceDetailPage() {
 
             {/* Invoice Title */}
             <div className="bg-gradient-to-l from-[#0D7C66] to-[#0A5E4D] px-6 py-3 flex flex-col items-center justify-center min-w-[170px]">
-              <h2 className="text-lg font-bold text-white">فاتورة صرف</h2>
+              <h2 className="text-lg font-bold text-white">فاتورة مبيعات</h2>
               <p className="text-sm text-[#D4A843] font-semibold">{invoice.invoice_number}</p>
               <p className="text-[11px] text-white/80 mt-0.5">
                 {formatDate(invoice.invoice_date)}

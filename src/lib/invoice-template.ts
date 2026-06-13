@@ -826,7 +826,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>فاتورة صرف - ${invoice.invoice_number}</title>
+  <title>فاتورة مبيعات - ${invoice.invoice_number}</title>
   <style>${getInvoiceCSS(showUnitCount)}</style>
 </head>
 <body>
@@ -850,7 +850,7 @@ export function generateInvoiceDocument(data: InvoiceDocumentData): string {
         </div>
       </div>
       <div class="inv-header-title">
-        <h2>فاتورة صرف</h2>
+        <h2>فاتورة مبيعات</h2>
         <span class="inv-num">${invoice.invoice_number}</span>
         <span class="inv-date">${formatDate(invoice.invoice_date)}${invoiceTime ? ` - ${invoiceTime}` : ''}</span>
       </div>
@@ -1705,7 +1705,7 @@ export function generateThermalDocument(data: InvoiceDocumentData): string {
 
     <!-- ===== INVOICE TITLE BOX ===== -->
     <div class="r-title-box">
-      <span class="r-title-text">فاتورة صرف</span>
+      <span class="r-title-text">فاتورة مبيعات</span>
     </div>
 
     <hr class="r-sep-double">

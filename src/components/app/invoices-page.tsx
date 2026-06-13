@@ -445,7 +445,7 @@ export default function InvoicesPage() {
               </div>
               <h3 className="text-xl font-bold mb-2 tracking-tight">لا توجد فواتير</h3>
               <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
-                لم يتم إنشاء أي فواتير بعد. ابدأ بإنشاء أول فاتورة صرف لتتبع عمليات البيع والتسليم.
+                لم يتم إنشاء أي فواتير بعد. ابدأ بإنشاء أول فاتورة مبيعات لتتبع عمليات البيع والتسليم.
               </p>
               <Button
                 onClick={() => navigateTo('invoice-form')}

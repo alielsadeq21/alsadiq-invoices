@@ -688,7 +688,7 @@ export default function PosPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <ShoppingCart className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-bold">سلة المشتريات</span>
+                  <span className="text-sm font-bold">سلة المبيعات</span>
                   {cartItemCount > 0 && (
                     <Badge className="bg-green-600 text-white text-[10px] h-5 min-w-5">{cartItemCount}</Badge>
                   )}
@@ -980,7 +980,7 @@ export default function PosPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShoppingCart className="w-5 h-5 text-green-600" />
-                سلة المشتريات
+                سلة المبيعات
                 {cartItemCount > 0 && (
                   <Badge className="bg-green-600 text-white text-[10px] h-5 min-w-5">{cartItemCount}</Badge>
                 )}

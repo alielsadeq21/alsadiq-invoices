@@ -5,7 +5,7 @@
  * This is NOT as secure as bcrypt/scrypt but is the best we can do client-side.
  */
 
-const SALT = 'alsadeq-invoice-system-2026';
+const SALT = 'alsadeq-system-2026';
 
 /**
  * Hash a password using SHA-256 with salt

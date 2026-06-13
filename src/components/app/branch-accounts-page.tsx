@@ -151,7 +151,7 @@ export default function BranchAccountsPage() {
         date: inv.invoice_date,
         debit: Number(inv.total),
         credit: 0,
-        notes: 'فاتورة صرف',
+        notes: 'فاتورة مبيعات',
       });
     });
 

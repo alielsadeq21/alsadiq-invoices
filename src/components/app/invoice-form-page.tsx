@@ -469,7 +469,7 @@ export default function InvoiceFormPage() {
             quantity: -totalPieces,
             reference_type: 'invoice',
             reference_id: id,
-            notes: `فاتورة صرف: ${invoiceNumber}`,
+            notes: `فاتورة مبيعات: ${invoiceNumber}`,
             created_by: user?.id || null,
           });
         }
@@ -497,14 +497,14 @@ export default function InvoiceFormPage() {
             account_name: customerOrCash,
             debit: total,
             credit: 0,
-            description: `فاتورة صرف رقم ${invoiceNumber}`,
+            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
           });
           // دائن: المبيعات
           jeLines.push({
             account_name: 'مبيعات الفروع',
             debit: 0,
             credit: subtotal,
-            description: `فاتورة صرف رقم ${invoiceNumber}`,
+            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
           });
           // دائن: الضريبة (لو فيها ضريبة)
           if (taxAmount > 0) {
@@ -521,7 +521,7 @@ export default function InvoiceFormPage() {
             .insert({
               entry_number: jeNum,
               entry_date: invoiceDate,
-              description: `قيد تلقائي - فاتورة صرف رقم ${invoiceNumber}`,
+              description: `قيد تلقائي - فاتورة مبيعات رقم ${invoiceNumber}`,
               total_debit: total,
               total_credit: subtotal + taxAmount,
               is_posted: true,
@@ -611,7 +611,7 @@ export default function InvoiceFormPage() {
             quantity: -totalPieces,
             reference_type: 'invoice',
             reference_id: invData.id,
-            notes: `فاتورة صرف: ${invoiceNumber}`,
+            notes: `فاتورة مبيعات: ${invoiceNumber}`,
             created_by: user?.id || null,
           });
         }
@@ -638,13 +638,13 @@ export default function InvoiceFormPage() {
             account_name: customerOrCash,
             debit: total,
             credit: 0,
-            description: `فاتورة صرف رقم ${invoiceNumber}`,
+            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
           });
           jeLines.push({
             account_name: 'مبيعات الفروع',
             debit: 0,
             credit: subtotal,
-            description: `فاتورة صرف رقم ${invoiceNumber}`,
+            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
           });
           if (taxAmount > 0) {
             jeLines.push({
@@ -660,7 +660,7 @@ export default function InvoiceFormPage() {
             .insert({
               entry_number: jeNum,
               entry_date: invoiceDate,
-              description: `قيد تلقائي - فاتورة صرف رقم ${invoiceNumber}`,
+              description: `قيد تلقائي - فاتورة مبيعات رقم ${invoiceNumber}`,
               total_debit: total,
               total_credit: subtotal + taxAmount,
               is_posted: true,
@@ -756,7 +756,7 @@ export default function InvoiceFormPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">
-              {isEdit ? 'تعديل الفاتورة' : 'فاتورة صرف جديدة'}
+              {isEdit ? 'تعديل الفاتورة' : 'فاتورة مبيعات جديدة'}
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5">{invoiceNumber}</p>
           </div>
