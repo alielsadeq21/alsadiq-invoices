@@ -1,0 +1,902 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { Return, InvoiceItem } from '@/lib/types';
+     7→import { formatCurrency, formatDate, generateReturnNumber, getCurrentYear } from '@/lib/utils';
+     8→import { Card, CardContent } from '@/components/ui/card';
+     9→import { Button } from '@/components/ui/button';
+    10→import { Input } from '@/components/ui/input';
+    11→import { Label } from '@/components/ui/label';
+    12→import { Textarea } from '@/components/ui/textarea';
+    13→import {
+    14→  Select,
+    15→  SelectContent,
+    16→  SelectItem,
+    17→  SelectTrigger,
+    18→  SelectValue,
+    19→} from '@/components/ui/select';
+    20→import {
+    21→  Dialog,
+    22→  DialogContent,
+    23→  DialogHeader,
+    24→  DialogTitle,
+    25→  DialogFooter,
+    26→} from '@/components/ui/dialog';
+    27→import {
+    28→  Table,
+    29→  TableBody,
+    30→  TableCell,
+    31→  TableHead,
+    32→  TableHeader,
+    33→  TableRow,
+    34→} from '@/components/ui/table';
+    35→import {
+    36→  RotateCcw,
+    37→  Plus,
+    38→  Search,
+    39→  Eye,
+    40→  ArrowRight,
+    41→  ChevronLeft,
+    42→  FileText,
+    43→  MapPin,
+    44→  Calendar,
+    45→  Receipt,
+    46→} from 'lucide-react';
+    47→import { toast } from 'sonner';
+    48→
+    49→interface ReturnFormItem {
+    50→  item_name: string;
+    51→  quantity: number;
+    52→  max_quantity: number;
+    53→  unit_count: number;
+    54→  unit_price: number;
+    55→  total_price: number;
+    56→  checked: boolean;
+    57→}
+    58→
+    59→const PAGE_SIZE = 10;
+    60→
+    61→export default function ReturnsPage() {
+    62→  const { navigateTo, user, isAdmin, hasPermission } = useAppStore();
+    63→  const [returns, setReturns] = useState<Return[]>([]);
+    64→  const [loading, setLoading] = useState(true);
+    65→  const [search, setSearch] = useState('');
+    66→  const [page, setPage] = useState(1);
+    67→  const [totalCount, setTotalCount] = useState(0);
+    68→
+    69→  // Create return dialog
+    70→  const [dialogOpen, setDialogOpen] = useState(false);
+    71→  const [invoices, setInvoices] = useState<any[]>([]);
+    72→  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+    73→  const [invoiceItems, setInvoiceItems] = useState<ReturnFormItem[]>([]);
+    74→  const [returnNumber, setReturnNumber] = useState('');
+    75→  const [returnNotes, setReturnNotes] = useState('');
+    76→  const [returnBranchId, setReturnBranchId] = useState('');
+    77→  const [saving, setSaving] = useState(false);
+    78→
+    79→  // Detail dialog
+    80→  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+    81→  const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
+    82→  const [returnItems, setReturnItems] = useState<any[]>([]);
+    83→
+    84→  useEffect(() => {
+    85→    loadReturns();
+    86→  }, [page, search]);
+    87→
+    88→  const loadReturns = async () => {
+    89→    setLoading(true);
+    90→    try {
+    91→      let query = supabase
+    92→        .from('returns')
+    93→        .select('*, branches(name), original_invoice:invoices(invoice_number)', { count: 'exact' })
+    94→        .order('created_at', { ascending: false });
+    95→
+    96→      if (search) {
+    97→        query = query.or(`return_number.ilike.%${search}%`);
+    98→      }
+    99→
+   100→      // Branch filtering for non-admin users
+   101→      if (!isAdmin && user?.branch_id) {
+   102→        query = query.eq('branch_id', user.branch_id);
+   103→      }
+   104→
+   105→      const from = (page - 1) * PAGE_SIZE;
+   106→      query = query.range(from, from + PAGE_SIZE - 1);
+   107→
+   108→      const { data, count, error } = await query;
+   109→      if (!error && data) {
+   110→        setReturns(data as unknown as Return[]);
+   111→        setTotalCount(count || 0);
+   112→      }
+   113→    } catch (err) {
+   114→      console.error(err);
+   115→    } finally {
+   116→      setLoading(false);
+   117→    }
+   118→  };
+   119→
+   120→  const openCreateDialog = async () => {
+   121→    // Load active invoices
+   122→    let invoicesQuery = supabase
+   123→      .from('invoices')
+   124→      .select('id, invoice_number, branch_id, branches(name)')
+   125→      .in('status', ['active', 'partially_returned'])
+   126→      .order('created_at', { ascending: false });
+   127→    if (!isAdmin && user?.branch_id) {
+   128→      invoicesQuery = invoicesQuery.eq('branch_id', user.branch_id);
+   129→    }
+   130→    const { data } = await invoicesQuery;
+   131→
+   132→    if (data) setInvoices(data as any);
+   133→
+   134→    // Generate return number
+   135→    const year = getCurrentYear();
+   136→    const { data: lastRet } = await supabase
+   137→      .from('returns')
+   138→      .select('return_number')
+   139→      .like('return_number', `RET-${year}-%`)
+   140→      .order('return_number', { ascending: false })
+   141→      .limit(1);
+   142→
+   143→    let lastNum = 0;
+   144→    if (lastRet && lastRet.length > 0) {
+   145→      const parts = lastRet[0].return_number.split('-');
+   146→      lastNum = parseInt(parts[parts.length - 1]) || 0;
+   147→    }
+   148→    setReturnNumber(generateReturnNumber(lastNum, year));
+   149→
+   150→    setSelectedInvoiceId('');
+   151→    setInvoiceItems([]);
+   152→    setReturnNotes('');
+   153→    setReturnBranchId('');
+   154→    setDialogOpen(true);
+   155→  };
+   156→
+   157→  const selectInvoice = async (invoiceId: string) => {
+   158→    setSelectedInvoiceId(invoiceId);
+   159→
+   160→    // Load invoice items
+   161→    const { data: invData } = await supabase
+   162→      .from('invoices')
+   163→      .select('*, items:invoice_items(*)')
+   164→      .eq('id', invoiceId)
+   165→      .single();
+   166→
+   167→    if (invData) {
+   168→      setReturnBranchId(invData.branch_id);
+   169→      const items = (invData.items || []).map((item: InvoiceItem) => ({
+   170→        item_name: item.item_name,
+   171→        quantity: 0,
+   172→        max_quantity: Number(item.quantity),
+   173→        unit_count: Number(item.unit_count) || 1,
+   174→        unit_price: Number(item.unit_price),
+   175→        total_price: 0,
+   176→        checked: false,
+   177→      }));
+   178→      setInvoiceItems(items);
+   179→    }
+   180→  };
+   181→
+   182→  const updateReturnItem = (index: number, quantity: number) => {
+   183→    setInvoiceItems((prev) => {
+   184→      const updated = [...prev];
+   185→      const item = { ...updated[index] };
+   186→      item.quantity = Math.min(quantity, item.max_quantity);
+   187→      item.total_price = item.quantity * item.unit_price;
+   188→      updated[index] = item;
+   189→      return updated;
+   190→    });
+   191→  };
+   192→
+   193→  const toggleReturnItem = (index: number, checked: boolean) => {
+   194→    setInvoiceItems((prev) => {
+   195→      const updated = [...prev];
+   196→      updated[index] = { ...updated[index], checked };
+   197→      if (!checked) {
+   198→        updated[index].quantity = 0;
+   199→        updated[index].total_price = 0;
+   200→      }
+   201→      return updated;
+   202→    });
+   203→  };
+   204→
+   205→  const returnTotal = invoiceItems.reduce((sum, item) => sum + item.total_price, 0);
+   206→  const returnTotalPieces = invoiceItems.reduce((sum, item) => sum + (item.quantity * item.unit_count), 0);
+   207→
+   208→  const handleSaveReturn = async () => {
+   209→    const checkedItems = invoiceItems.filter((i) => i.checked && i.quantity > 0);
+   210→    if (checkedItems.length === 0) {
+   211→      toast.error('يرجى تحديد أصناف المرتجع');
+   212→      return;
+   213→    }
+   214→
+   215→    setSaving(true);
+   216→    try {
+   217→      const { data: retData, error } = await supabase
+   218→        .from('returns')
+   219→        .insert({
+   220→          return_number: returnNumber,
+   221→          original_invoice_id: selectedInvoiceId,
+   222→          branch_id: returnBranchId,
+   223→          total: returnTotal,
+   224→          notes: returnNotes || null,
+   225→        })
+   226→        .select('id')
+   227→        .single();
+   228→
+   229→      if (error) throw error;
+   230→
+   231→      // Insert return items with unit_count and product_id
+   232→      const itemsData: any[] = [];
+   233→      for (const item of checkedItems) {
+   234→        const { data: origItem } = await supabase
+   235→          .from('invoice_items')
+   236→          .select('product_id')
+   237→          .eq('invoice_id', selectedInvoiceId)
+   238→          .eq('item_name', item.item_name)
+   239→          .limit(1)
+   240→          .single();
+   241→
+   242→        itemsData.push({
+   243→          return_id: retData.id,
+   244→          item_name: item.item_name,
+   245→          product_id: origItem?.product_id || null,
+   246→          quantity: item.quantity,
+   247→          unit_count: item.unit_count,
+   248→          unit_price: item.unit_price,
+   249→          total_price: item.total_price,
+   250→        });
+   251→      }
+   252→      await supabase.from('return_items').insert(itemsData);
+   253→
+   254→      // Log activity
+   255→      await supabase.from('audit_log').insert({
+   256→        action: 'create_return',
+   257→        details: { return_number: returnNumber, total: returnTotal },
+   258→      });
+   259→
+   260→      // Update invoice status
+   261→      const allReturned = invoiceItems.every(
+   262→        (item) => !item.checked || item.quantity >= item.max_quantity
+   263→      );
+   264→      await supabase
+   265→        .from('invoices')
+   266→        .update({
+   267→          status: allReturned ? 'fully_returned' : 'partially_returned',
+   268→          updated_at: new Date().toISOString(),
+   269→        })
+   270→        .eq('id', selectedInvoiceId);
+   271→
+   272→      // ===== ربط المخزون بالمرتجعات: إرجاع للمخزون =====
+   273→      for (const retItem of checkedItems) {
+   274→        // Try to find product_id from original invoice items
+   275→        const { data: origItem } = await supabase
+   276→          .from('invoice_items')
+   277→          .select('product_id')
+   278→          .eq('invoice_id', selectedInvoiceId)
+   279→          .eq('item_name', retItem.item_name)
+   280→          .limit(1)
+   281→          .single();
+   282→
+   283→        const productId = origItem?.product_id;
+   284→        if (!productId) continue;
+   285→        const totalPieces = retItem.quantity * retItem.unit_count;
+   286→
+   287→        const { data: invRecord } = await supabase
+   288→          .from('inventory')
+   289→          .select('*')
+   290→          .eq('product_id', productId)
+   291→          .eq('branch_id', returnBranchId)
+   292→          .single();
+   293→
+   294→        if (invRecord) {
+   295→          await supabase
+   296→            .from('inventory')
+   297→            .update({
+   298→              quantity: invRecord.quantity + totalPieces,
+   299→              last_updated: new Date().toISOString(),
+   300→            })
+   301→            .eq('id', invRecord.id);
+   302→        }
+   303→
+   304→        await supabase.from('inventory_transactions').insert({
+   305→          product_id: productId,
+   306→          branch_id: returnBranchId,
+   307→          transaction_type: 'in',
+   308→          quantity: totalPieces,
+   309→          reference_type: 'return',
+   310→          reference_id: retData.id,
+   311→          notes: `مرتجع من فاتورة: ${returnNumber}`,
+   312→          created_by: user?.id || null,
+   313→        });
+   314→      }
+   315→
+   316→      toast.success('تم إنشاء المرتجع بنجاح');
+   317→      setDialogOpen(false);
+   318→      loadReturns();
+   319→    } catch (err) {
+   320→      console.error(err);
+   321→      toast.error('حدث خطأ أثناء حفظ المرتجع');
+   322→    } finally {
+   323→      setSaving(false);
+   324→    }
+   325→  };
+   326→
+   327→  const viewReturnDetail = async (ret: Return) => {
+   328→    setSelectedReturn(ret);
+   329→    const { data } = await supabase
+   330→      .from('return_items')
+   331→      .select('*')
+   332→      .eq('return_id', ret.id);
+   333→    if (data) setReturnItems(data);
+   334→    setDetailDialogOpen(true);
+   335→  };
+   336→
+   337→  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+   338→
+   339→  return (
+   340→    <div className="space-y-6">
+   341→      {/* Header */}
+   342→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   343→        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+   344→          <div
+   345→            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+   346→            style={{
+   347→              background: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+   348→              flexShrink: 0,
+   349→            }}
+   350→          >
+   351→            <RotateCcw className="w-6 h-6 text-white" />
+   352→          </div>
+   353→          <div>
+   354→            <h1 className="text-2xl font-bold tracking-tight">المرتجعات</h1>
+   355→            <div className="flex items-center gap-2 mt-1">
+   356→              <span
+   357→                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+   358→                style={{ background: 'rgba(244,63,94,0.1)', color: '#e11d48' }}
+   359→              >
+   360→                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#e11d48' }}></span>
+   361→                {totalCount} مرتجع
+   362→              </span>
+   363→            </div>
+   364→          </div>
+   365→        </div>
+   366→        {hasPermission('returns', 'create') && (
+   367→          <Button
+   368→            onClick={openCreateDialog}
+   369→            className="gap-2 shadow-lg text-white font-semibold px-5 h-11 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+   370→            style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   371→          >
+   372→            <Plus className="w-4 h-4" />
+   373→            مرتجع جديد
+   374→          </Button>
+   375→        )}
+   376→      </div>
+   377→
+   378→      {/* Search */}
+   379→      <Card
+   380→        className="border-0 shadow-md overflow-hidden"
+   381→        style={{ borderTop: '3px solid', borderImage: 'linear-gradient(to left, #f43f5e, #fb7185) 1' }}
+   382→      >
+   383→        <CardContent className="p-4">
+   384→          <div className="relative">
+   385→            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-400" />
+   386→            <Input
+   387→              placeholder="بحث برقم المرتجع..."
+   388→              value={search}
+   389→              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+   390→              className="pr-10 h-11 bg-gray-50/80 border-gray-200/60 focus:bg-white transition-colors"
+   391→            />
+   392→          </div>
+   393→        </CardContent>
+   394→      </Card>
+   395→
+   396→      {/* Returns Content */}
+   397→      <Card className="border-0 shadow-md overflow-hidden">
+   398→        {/* Gradient accent bar at top */}
+   399→        <div
+   400→          style={{
+   401→            height: '3px',
+   402→            background: 'linear-gradient(to left, #f43f5e, #fb7185, #fda4af)',
+   403→          }}
+   404→        />
+   405→        <CardContent className="p-0">
+   406→          {loading ? (
+   407→            <div className="flex flex-col items-center justify-center py-16 gap-3">
+   408→              <div className="relative">
+   409→                <div
+   410→                  className="w-10 h-10 rounded-full border-3 border-t-transparent animate-spin"
+   411→                  style={{ borderColor: '#fda4af', borderTopColor: 'transparent' }}
+   412→                />
+   413→              </div>
+   414→              <p className="text-muted-foreground text-sm font-medium">جاري التحميل...</p>
+   415→            </div>
+   416→          ) : returns.length === 0 ? (
+   417→            <div className="flex flex-col items-center justify-center py-20 px-4">
+   418→              <div
+   419→                className="w-24 h-24 rounded-2xl flex items-center justify-center mb-5 shadow-lg"
+   420→                style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.15), rgba(251,113,133,0.15))' }}
+   421→              >
+   422→                <RotateCcw
+   423→                  className="w-12 h-12"
+   424→                  style={{ color: '#e11d48' }}
+   425→                />
+   426→              </div>
+   427→              <h3 className="text-xl font-bold mb-2">لا توجد مرتجعات</h3>
+   428→              <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs leading-relaxed">
+   429→                لم يتم تسجيل أي مرتجعات بعد. يمكنك إنشاء مرتجع من أي فاتورة نشطة لإدارة الاسترجاعات.
+   430→              </p>
+   431→              {hasPermission('returns', 'create') && (
+   432→                <Button
+   433→                  onClick={openCreateDialog}
+   434→                  className="gap-2 shadow-lg text-white font-semibold px-6 h-11 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+   435→                  style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   436→                  size="lg"
+   437→                >
+   438→                  <Plus className="w-5 h-5" />
+   439→                  إنشاء مرتجع جديد
+   440→                </Button>
+   441→              )}
+   442→            </div>
+   443→          ) : (
+   444→            <>
+   445→              {/* Mobile Card Layout */}
+   446→              <div className="sm:hidden p-3 space-y-3">
+   447→                {returns.map((ret) => (
+   448→                  <div
+   449→                    key={ret.id}
+   450→                    className="relative rounded-xl bg-white border border-gray-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+   451→                    style={{ borderRight: '4px solid #f43f5e' }}
+   452→                  >
+   453→                    <div className="p-3 space-y-3">
+   454→                      {/* Return number row */}
+   455→                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+   456→                        <div
+   457→                          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+   458→                          style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   459→                        >
+   460→                          <RotateCcw className="w-4 h-4 text-white" />
+   461→                        </div>
+   462→                        <div style={{ flex: 1, minWidth: 0 }}>
+   463→                          <p className="font-bold text-sm truncate">{ret.return_number}</p>
+   464→                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+   465→                            <FileText className="w-3 h-3" />
+   466→                            {(ret as any).original_invoice?.invoice_number || '—'}
+   467→                          </p>
+   468→                        </div>
+   469→                        <div
+   470→                          className="text-left flex-shrink-0"
+   471→                        >
+   472→                          <p className="font-bold text-sm" style={{ color: '#e11d48' }}>
+   473→                            {formatCurrency(ret.total)}
+   474→                          </p>
+   475→                        </div>
+   476→                      </div>
+   477→
+   478→                      {/* Details row */}
+   479→                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+   480→                        <span
+   481→                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md"
+   482→                          style={{ background: 'rgba(244,63,94,0.06)', color: '#9f1239' }}
+   483→                        >
+   484→                          <MapPin className="w-3 h-3" />
+   485→                          {(ret as any).branches?.name || '—'}
+   486→                        </span>
+   487→                        <span
+   488→                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md"
+   489→                          style={{ background: 'rgba(59,130,246,0.06)', color: '#1e40af' }}
+   490→                        >
+   491→                          <Calendar className="w-3 h-3" />
+   492→                          {formatDate(ret.return_date)}
+   493→                        </span>
+   494→                      </div>
+   495→
+   496→                      {/* Action button */}
+   497→                      <Button
+   498→                        variant="outline"
+   499→                        size="sm"
+   500→                        className="w-full h-9 text-xs font-medium gap-1.5 transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+   501→                        onClick={() => viewReturnDetail(ret)}
+   502→                      >
+   503→                        <Eye className="w-3.5 h-3.5" />
+   504→                        عرض التفاصيل
+   505→                      </Button>
+   506→                    </div>
+   507→                  </div>
+   508→                ))}
+   509→              </div>
+   510→
+   511→              {/* Desktop Table */}
+   512→              <div className="hidden sm:block">
+   513→                <div style={{ overflowX: 'auto' }}>
+   514→                  <Table>
+   515→                    <TableHeader>
+   516→                      <TableRow
+   517→                        className="border-b-0"
+   518→                        style={{ background: 'linear-gradient(to left, rgba(244,63,94,0.04), rgba(251,113,133,0.04))' }}
+   519→                      >
+   520→                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4" style={{ color: '#9f1239' }}>
+   521→                          رقم المرتجع
+   522→                        </TableHead>
+   523→                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4 hidden sm:table-cell" style={{ color: '#9f1239' }}>
+   524→                          الفاتورة الأصلية
+   525→                        </TableHead>
+   526→                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4 hidden md:table-cell" style={{ color: '#9f1239' }}>
+   527→                          الفرع
+   528→                        </TableHead>
+   529→                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4 hidden md:table-cell" style={{ color: '#9f1239' }}>
+   530→                          التاريخ
+   531→                        </TableHead>
+   532→                        <TableHead className="text-right font-bold text-xs uppercase tracking-wider py-4" style={{ color: '#9f1239' }}>
+   533→                          الإجمالي
+   534→                        </TableHead>
+   535→                        <TableHead className="text-center font-bold text-xs uppercase tracking-wider py-4" style={{ color: '#9f1239' }}>
+   536→                          عرض
+   537→                        </TableHead>
+   538→                      </TableRow>
+   539→                    </TableHeader>
+   540→                    <TableBody>
+   541→                      {returns.map((ret) => (
+   542→                        <TableRow
+   543→                          key={ret.id}
+   544→                          className="transition-all duration-150 group"
+   545→                          style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}
+   546→                        >
+   547→                          <TableCell>
+   548→                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+   549→                              <div
+   550→                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+   551→                                style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   552→                              >
+   553→                                <RotateCcw className="w-3.5 h-3.5 text-white" />
+   554→                              </div>
+   555→                              <span className="font-semibold text-sm">{ret.return_number}</span>
+   556→                            </div>
+   557→                          </TableCell>
+   558→                          <TableCell className="hidden sm:table-cell">
+   559→                            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+   560→                              <FileText className="w-3.5 h-3.5 text-gray-400" />
+   561→                              {(ret as any).original_invoice?.invoice_number || '—'}
+   562→                            </span>
+   563→                          </TableCell>
+   564→                          <TableCell className="hidden md:table-cell">
+   565→                            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+   566→                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+   567→                              {(ret as any).branches?.name || '—'}
+   568→                            </span>
+   569→                          </TableCell>
+   570→                          <TableCell className="hidden md:table-cell">
+   571→                            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+   572→                              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+   573→                              {formatDate(ret.return_date)}
+   574→                            </span>
+   575→                          </TableCell>
+   576→                          <TableCell>
+   577→                            <span
+   578→                              className="font-bold text-sm px-2.5 py-1 rounded-md"
+   579→                              style={{ background: 'rgba(244,63,94,0.08)', color: '#e11d48' }}
+   580→                            >
+   581→                              {formatCurrency(ret.total)}
+   582→                            </span>
+   583→                          </TableCell>
+   584→                          <TableCell className="text-center">
+   585→                            <Button
+   586→                              variant="ghost"
+   587→                              size="icon"
+   588→                              className="h-9 w-9 rounded-lg transition-all duration-200 hover:bg-rose-50 hover:text-rose-600"
+   589→                              onClick={() => viewReturnDetail(ret)}
+   590→                            >
+   591→                              <Eye className="w-4 h-4" />
+   592→                            </Button>
+   593→                          </TableCell>
+   594→                        </TableRow>
+   595→                      ))}
+   596→                    </TableBody>
+   597→                  </Table>
+   598→                </div>
+   599→              </div>
+   600→
+   601→              {totalPages > 1 && (
+   602→                <div
+   603→                  className="flex items-center justify-between px-4 py-3 border-t"
+   604→                  style={{ borderColor: 'rgba(0,0,0,0.06)', background: 'rgba(244,63,94,0.02)' }}
+   605→                >
+   606→                  <p className="text-sm text-muted-foreground font-medium">
+   607→                    صفحة <span style={{ color: '#e11d48', fontWeight: 700 }}>{page}</span> من {totalPages}
+   608→                  </p>
+   609→                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+   610→                    <Button
+   611→                      variant="outline"
+   612→                      size="icon"
+   613→                      className="h-8 w-8 rounded-lg transition-all duration-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
+   614→                      onClick={() => setPage(Math.max(1, page - 1))}
+   615→                      disabled={page <= 1}
+   616→                    >
+   617→                      <ArrowRight className="w-4 h-4" />
+   618→                    </Button>
+   619→                    <Button
+   620→                      variant="outline"
+   621→                      size="icon"
+   622→                      className="h-8 w-8 rounded-lg transition-all duration-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
+   623→                      onClick={() => setPage(Math.min(totalPages, page + 1))}
+   624→                      disabled={page >= totalPages}
+   625→                    >
+   626→                      <ChevronLeft className="w-4 h-4" />
+   627→                    </Button>
+   628→                  </div>
+   629→                </div>
+   630→              )}
+   631→            </>
+   632→          )}
+   633→        </CardContent>
+   634→      </Card>
+   635→
+   636→      {/* Create Return Dialog */}
+   637→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   638→        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+   639→          <DialogHeader>
+   640→            <DialogTitle className="flex items-center gap-2">
+   641→              <div
+   642→                className="w-8 h-8 rounded-lg flex items-center justify-center"
+   643→                style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   644→              >
+   645→                <RotateCcw className="w-4 h-4 text-white" />
+   646→              </div>
+   647→              إنشاء مرتجع جديد
+   648→            </DialogTitle>
+   649→          </DialogHeader>
+   650→          <div className="space-y-4 py-4">
+   651→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   652→              <div className="space-y-2">
+   653→                <Label className="font-semibold text-sm">رقم المرتجع</Label>
+   654→                <Input value={returnNumber} disabled className="bg-muted h-10 font-mono" />
+   655→              </div>
+   656→              <div className="space-y-2">
+   657→                <Label className="font-semibold text-sm">الفاتورة الأصلية *</Label>
+   658→                <Select value={selectedInvoiceId} onValueChange={selectInvoice}>
+   659→                  <SelectTrigger className="h-10">
+   660→                    <SelectValue placeholder="اختر الفاتورة" />
+   661→                  </SelectTrigger>
+   662→                  <SelectContent>
+   663→                    {invoices.map((inv: any) => (
+   664→                      <SelectItem key={inv.id} value={inv.id}>
+   665→                        {inv.invoice_number} - {inv.branches?.name}
+   666→                      </SelectItem>
+   667→                    ))}
+   668→                  </SelectContent>
+   669→                </Select>
+   670→              </div>
+   671→            </div>
+   672→
+   673→            {invoiceItems.length > 0 && (
+   674→              <div className="space-y-3">
+   675→                <Label className="font-semibold text-sm">أصناف المرتجع</Label>
+   676→                <div className="overflow-x-auto border rounded-lg">
+   677→                  <Table>
+   678→                    <TableHeader>
+   679→                      <TableRow>
+   680→                        <TableHead className="text-center w-10">✓</TableHead>
+   681→                        <TableHead className="text-right">الصنف</TableHead>
+   682→                        <TableHead className="text-center">الكمية الأصلية</TableHead>
+   683→                        <TableHead className="text-center hidden sm:table-cell">عدد/وحدة</TableHead>
+   684→                        <TableHead className="text-center">كمية المرتجع</TableHead>
+   685→                        <TableHead className="text-center hidden md:table-cell">إجمالي القطع</TableHead>
+   686→                        <TableHead className="text-center">سعر الوحدة</TableHead>
+   687→                        <TableHead className="text-left">الإجمالي</TableHead>
+   688→                      </TableRow>
+   689→                    </TableHeader>
+   690→                    <TableBody>
+   691→                      {invoiceItems.map((item, index) => {
+   692→                        const totalPieces = item.quantity * item.unit_count;
+   693→                        return (
+   694→                          <TableRow key={index}>
+   695→                            <TableCell className="text-center">
+   696→                              <input
+   697→                                type="checkbox"
+   698→                                checked={item.checked}
+   699→                                onChange={(e) => toggleReturnItem(index, e.target.checked)}
+   700→                                className="w-4 h-4 accent-rose-500"
+   701→                              />
+   702→                            </TableCell>
+   703→                            <TableCell className="font-medium">{item.item_name}</TableCell>
+   704→                            <TableCell className="text-center">{item.max_quantity}</TableCell>
+   705→                            <TableCell className="text-center hidden sm:table-cell">
+   706→                              {item.unit_count > 1 ? item.unit_count : '—'}
+   707→                            </TableCell>
+   708→                            <TableCell>
+   709→                              <Input
+   710→                                type="number"
+   711→                                inputMode="decimal"
+   712→                                value={item.quantity || ''}
+   713→                                onChange={(e) => updateReturnItem(index, Number(e.target.value) || 0)}
+   714→                                disabled={!item.checked}
+   715→                                className="h-8 w-20 text-center mx-auto"
+   716→                                min="0"
+   717→                                max={item.max_quantity}
+   718→                                step="0.01"
+   719→                              />
+   720→                            </TableCell>
+   721→                            <TableCell className="text-center hidden md:table-cell">
+   722→                              {item.checked && item.unit_count > 1 ? (
+   723→                                <span className="font-bold text-sm" style={{ color: '#e11d48' }}>
+   724→                                  {totalPieces.toLocaleString('ar-EG')}
+   725→                                </span>
+   726→                              ) : '—'}
+   727→                            </TableCell>
+   728→                            <TableCell className="text-center">{formatCurrency(item.unit_price)}</TableCell>
+   729→                            <TableCell className="text-left font-semibold">{formatCurrency(item.total_price)}</TableCell>
+   730→                          </TableRow>
+   731→                        );
+   732→                      })}
+   733→                    </TableBody>
+   734→                  </Table>
+   735→                </div>
+   736→
+   737→                <div
+   738→                  className="flex items-center justify-between p-4 rounded-xl"
+   739→                  style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.06), rgba(251,113,133,0.06))' }}
+   740→                >
+   741→                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+   742→                    <Receipt className="w-5 h-5" style={{ color: '#e11d48' }} />
+   743→                    <div>
+   744→                      <span className="font-bold text-sm">إجمالي المرتجع</span>
+   745→                      {returnTotalPieces > 0 && (
+   746→                        <span className="text-xs text-muted-foreground mr-2">
+   747→                          ({returnTotalPieces.toLocaleString('ar-EG')} قطعة)
+   748→                        </span>
+   749→                      )}
+   750→                    </div>
+   751→                  </div>
+   752→                  <span className="text-lg font-bold" style={{ color: '#e11d48' }}>{formatCurrency(returnTotal)}</span>
+   753→                </div>
+   754→              </div>
+   755→            )}
+   756→
+   757→            <div className="space-y-2">
+   758→              <Label className="font-semibold text-sm">ملاحظات</Label>
+   759→              <Textarea
+   760→                value={returnNotes}
+   761→                onChange={(e) => setReturnNotes(e.target.value)}
+   762→                placeholder="ملاحظات إضافية..."
+   763→                rows={2}
+   764→                className="resize-none"
+   765→              />
+   766→            </div>
+   767→          </div>
+   768→          <DialogFooter className="gap-2">
+   769→            <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-10">إلغاء</Button>
+   770→            <Button
+   771→              onClick={handleSaveReturn}
+   772→              disabled={saving}
+   773→              className="h-10 text-white font-semibold px-5 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+   774→              style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   775→            >
+   776→              {saving ? 'جاري الحفظ...' : 'حفظ المرتجع'}
+   777→            </Button>
+   778→          </DialogFooter>
+   779→        </DialogContent>
+   780→      </Dialog>
+   781→
+   782→      {/* Return Detail Dialog */}
+   783→      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+   784→        <DialogContent className="w-[95vw] sm:max-w-lg">
+   785→          <DialogHeader>
+   786→            <DialogTitle className="flex items-center gap-2">
+   787→              <div
+   788→                className="w-8 h-8 rounded-lg flex items-center justify-center"
+   789→                style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
+   790→              >
+   791→                <Eye className="w-4 h-4 text-white" />
+   792→              </div>
+   793→              تفاصيل المرتجع {selectedReturn?.return_number}
+   794→            </DialogTitle>
+   795→          </DialogHeader>
+   796→          <div className="space-y-4">
+   797→            {/* Info Cards */}
+   798→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   799→              <div
+   800→                className="p-3 rounded-xl"
+   801→                style={{ background: 'rgba(244,63,94,0.05)', border: '1px solid rgba(244,63,94,0.1)' }}
+   802→              >
+   803→                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+   804→                  <MapPin className="w-3.5 h-3.5" style={{ color: '#e11d48' }} />
+   805→                  <span className="text-xs text-muted-foreground">الفرع</span>
+   806→                </div>
+   807→                <p className="font-semibold text-sm">{(selectedReturn as any)?.branches?.name || '—'}</p>
+   808→              </div>
+   809→              <div
+   810→                className="p-3 rounded-xl"
+   811→                style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.1)' }}
+   812→              >
+   813→                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+   814→                  <Calendar className="w-3.5 h-3.5 text-blue-500" />
+   815→                  <span className="text-xs text-muted-foreground">التاريخ</span>
+   816→                </div>
+   817→                <p className="font-semibold text-sm">{selectedReturn ? formatDate(selectedReturn.return_date) : ''}</p>
+   818→              </div>
+   819→              <div
+   820→                className="p-3 rounded-xl"
+   821→                style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.1)' }}
+   822→              >
+   823→                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+   824→                  <FileText className="w-3.5 h-3.5 text-emerald-500" />
+   825→                  <span className="text-xs text-muted-foreground">الفاتورة الأصلية</span>
+   826→                </div>
+   827→                <p className="font-semibold text-sm">{(selectedReturn as any)?.original_invoice?.invoice_number || '—'}</p>
+   828→              </div>
+   829→              <div
+   830→                className="p-3 rounded-xl"
+   831→                style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.15)' }}
+   832→              >
+   833→                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} className="mb-1">
+   834→                  <Receipt className="w-3.5 h-3.5" style={{ color: '#e11d48' }} />
+   835→                  <span className="text-xs text-muted-foreground">الإجمالي</span>
+   836→                </div>
+   837→                <p className="font-bold text-sm" style={{ color: '#e11d48' }}>{selectedReturn ? formatCurrency(selectedReturn.total) : ''}</p>
+   838→              </div>
+   839→            </div>
+   840→
+   841→            {returnItems.length > 0 && (
+   842→              <div className="border rounded-xl overflow-hidden">
+   843→                <div
+   844→                  className="px-4 py-2.5"
+   845→                  style={{ background: 'linear-gradient(to left, rgba(244,63,94,0.06), rgba(251,113,133,0.06))' }}
+   846→                >
+   847→                  <p className="font-semibold text-sm" style={{ color: '#9f1239' }}>أصناف المرتجع</p>
+   848→                </div>
+   849→                <Table>
+   850→                  <TableHeader>
+   851→                    <TableRow>
+   852→                      <TableHead className="text-right">الصنف</TableHead>
+   853→                      <TableHead className="text-center">الكمية</TableHead>
+   854→                      <TableHead className="text-center hidden sm:table-cell">عدد/وحدة</TableHead>
+   855→                      <TableHead className="text-center hidden sm:table-cell">إجمالي القطع</TableHead>
+   856→                      <TableHead className="text-left">الإجمالي</TableHead>
+   857→                    </TableRow>
+   858→                  </TableHeader>
+   859→                  <TableBody>
+   860→                    {returnItems.map((item) => {
+   861→                      const unitCount = Number(item.unit_count) || 1;
+   862→                      const qty = Number(item.quantity);
+   863→                      const totalPieces = qty * unitCount;
+   864→                      return (
+   865→                        <TableRow key={item.id}>
+   866→                          <TableCell className="font-medium">{item.item_name}</TableCell>
+   867→                          <TableCell className="text-center">{qty.toLocaleString('ar-EG')}</TableCell>
+   868→                          <TableCell className="text-center hidden sm:table-cell">
+   869→                            {unitCount > 1 ? unitCount : '—'}
+   870→                          </TableCell>
+   871→                          <TableCell className="text-center hidden sm:table-cell">
+   872→                            {unitCount > 1 ? (
+   873→                              <span className="font-bold text-sm" style={{ color: '#e11d48' }}>
+   874→                                {totalPieces.toLocaleString('ar-EG')}
+   875→                              </span>
+   876→                            ) : '—'}
+   877→                          </TableCell>
+   878→                          <TableCell className="text-left font-semibold">{formatCurrency(Number(item.total_price))}</TableCell>
+   879→                        </TableRow>
+   880→                      );
+   881→                    })}
+   882→                  </TableBody>
+   883→                </Table>
+   884→              </div>
+   885→            )}
+   886→
+   887→            {selectedReturn?.notes && (
+   888→              <div
+   889→                className="p-3 rounded-xl text-sm"
+   890→                style={{ background: 'rgba(244,63,94,0.04)', border: '1px solid rgba(244,63,94,0.1)' }}
+   891→              >
+   892→                <span className="font-semibold" style={{ color: '#9f1239' }}>ملاحظات:</span>{' '}
+   893→                <span className="text-gray-600">{selectedReturn.notes}</span>
+   894→              </div>
+   895→            )}
+   896→          </div>
+   897→        </DialogContent>
+   898→      </Dialog>
+   899→    </div>
+   900→  );
+   901→}
+   902→

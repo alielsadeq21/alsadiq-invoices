@@ -1,0 +1,1307 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState, useCallback, useRef } from 'react';
+     4→import { useAppStore } from '@/store/app-store';
+     5→import { supabase } from '@/lib/supabase';
+     6→import type { Branch, Customer, Invoice, InvoiceItem, InvoiceFormItem, PaymentMethod, Product } from '@/lib/types';
+     7→import { formatCurrency, generateInvoiceNumber, getCurrentYear, getTodayISO } from '@/lib/utils';
+     8→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     9→import { Button } from '@/components/ui/button';
+    10→import { Input } from '@/components/ui/input';
+    11→import { Label } from '@/components/ui/label';
+    12→import { Textarea } from '@/components/ui/textarea';
+    13→import { Checkbox } from '@/components/ui/checkbox';
+    14→import { Separator } from '@/components/ui/separator';
+    15→import {
+    16→  Select,
+    17→  SelectContent,
+    18→  SelectItem,
+    19→  SelectTrigger,
+    20→  SelectValue,
+    21→} from '@/components/ui/select';
+    22→import {
+    23→  Table,
+    24→  TableBody,
+    25→  TableCell,
+    26→  TableHead,
+    27→  TableHeader,
+    28→  TableRow,
+    29→} from '@/components/ui/table';
+    30→import {
+    31→  ArrowRight,
+    32→  Plus,
+    33→  Trash2,
+    34→  Save,
+    35→  Printer,
+    36→  FileText,
+    37→  Loader2,
+    38→  User,
+    39→  Truck,
+    40→  Clock,
+    41→  Calendar,
+    42→  Calculator,
+    43→} from 'lucide-react';
+    44→import { toast } from 'sonner';
+    45→import { motion } from 'framer-motion';
+    46→import {
+    47→  AlertDialog,
+    48→  AlertDialogAction,
+    49→  AlertDialogCancel,
+    50→  AlertDialogContent,
+    51→  AlertDialogDescription,
+    52→  AlertDialogFooter,
+    53→  AlertDialogHeader,
+    54→  AlertDialogTitle,
+    55→} from '@/components/ui/alert-dialog';
+    56→
+    57→export default function InvoiceFormPage() {
+    58→  const { navigateTo, pageParams, settings, user, isAdmin } = useAppStore();
+    59→  const id = pageParams.id;
+    60→
+    61→  const [branches, setBranches] = useState<Branch[]>([]);
+    62→  const [customers, setCustomers] = useState<Customer[]>([]);
+    63→  const [products, setProducts] = useState<Product[]>([]);
+    64→  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+    65→  const [loading, setLoading] = useState(false);
+    66→  const [saving, setSaving] = useState(false);
+    67→  const [isEdit, setIsEdit] = useState(false);
+    68→
+    69→  const [invoiceNumber, setInvoiceNumber] = useState('');
+    70→  const [branchId, setBranchId] = useState('');
+    71→  const [customerId, setCustomerId] = useState<string>('');
+    72→  const [invoiceDate, setInvoiceDate] = useState(getTodayISO());
+    73→  const [invoiceTime, setInvoiceTime] = useState(() => {
+    74→    const now = new Date();
+    75→    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    76→  });
+    77→  const [receiverName, setReceiverName] = useState('');
+    78→  const [driverName, setDriverName] = useState('');
+    79→  const [driverPhone, setDriverPhone] = useState('');
+    80→  const [paymentMethodId, setPaymentMethodId] = useState<string>('');
+    81→  const [items, setItems] = useState<InvoiceFormItem[]>([
+    82→    { item_name: '', quantity: 1, unit_count: 1, unit_price: 0, total_price: 0 },
+    83→  ]);
+    84→  const [showUnitCountCols, setShowUnitCountCols] = useState(false);
+    85→  const [activeSuggestion, setActiveSuggestion] = useState<number | null>(null);
+    86→  const [applyTax, setApplyTax] = useState(false);
+    87→  const [taxRate, setTaxRate] = useState(settings?.default_tax_rate || 0);
+    88→  const [notes, setNotes] = useState('');
+    89→  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+    90→
+    91→  // Track if form has been modified for beforeunload warning
+    92→  const [hasChanges, setHasChanges] = useState(false);
+    93→  const savingRef = useRef(false);
+    94→
+    95→  // Mark form as changed whenever any field is updated
+    96→  const markChanged = useCallback(() => {
+    97→    if (!savingRef.current) {
+    98→      setHasChanges(true);
+    99→    }
+   100→  }, []);
+   101→
+   102→  // Wrapper for state setters that also marks form as changed
+   103→  const setBranchIdChanged = (v: string) => { setBranchId(v); markChanged(); };
+   104→  const setCustomerIdChanged = (v: string) => { setCustomerId(v === 'none' ? '' : v); markChanged(); };
+   105→  const setInvoiceDateChanged = (v: string) => { setInvoiceDate(v); markChanged(); };
+   106→  const setInvoiceTimeChanged = (v: string) => { setInvoiceTime(v); markChanged(); };
+   107→  const setReceiverNameChanged = (v: string) => { setReceiverName(v); markChanged(); };
+   108→  const setDriverNameChanged = (v: string) => { setDriverName(v); markChanged(); };
+   109→  const setDriverPhoneChanged = (v: string) => { setDriverPhone(v); markChanged(); };
+   110→  const setPaymentMethodIdChanged = (v: string) => { setPaymentMethodId(v); markChanged(); };
+   111→  const setNotesChanged = (v: string) => { setNotes(v); markChanged(); };
+   112→
+   113→  // beforeunload warning
+   114→  useEffect(() => {
+   115→    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+   116→      if (hasChanges) {
+   117→        e.preventDefault();
+   118→        e.returnValue = '';
+   119→      }
+   120→    };
+   121→    window.addEventListener('beforeunload', handleBeforeUnload);
+   122→    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+   123→  }, [hasChanges]);
+   124→
+   125→  useEffect(() => {
+   126→    loadBranches();
+   127→    loadCustomers();
+   128→    loadProducts();
+   129→    loadPaymentMethods();
+   130→    // Auto-select branch for non-admin users
+   131→    if (!isAdmin && user?.branch_id) {
+   132→      setBranchId(user.branch_id);
+   133→    }
+   134→    if (id) {
+   135→      setIsEdit(true);
+   136→      loadInvoice(id);
+   137→    } else if (pageParams.duplicate) {
+   138→      loadDuplicateInvoice(pageParams.duplicate);
+   139→    } else {
+   140→      generateNewInvoiceNumber();
+   141→    }
+   142→  }, [id]);
+   143→
+   144→  useEffect(() => {
+   145→    if (settings?.default_tax_rate && settings.default_tax_rate > 0) {
+   146→      setApplyTax(true);
+   147→      setTaxRate(settings.default_tax_rate);
+   148→    }
+   149→  }, [settings]);
+   150→
+   151→  const loadBranches = async () => {
+   152→    let query = supabase
+   153→      .from('branches')
+   154→      .select('*')
+   155→      .eq('is_active', true)
+   156→      .order('name');
+   157→    if (!isAdmin && user?.branch_id) query = query.eq('id', user.branch_id);
+   158→    const { data } = await query;
+   159→    if (data) setBranches(data as Branch[]);
+   160→  };
+   161→
+   162→  const loadProducts = async () => {
+   163→    const { data } = await supabase
+   164→      .from('products')
+   165→      .select('*')
+   166→      .eq('is_active', true)
+   167→      .order('name');
+   168→    if (data) setProducts(data as Product[]);
+   169→  };
+   170→
+   171→  const loadCustomers = async () => {
+   172→    const { data } = await supabase
+   173→      .from('customers')
+   174→      .select('*')
+   175→      .eq('is_active', true)
+   176→      .order('name');
+   177→    if (data) setCustomers(data as Customer[]);
+   178→  };
+   179→
+   180→  const loadPaymentMethods = async () => {
+   181→    const { data } = await supabase
+   182→      .from('payment_methods')
+   183→      .select('*')
+   184→      .order('sort_order');
+   185→    if (data) setPaymentMethods(data as PaymentMethod[]);
+   186→  };
+   187→
+   188→  const generateNewInvoiceNumber = async () => {
+   189→    const year = getCurrentYear();
+   190→    const { data } = await supabase
+   191→      .from('invoices')
+   192→      .select('invoice_number')
+   193→      .like('invoice_number', `INV-${year}-%`)
+   194→      .order('invoice_number', { ascending: false })
+   195→      .limit(1);
+   196→
+   197→    let lastNum = 0;
+   198→    if (data && data.length > 0) {
+   199→      const parts = data[0].invoice_number.split('-');
+   200→      lastNum = parseInt(parts[parts.length - 1]) || 0;
+   201→    }
+   202→    setInvoiceNumber(generateInvoiceNumber(lastNum, year));
+   203→  };
+   204→
+   205→  const loadInvoice = async (invoiceId: string) => {
+   206→    setLoading(true);
+   207→    try {
+   208→      const { data, error } = await supabase
+   209→        .from('invoices')
+   210→        .select('*, items:invoice_items(*)')
+   211→        .eq('id', invoiceId)
+   212→        .single();
+   213→
+   214→      if (error || !data) {
+   215→        toast.error('لم يتم العثور على الفاتورة');
+   216→        navigateTo('invoices');
+   217→        return;
+   218→      }
+   219→
+   220→      const invoice = data as Invoice & { items: InvoiceItem[] };
+   221→
+   222→      // Block editing of finalized/locked invoices (security protection)
+   223→      // Once an invoice is saved, it becomes locked - no modifications allowed
+   224→      if (invoice.status === 'active' || invoice.status === 'cancelled' || invoice.status === 'partially_returned' || invoice.status === 'fully_returned') {
+   225→        toast.error('لا يمكن تعديل فاتورة مُنهية. الفواتير بعد الحفظ تصبح مقفلة.');
+   226→        navigateTo('invoice-detail', { id: invoiceId });
+   227→        return;
+   228→      }
+   229→
+   230→      setInvoiceNumber(invoice.invoice_number);
+   231→      setBranchId(invoice.branch_id);
+   232→      setCustomerId((invoice as any).customer_id || '');
+   233→      setInvoiceDate(invoice.invoice_date);
+   234→      setInvoiceTime(invoice.invoice_time || '');
+   235→      setReceiverName(invoice.receiver_name || '');
+   236→      setDriverName(invoice.driver_name || '');
+   237→      setDriverPhone(invoice.driver_phone || '');
+   238→      setPaymentMethodId((invoice as any).payment_method_id || '');
+   239→      setApplyTax(invoice.tax_rate > 0);
+   240→      setTaxRate(invoice.tax_rate);
+   241→      setNotes(invoice.notes || '');
+   242→
+   243→      if (invoice.items && invoice.items.length > 0) {
+   244→        setItems(
+   245→          invoice.items.map((item) => ({
+   246→            item_name: item.item_name,
+   247→            quantity: Number(item.quantity),
+   248→            unit_count: Number(item.unit_count) || 1,
+   249→            unit_price: Number(item.unit_price),
+   250→            total_price: Number(item.total_price),
+   251→          }))
+   252→        );
+   253→      }
+   254→
+   255→      // Mark as no changes after loading existing invoice
+   256→      setHasChanges(false);
+   257→    } catch (err) {
+   258→      console.error(err);
+   259→      toast.error('حدث خطأ في تحميل الفاتورة');
+   260→    } finally {
+   261→      setLoading(false);
+   262→    }
+   263→  };
+   264→
+   265→  const loadDuplicateInvoice = async (sourceId: string) => {
+   266→    setLoading(true);
+   267→    try {
+   268→      const { data, error } = await supabase
+   269→        .from('invoices')
+   270→        .select('*, items:invoice_items(*)')
+   271→        .eq('id', sourceId)
+   272→        .single();
+   273→
+   274→      if (error || !data) {
+   275→        toast.error('لم يتم العثور على الفاتورة الأصلية');
+   276→        navigateTo('invoices');
+   277→        return;
+   278→      }
+   279→
+   280→      const source = data as Invoice & { items: InvoiceItem[] };
+   281→
+   282→      // Pre-fill form with source invoice data (new number, today's date/time)
+   283→      generateNewInvoiceNumber();
+   284→      setBranchId(source.branch_id);
+   285→      setCustomerId((source as any).customer_id || '');
+   286→      setInvoiceDate(getTodayISO());
+   287→      setInvoiceTime(() => {
+   288→        const now = new Date();
+   289→        return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+   290→      });
+   291→      setReceiverName(source.receiver_name || '');
+   292→      setDriverName(source.driver_name || '');
+   293→      setDriverPhone(source.driver_phone || '');
+   294→      setPaymentMethodId((source as any).payment_method_id || '');
+   295→      setApplyTax(source.tax_rate > 0);
+   296→      setTaxRate(source.tax_rate);
+   297→      setNotes(source.notes || '');
+   298→
+   299→      if (source.items && source.items.length > 0) {
+   300→        setItems(
+   301→          source.items.map((item) => ({
+   302→            item_name: item.item_name,
+   303→            quantity: Number(item.quantity),
+   304→            unit_count: Number(item.unit_count) || 1,
+   305→            unit_price: Number(item.unit_price),
+   306→            total_price: Number(item.total_price),
+   307→          }))
+   308→        );
+   309→        setShowUnitCountCols(source.items.some(item => Number(item.unit_count) > 1));
+   310→      }
+   311→
+   312→      toast.success('تم تحميل بيانات الفاتورة - عدّل واحفظ كفاتورة جديدة');
+   313→      setHasChanges(false);
+   314→    } catch (err) {
+   315→      console.error(err);
+   316→      toast.error('حدث خطأ في تحميل الفاتورة');
+   317→    } finally {
+   318→      setLoading(false);
+   319→    }
+   320→  };
+   321→
+   322→  const updateItem = (index: number, field: keyof InvoiceFormItem, value: string | number) => {
+   323→    markChanged();
+   324→    setItems((prev) => {
+   325→      const updated = [...prev];
+   326→      const item = { ...updated[index] };
+   327→
+   328→      if (field === 'item_name') {
+   329→        item.item_name = value as string;
+   330→      } else if (field === 'quantity') {
+   331→        item.quantity = Math.max(0, Number(value) || 0);
+   332→        item.total_price = item.quantity * item.unit_count * item.unit_price;
+   333→      } else if (field === 'unit_count') {
+   334→        item.unit_count = Math.max(1, Number(value) || 1);
+   335→        item.total_price = item.quantity * item.unit_count * item.unit_price;
+   336→      } else if (field === 'unit_price') {
+   337→        item.unit_price = Math.max(0, Number(value) || 0);
+   338→        item.total_price = item.quantity * item.unit_count * item.unit_price;
+   339→      }
+   340→
+   341→      updated[index] = item;
+   342→      return updated;
+   343→    });
+   344→  };
+   345→
+   346→  const addItem = () => {
+   347→    markChanged();
+   348→    setItems((prev) => [
+   349→      ...prev,
+   350→      { item_name: '', quantity: 1, unit_count: 1, unit_price: 0, total_price: 0 },
+   351→    ]);
+   352→  };
+   353→
+   354→  const removeItem = (index: number) => {
+   355→    if (items.length <= 1) {
+   356→      toast.error('يجب أن تحتوي الفاتورة على صنف واحد على الأقل');
+   357→      return;
+   358→    }
+   359→    markChanged();
+   360→    setItems((prev) => prev.filter((_, i) => i !== index));
+   361→  };
+   362→
+   363→  const selectProduct = (index: number, product: Product) => {
+   364→    markChanged();
+   365→    setActiveSuggestion(null);
+   366→    setItems((prev) => {
+   367→      const updated = [...prev];
+   368→      const item = { ...updated[index] };
+   369→      item.item_name = product.name;
+   370→      (item as any).product_id = product.id;
+   371→      item.unit_price = product.unit_price;
+   372→      if (product.unit_count > 1) {
+   373→        item.unit_count = product.unit_count;
+   374→        setShowUnitCountCols(true);
+   375→      }
+   376→      item.total_price = item.quantity * item.unit_count * item.unit_price;
+   377→      updated[index] = item;
+   378→      return updated;
+   379→    });
+   380→  };
+   381→
+   382→  const getFilteredProducts = (index: number) => {
+   383→    const itemName = items[index]?.item_name?.trim() || '';
+   384→    if (!itemName || itemName.length < 1) return [];
+   385→    return products.filter(p =>
+   386→      p.name.includes(itemName) && p.name !== itemName
+   387→    ).slice(0, 5);
+   388→  };
+   389→
+   390→  const showUnitCount = showUnitCountCols || items.some(item => item.unit_count > 1);
+   391→  const subtotal = items.reduce((sum, item) => sum + item.total_price, 0);
+   392→  const taxAmount = applyTax ? (subtotal * taxRate) / 100 : 0;
+   393→  const total = subtotal + taxAmount;
+   394→  const totalPieces = items.reduce((sum, item) => sum + (item.quantity * item.unit_count), 0);
+   395→
+   396→  const validateForm = (): boolean => {
+   397→    if (!branchId) {
+   398→      toast.error('يرجى اختيار الفرع');
+   399→      return false;
+   400→    }
+   401→    if (!invoiceDate) {
+   402→      toast.error('يرجى تحديد تاريخ الفاتورة');
+   403→      return false;
+   404→    }
+   405→    const hasEmptyName = items.some((item) => !item.item_name.trim());
+   406→    if (hasEmptyName) {
+   407→      toast.error('يرجى إدخال اسم جميع الأصناف');
+   408→      return false;
+   409→    }
+   410→    const hasZeroPrice = items.some((item) => item.unit_price <= 0);
+   411→    if (hasZeroPrice) {
+   412→      toast.error('يرجى إدخال سعر الوحدة لجميع الأصناف');
+   413→      return false;
+   414→    }
+   415→    const hasZeroQty = items.some((item) => item.quantity <= 0);
+   416→    if (hasZeroQty) {
+   417→      toast.error('يرجى إدخال الكمية لجميع الأصناف');
+   418→      return false;
+   419→    }
+   420→    return true;
+   421→  };
+   422→
+   423→  const handleSave = async (andPrint = false) => {
+   424→    if (!validateForm()) return;
+   425→
+   426→    savingRef.current = true;
+   427→    setSaving(true);
+   428→    try {
+   429→      if (isEdit && id) {
+   430→        const { error: invError } = await supabase
+   431→          .from('invoices')
+   432→          .update({
+   433→            branch_id: branchId,
+   434→            customer_id: customerId || null,
+   435→            invoice_date: invoiceDate,
+   436→            invoice_time: invoiceTime || null,
+   437→            receiver_name: receiverName || null,
+   438→            driver_name: driverName || null,
+   439→            driver_phone: driverPhone || null,
+   440→            payment_method_id: paymentMethodId || null,
+   441→            subtotal,
+   442→            tax_rate: applyTax ? taxRate : 0,
+   443→            tax_amount: taxAmount,
+   444→            total,
+   445→            notes: notes || null,
+   446→            updated_at: new Date().toISOString(),
+   447→          })
+   448→          .eq('id', id);
+   449→
+   450→        if (invError) throw invError;
+   451→
+   452→        await supabase.from('invoice_items').delete().eq('invoice_id', id);
+   453→        const itemsData = items.map((item) => ({
+   454→          invoice_id: id,
+   455→          item_name: item.item_name,
+   456→          product_id: (item as any).product_id || null,
+   457→          quantity: item.quantity,
+   458→          unit_count: item.unit_count,
+   459→          unit_price: item.unit_price,
+   460→          total_price: item.total_price,
+   461→        }));
+   462→        const { error: itemsError } = await supabase.from('invoice_items').insert(itemsData);
+   463→        if (itemsError) throw itemsError;
+   464→
+   465→        // ===== ربط المخزون بالفواتير: خصم من المخزون =====
+   466→        for (const item of items) {
+   467→          const productId = (item as any).product_id;
+   468→          if (!productId) continue;
+   469→          const totalPieces = item.quantity * item.unit_count;
+   470→
+   471→          // Check if inventory record exists for this product+branch
+   472→          const { data: invRecord } = await supabase
+   473→            .from('inventory')
+   474→            .select('*')
+   475→            .eq('product_id', productId)
+   476→            .eq('branch_id', branchId)
+   477→            .single();
+   478→
+   479→          if (invRecord) {
+   480→            const newQty = invRecord.quantity - totalPieces;
+   481→            await supabase
+   482→              .from('inventory')
+   483→              .update({
+   484→                quantity: Math.max(0, newQty),
+   485→                last_updated: new Date().toISOString(),
+   486→              })
+   487→              .eq('id', invRecord.id);
+   488→          }
+   489→
+   490→          // Log inventory transaction
+   491→          await supabase.from('inventory_transactions').insert({
+   492→            product_id: productId,
+   493→            branch_id: branchId,
+   494→            transaction_type: 'out',
+   495→            quantity: -totalPieces,
+   496→            reference_type: 'invoice',
+   497→            reference_id: id,
+   498→            notes: `فاتورة مبيعات: ${invoiceNumber}`,
+   499→            created_by: user?.id || null,
+   500→          });
+   501→        }
+   502→
+   503→        // ===== قيد محاسبي تلقائي للفاتورة =====
+   504→        try {
+   505→          const year = new Date().getFullYear();
+   506→          const { data: lastJe } = await supabase
+   507→            .from('journal_entries')
+   508→            .select('entry_number')
+   509→            .like('entry_number', `JE-${year}-%`)
+   510→            .order('entry_number', { ascending: false })
+   511→            .limit(1);
+   512→          let lastJeNum = 0;
+   513→          if (lastJe && lastJe.length > 0) {
+   514→            const parts = lastJe[0].entry_number.split('-');
+   515→            lastJeNum = parseInt(parts[parts.length - 1]) || 0;
+   516→          }
+   517→          const jeNum = `JE-${year}-${(lastJeNum + 1).toString().padStart(4, '0')}`;
+   518→
+   519→          const jeLines: { account_name: string; debit: number; credit: number; description: string }[] = [];
+   520→          // مدين: العميل أو الصندوق
+   521→          const customerOrCash = customerId ? 'العملاء' : 'الصندوق (كاش)';
+   522→          jeLines.push({
+   523→            account_name: customerOrCash,
+   524→            debit: total,
+   525→            credit: 0,
+   526→            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
+   527→          });
+   528→          // دائن: المبيعات
+   529→          jeLines.push({
+   530→            account_name: 'مبيعات الفروع',
+   531→            debit: 0,
+   532→            credit: subtotal,
+   533→            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
+   534→          });
+   535→          // دائن: الضريبة (لو فيها ضريبة)
+   536→          if (taxAmount > 0) {
+   537→            jeLines.push({
+   538→              account_name: 'الضريبة',
+   539→              debit: 0,
+   540→              credit: taxAmount,
+   541→              description: `ضريبة فاتورة رقم ${invoiceNumber}`,
+   542→            });
+   543→          }
+   544→
+   545→          const { data: jeData } = await supabase
+   546→            .from('journal_entries')
+   547→            .insert({
+   548→              entry_number: jeNum,
+   549→              entry_date: invoiceDate,
+   550→              description: `قيد تلقائي - فاتورة مبيعات رقم ${invoiceNumber}`,
+   551→              total_debit: total,
+   552→              total_credit: subtotal + taxAmount,
+   553→              is_posted: true,
+   554→              source_type: 'invoice',
+   555→              source_id: id,
+   556→              created_by: user?.id || null,
+   557→            })
+   558→            .select('id')
+   559→            .single();
+   560→
+   561→          if (jeData) {
+   562→            await supabase.from('journal_entry_lines').insert(
+   563→              jeLines.map((line) => ({
+   564→                ...line,
+   565→                journal_entry_id: jeData.id,
+   566→              }))
+   567→            );
+   568→          }
+   569→        } catch (jeErr) {
+   570→          console.error('Auto journal entry error:', jeErr);
+   571→        }
+   572→
+   573→        toast.success('تم تحديث الفاتورة بنجاح');
+   574→      } else {
+   575→        const { data: invData, error: invError } = await supabase
+   576→          .from('invoices')
+   577→          .insert({
+   578→            invoice_number: invoiceNumber,
+   579→            branch_id: branchId,
+   580→            customer_id: customerId || null,
+   581→            invoice_date: invoiceDate,
+   582→            invoice_time: invoiceTime || null,
+   583→            receiver_name: receiverName || null,
+   584→            driver_name: driverName || null,
+   585→            driver_phone: driverPhone || null,
+   586→            payment_method_id: paymentMethodId || null,
+   587→            subtotal,
+   588→            tax_rate: applyTax ? taxRate : 0,
+   589→            tax_amount: taxAmount,
+   590→            total,
+   591→            notes: notes || null,
+   592→          })
+   593→          .select('id')
+   594→          .single();
+   595→
+   596→        if (invError) throw invError;
+   597→
+   598→        const itemsData = items.map((item) => ({
+   599→          invoice_id: invData.id,
+   600→          item_name: item.item_name,
+   601→          product_id: (item as any).product_id || null,
+   602→          quantity: item.quantity,
+   603→          unit_count: item.unit_count,
+   604→          unit_price: item.unit_price,
+   605→          total_price: item.total_price,
+   606→        }));
+   607→        const { error: itemsError } = await supabase.from('invoice_items').insert(itemsData);
+   608→        if (itemsError) throw itemsError;
+   609→
+   610→        // ===== ربط المخزون بالفواتير: خصم من المخزون =====
+   611→        for (const item of items) {
+   612→          const productId = (item as any).product_id;
+   613→          if (!productId) continue;
+   614→          const totalPieces = item.quantity * item.unit_count;
+   615→
+   616→          const { data: invRecord } = await supabase
+   617→            .from('inventory')
+   618→            .select('*')
+   619→            .eq('product_id', productId)
+   620→            .eq('branch_id', branchId)
+   621→            .single();
+   622→
+   623→          if (invRecord) {
+   624→            const newQty = invRecord.quantity - totalPieces;
+   625→            await supabase
+   626→              .from('inventory')
+   627→              .update({
+   628→                quantity: Math.max(0, newQty),
+   629→                last_updated: new Date().toISOString(),
+   630→              })
+   631→              .eq('id', invRecord.id);
+   632→          }
+   633→
+   634→          await supabase.from('inventory_transactions').insert({
+   635→            product_id: productId,
+   636→            branch_id: branchId,
+   637→            transaction_type: 'out',
+   638→            quantity: -totalPieces,
+   639→            reference_type: 'invoice',
+   640→            reference_id: invData.id,
+   641→            notes: `فاتورة مبيعات: ${invoiceNumber}`,
+   642→            created_by: user?.id || null,
+   643→          });
+   644→        }
+   645→
+   646→        // ===== قيد محاسبي تلقائي للفاتورة الجديدة =====
+   647→        try {
+   648→          const year = new Date().getFullYear();
+   649→          const { data: lastJe } = await supabase
+   650→            .from('journal_entries')
+   651→            .select('entry_number')
+   652→            .like('entry_number', `JE-${year}-%`)
+   653→            .order('entry_number', { ascending: false })
+   654→            .limit(1);
+   655→          let lastJeNum = 0;
+   656→          if (lastJe && lastJe.length > 0) {
+   657→            const parts = lastJe[0].entry_number.split('-');
+   658→            lastJeNum = parseInt(parts[parts.length - 1]) || 0;
+   659→          }
+   660→          const jeNum = `JE-${year}-${(lastJeNum + 1).toString().padStart(4, '0')}`;
+   661→
+   662→          const jeLines: { account_name: string; debit: number; credit: number; description: string }[] = [];
+   663→          const customerOrCash = customerId ? 'العملاء' : 'الصندوق (كاش)';
+   664→          jeLines.push({
+   665→            account_name: customerOrCash,
+   666→            debit: total,
+   667→            credit: 0,
+   668→            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
+   669→          });
+   670→          jeLines.push({
+   671→            account_name: 'مبيعات الفروع',
+   672→            debit: 0,
+   673→            credit: subtotal,
+   674→            description: `فاتورة مبيعات رقم ${invoiceNumber}`,
+   675→          });
+   676→          if (taxAmount > 0) {
+   677→            jeLines.push({
+   678→              account_name: 'الضريبة',
+   679→              debit: 0,
+   680→              credit: taxAmount,
+   681→              description: `ضريبة فاتورة رقم ${invoiceNumber}`,
+   682→            });
+   683→          }
+   684→
+   685→          const { data: jeData } = await supabase
+   686→            .from('journal_entries')
+   687→            .insert({
+   688→              entry_number: jeNum,
+   689→              entry_date: invoiceDate,
+   690→              description: `قيد تلقائي - فاتورة مبيعات رقم ${invoiceNumber}`,
+   691→              total_debit: total,
+   692→              total_credit: subtotal + taxAmount,
+   693→              is_posted: true,
+   694→              source_type: 'invoice',
+   695→              source_id: invData.id,
+   696→              created_by: user?.id || null,
+   697→            })
+   698→            .select('id')
+   699→            .single();
+   700→
+   701→          if (jeData) {
+   702→            await supabase.from('journal_entry_lines').insert(
+   703→              jeLines.map((line) => ({
+   704→                ...line,
+   705→                journal_entry_id: jeData.id,
+   706→              }))
+   707→            );
+   708→          }
+   709→        } catch (jeErr) {
+   710→          console.error('Auto journal entry error:', jeErr);
+   711→        }
+   712→
+   713→        toast.success('تم حفظ الفاتورة بنجاح');
+   714→        setHasChanges(false);
+   715→
+   716→        if (andPrint) {
+   717→          navigateTo('invoice-detail', { id: invData.id, print: 'true' });
+   718→          return;
+   719→        }
+   720→
+   721→        navigateTo('invoice-detail', { id: invData.id });
+   722→        return;
+   723→      }
+   724→
+   725→      await supabase.from('audit_log').insert({
+   726→        action: isEdit ? 'update_invoice' : 'create_invoice',
+   727→        details: { invoice_number: invoiceNumber, total },
+   728→      });
+   729→
+   730→      setHasChanges(false);
+   731→
+   732→      if (andPrint && id) {
+   733→        navigateTo('invoice-detail', { id, print: 'true' });
+   734→      } else if (id) {
+   735→        navigateTo('invoice-detail', { id });
+   736→      }
+   737→    } catch (err) {
+   738→      console.error(err);
+   739→      toast.error('حدث خطأ أثناء حفظ الفاتورة');
+   740→    } finally {
+   741→      setSaving(false);
+   742→      savingRef.current = false;
+   743→    }
+   744→  };
+   745→
+   746→  // Keyboard shortcuts: Ctrl+S to save, Ctrl+P to save & print
+   747→  useEffect(() => {
+   748→    const handleKeyDown = (e: KeyboardEvent) => {
+   749→      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+   750→        e.preventDefault();
+   751→        if (!saving) handleSave(false);
+   752→      }
+   753→      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+   754→        e.preventDefault();
+   755→        if (!saving) handleSave(true);
+   756→      }
+   757→    };
+   758→    window.addEventListener('keydown', handleKeyDown);
+   759→    return () => window.removeEventListener('keydown', handleKeyDown);
+   760→  }, [saving, items, branchId, invoiceDate, invoiceTime, receiverName, driverName, driverPhone, paymentMethodId, applyTax, taxRate, notes, isEdit, id, invoiceNumber]);
+   761→
+   762→  if (loading) {
+   763→    return (
+   764→      <div className="flex items-center justify-center min-h-[60vh]">
+   765→        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+   766→      </div>
+   767→    );
+   768→  }
+   769→
+   770→  return (
+   771→    <div className="space-y-6">
+   772→      {/* Header */}
+   773→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   774→        <div className="flex items-center gap-3">
+   775→          <Button variant="ghost" size="icon" onClick={() => {
+   776→            if (hasChanges) {
+   777→              setShowDiscardDialog(true);
+   778→            } else {
+   779→              navigateTo('invoices');
+   780→            }
+   781→          }}>
+   782→            <ArrowRight className="w-5 h-5" />
+   783→          </Button>
+   784→          <div>
+   785→            <h1 className="text-2xl font-bold">
+   786→              {isEdit ? 'تعديل الفاتورة' : 'فاتورة مبيعات جديدة'}
+   787→            </h1>
+   788→            <p className="text-muted-foreground text-sm mt-0.5">{invoiceNumber}</p>
+   789→          </div>
+   790→        </div>
+   791→        <div className="flex items-center gap-2">
+   792→          <Button
+   793→            variant="outline"
+   794→            onClick={() => handleSave(false)}
+   795→            disabled={saving}
+   796→            className="gap-2"
+   797→          >
+   798→            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+   799→            حفظ
+   800→            <span className="text-[10px] text-muted-foreground hidden sm:inline">Ctrl+S</span>
+   801→          </Button>
+   802→          <Button
+   803→            onClick={() => handleSave(true)}
+   804→            disabled={saving}
+   805→            className="gap-2"
+   806→          >
+   807→            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+   808→            حفظ وطباعة
+   809→            <span className="text-[10px] text-white/70 hidden sm:inline">Ctrl+P</span>
+   810→          </Button>
+   811→        </div>
+   812→      </div>
+   813→
+   814→      {/* Invoice Info */}
+   815→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+   816→        <Card className="border-0 shadow-md">
+   817→          <CardHeader className="pb-3">
+   818→            <CardTitle className="text-lg flex items-center gap-2">
+   819→              <FileText className="w-5 h-5 text-primary" />
+   820→              بيانات الفاتورة
+   821→            </CardTitle>
+   822→          </CardHeader>
+   823→          <CardContent>
+   824→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+   825→              <div className="space-y-2">
+   826→                <Label>رقم الفاتورة</Label>
+   827→                <Input value={invoiceNumber} disabled className="bg-muted" />
+   828→              </div>
+   829→              <div className="space-y-2">
+   830→                <Label>الفرع *</Label>
+   831→                <Select value={branchId} onValueChange={setBranchIdChanged} disabled={!isAdmin && !!user?.branch_id}>
+   832→                  <SelectTrigger>
+   833→                    <SelectValue placeholder="اختر الفرع" />
+   834→                  </SelectTrigger>
+   835→                  <SelectContent>
+   836→                    {branches.map((branch) => (
+   837→                      <SelectItem key={branch.id} value={branch.id}>
+   838→                        {branch.name}
+   839→                      </SelectItem>
+   840→                    ))}
+   841→                  </SelectContent>
+   842→                </Select>
+   843→              </div>
+   844→              <div className="space-y-2">
+   845→                <Label>العميل</Label>
+   846→                <Select value={customerId || 'none'} onValueChange={setCustomerIdChanged}>
+   847→                  <SelectTrigger>
+   848→                    <SelectValue placeholder="اختر العميل (اختياري)" />
+   849→                  </SelectTrigger>
+   850→                  <SelectContent>
+   851→                    <SelectItem value="none">بدون عميل</SelectItem>
+   852→                    {customers.map((customer) => (
+   853→                      <SelectItem key={customer.id} value={customer.id}>
+   854→                        {customer.name}{customer.phone ? ` - ${customer.phone}` : ''}
+   855→                      </SelectItem>
+   856→                    ))}
+   857→                  </SelectContent>
+   858→                </Select>
+   859→              </div>
+   860→              <div className="space-y-2">
+   861→                <Label className="flex items-center gap-1">
+   862→                  <Calendar className="w-3.5 h-3.5" />
+   863→                  التاريخ *
+   864→                </Label>
+   865→                <Input
+   866→                  type="date"
+   867→                  value={invoiceDate}
+   868→                  onChange={(e) => setInvoiceDateChanged(e.target.value)}
+   869→                />
+   870→              </div>
+   871→              <div className="space-y-2">
+   872→                <Label className="flex items-center gap-1">
+   873→                  <Clock className="w-3.5 h-3.5" />
+   874→                  الوقت
+   875→                </Label>
+   876→                <Input
+   877→                  type="time"
+   878→                  value={invoiceTime}
+   879→                  onChange={(e) => setInvoiceTimeChanged(e.target.value)}
+   880→                />
+   881→              </div>
+   882→              <div className="space-y-2">
+   883→                <Label>طريقة الدفع</Label>
+   884→                <Select value={paymentMethodId || 'none'} onValueChange={(v) => setPaymentMethodIdChanged(v === 'none' ? '' : v)}>
+   885→                  <SelectTrigger>
+   886→                    <SelectValue placeholder="اختر طريقة الدفع" />
+   887→                  </SelectTrigger>
+   888→                  <SelectContent>
+   889→                    <SelectItem value="none">بدون تحديد</SelectItem>
+   890→                    {paymentMethods.map((pm) => (
+   891→                      <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+   892→                    ))}
+   893→                  </SelectContent>
+   894→                </Select>
+   895→              </div>
+   896→            </div>
+   897→          </CardContent>
+   898→        </Card>
+   899→      </motion.div>
+   900→
+   901→      {/* Delivery Info */}
+   902→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
+   903→        <Card className="border-0 shadow-md">
+   904→          <CardHeader className="pb-3">
+   905→            <CardTitle className="text-lg flex items-center gap-2">
+   906→              <Truck className="w-5 h-5 text-primary" />
+   907→              بيانات التسليم
+   908→            </CardTitle>
+   909→          </CardHeader>
+   910→          <CardContent>
+   911→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   912→              <div className="space-y-2">
+   913→                <Label className="flex items-center gap-1">
+   914→                  <User className="w-3.5 h-3.5" />
+   915→                  اسم المستلم
+   916→                </Label>
+   917→                <Input
+   918→                  value={receiverName}
+   919→                  onChange={(e) => setReceiverNameChanged(e.target.value)}
+   920→                  placeholder="اسم مستلم البضاعة"
+   921→                />
+   922→              </div>
+   923→              <div className="space-y-2">
+   924→                <Label className="flex items-center gap-1">
+   925→                  <Truck className="w-3.5 h-3.5" />
+   926→                  اسم السائق
+   927→                </Label>
+   928→                <Input
+   929→                  value={driverName}
+   930→                  onChange={(e) => setDriverNameChanged(e.target.value)}
+   931→                  placeholder="اسم السائق"
+   932→                />
+   933→              </div>
+   934→              <div className="space-y-2">
+   935→                <Label>هاتف السائق</Label>
+   936→                <Input
+   937→                  type="tel"
+   938→                  inputMode="tel"
+   939→                  value={driverPhone}
+   940→                  onChange={(e) => setDriverPhoneChanged(e.target.value)}
+   941→                  placeholder="01XXXXXXXXX"
+   942→                  dir="ltr"
+   943→                  className="text-left"
+   944→                />
+   945→              </div>
+   946→            </div>
+   947→          </CardContent>
+   948→        </Card>
+   949→      </motion.div>
+   950→
+   951→      {/* Items Table */}
+   952→      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
+   953→        <Card className="border-0 shadow-md">
+   954→          <CardHeader className="pb-3 flex-row items-center justify-between">
+   955→            <CardTitle className="text-lg">الأصناف</CardTitle>
+   956→            <div className="flex items-center gap-2">
+   957→              {!showUnitCount && (
+   958→                <Button
+   959→                  onClick={() => setShowUnitCountCols(true)}
+   960→                  size="sm"
+   961→                  variant="ghost"
+   962→                  className="gap-1 text-primary hover:text-primary hover:bg-primary/10"
+   963→                >
+   964→                  <Calculator className="w-4 h-4" />
+   965→                  <span className="hidden sm:inline">عدد/وحدة</span>
+   966→                </Button>
+   967→              )}
+   968→              <Button onClick={addItem} size="sm" variant="outline" className="gap-1">
+   969→                <Plus className="w-4 h-4" />
+   970→                إضافة صنف
+   971→              </Button>
+   972→            </div>
+   973→          </CardHeader>
+   974→          <CardContent className="p-0">
+   975→            {/* Mobile Cards View */}
+   976→            <div className="sm:hidden divide-y">
+   977→              {items.map((item, index) => {
+   978→                const totalItemPieces = item.quantity * item.unit_count;
+   979→                return (
+   980→                  <div key={index} className="p-4 space-y-3">
+   981→                    {/* Row 1: Item name + delete */}
+   982→                    <div className="flex items-center gap-2">
+   983→                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold shrink-0">
+   984→                        {index + 1}
+   985→                      </span>
+   986→                      <div className="flex-1 relative">
+   987→                        <Input
+   988→                          value={item.item_name}
+   989→                          onChange={(e) => { updateItem(index, 'item_name', e.target.value); setActiveSuggestion(index); }}
+   990→                          onFocus={() => setActiveSuggestion(index)}
+   991→                          onBlur={() => setTimeout(() => setActiveSuggestion(null), 200)}
+   992→                          placeholder="اسم الصنف"
+   993→                          className="h-9"
+   994→                        />
+   995→                        {activeSuggestion === index && getFilteredProducts(index).length > 0 && (
+   996→                          <div className="absolute top-full right-0 left-0 z-10 mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden">
+   997→                            {getFilteredProducts(index).map((product) => (
+   998→                              <button
+   999→                                key={product.id}
+  1000→                                type="button"
+  1001→                                onMouseDown={(e) => e.preventDefault()}
+  1002→                                onClick={() => selectProduct(index, product)}
+  1003→                                className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors"
+  1004→                              >
+  1005→                                <span className="font-medium">{product.name}</span>
+  1006→                                <span className="text-muted-foreground text-xs">{formatCurrency(product.unit_price)}</span>
+  1007→                              </button>
+  1008→                            ))}
+  1009→                          </div>
+  1010→                        )}
+  1011→                      </div>
+  1012→                      <Button
+  1013→                        variant="ghost"
+  1014→                        size="icon"
+  1015→                        onClick={() => removeItem(index)}
+  1016→                        className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+  1017→                      >
+  1018→                        <Trash2 className="w-4 h-4" />
+  1019→                      </Button>
+  1020→                    </div>
+  1021→                    {/* Row 2: Quantity, unit_count, price */}
+  1022→                    <div className={`grid gap-2 ${showUnitCount ? 'grid-cols-3' : 'grid-cols-2'}`}>
+  1023→                      <div className="space-y-1">
+  1024→                        <Label className="text-[10px] text-muted-foreground">الكمية</Label>
+  1025→                        <Input
+  1026→                          type="number"
+  1027→                          inputMode="decimal"
+  1028→                          value={item.quantity || ''}
+  1029→                          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+  1030→                          placeholder="0"
+  1031→                          className="h-9 text-left"
+  1032→                          min="0"
+  1033→                          step="0.01"
+  1034→                        />
+  1035→                      </div>
+  1036→                      {showUnitCount && (
+  1037→                        <div className="space-y-1">
+  1038→                          <Label className="text-[10px] text-muted-foreground">عدد/وحدة</Label>
+  1039→                          <Input
+  1040→                            type="number"
+  1041→                            inputMode="numeric"
+  1042→                            value={item.unit_count || ''}
+  1043→                            onChange={(e) => updateItem(index, 'unit_count', e.target.value)}
+  1044→                            placeholder="1"
+  1045→                            className="h-9 text-center"
+  1046→                            min="1"
+  1047→                            step="1"
+  1048→                          />
+  1049→                        </div>
+  1050→                      )}
+  1051→                      <div className="space-y-1">
+  1052→                        <Label className="text-[10px] text-muted-foreground">سعر الوحدة</Label>
+  1053→                        <Input
+  1054→                          type="number"
+  1055→                          inputMode="decimal"
+  1056→                          value={item.unit_price || ''}
+  1057→                          onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+  1058→                          placeholder="0.00"
+  1059→                          className="h-9 text-left"
+  1060→                          min="0"
+  1061→                          step="0.01"
+  1062→                        />
+  1063→                      </div>
+  1064→                    </div>
+  1065→                    {/* Row 3: Total + pieces */}
+  1066→                    <div className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2">
+  1067→                      <div className="flex items-center gap-2">
+  1068→                        {showUnitCount && item.unit_count > 1 && (
+  1069→                          <span className="text-[10px] text-muted-foreground">
+  1070→                            {item.quantity} × {item.unit_count} = {totalItemPieces.toLocaleString('ar-EG')} قطعة
+  1071→                          </span>
+  1072→                        )}
+  1073→                      </div>
+  1074→                      <span className="font-bold text-primary">
+  1075→                        {formatCurrency(item.total_price)}
+  1076→                      </span>
+  1077→                    </div>
+  1078→                  </div>
+  1079→                );
+  1080→              })}
+  1081→            </div>
+  1082→
+  1083→            {/* Desktop Table View */}
+  1084→            <div className="hidden sm:block overflow-x-auto">
+  1085→              <Table>
+  1086→                <TableHeader>
+  1087→                  <TableRow>
+  1088→                    <TableHead className="text-right w-8">#</TableHead>
+  1089→                    <TableHead className="text-right min-w-[160px]">اسم الصنف</TableHead>
+  1090→                    <TableHead className="text-right w-28">الكمية</TableHead>
+  1091→                    {showUnitCount && <TableHead className="text-center w-28">عدد/وحدة</TableHead>}
+  1092→                    {showUnitCount && <TableHead className="text-center w-32">إجمالي القطع</TableHead>}
+  1093→                    <TableHead className="text-right w-32">سعر الوحدة</TableHead>
+  1094→                    <TableHead className="text-right w-36">الإجمالي</TableHead>
+  1095→                    <TableHead className="text-center w-12"></TableHead>
+  1096→                  </TableRow>
+  1097→                </TableHeader>
+  1098→                <TableBody>
+  1099→                  {items.map((item, index) => {
+  1100→                    const totalItemPieces = item.quantity * item.unit_count;
+  1101→                    return (
+  1102→                      <TableRow key={index}>
+  1103→                        <TableCell className="font-medium text-muted-foreground">
+  1104→                          {index + 1}
+  1105→                        </TableCell>
+  1106→                        <TableCell>
+  1107→                          <div className="relative">
+  1108→                            <Input
+  1109→                              value={item.item_name}
+  1110→                              onChange={(e) => { updateItem(index, 'item_name', e.target.value); setActiveSuggestion(index); }}
+  1111→                              onFocus={() => setActiveSuggestion(index)}
+  1112→                              onBlur={() => setTimeout(() => setActiveSuggestion(null), 200)}
+  1113→                              placeholder="اسم الصنف"
+  1114→                              className="h-9"
+  1115→                            />
+  1116→                            {activeSuggestion === index && getFilteredProducts(index).length > 0 && (
+  1117→                              <div className="absolute top-full right-0 left-0 z-10 mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden min-w-[200px]">
+  1118→                                {getFilteredProducts(index).map((product) => (
+  1119→                                  <button
+  1120→                                    key={product.id}
+  1121→                                    type="button"
+  1122→                                    onMouseDown={(e) => e.preventDefault()}
+  1123→                                    onClick={() => selectProduct(index, product)}
+  1124→                                    className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors"
+  1125→                                  >
+  1126→                                    <span className="font-medium">{product.name}</span>
+  1127→                                    <span className="text-muted-foreground text-xs">{formatCurrency(product.unit_price)}</span>
+  1128→                                  </button>
+  1129→                                ))}
+  1130→                              </div>
+  1131→                            )}
+  1132→                          </div>
+  1133→                        </TableCell>
+  1134→                        <TableCell>
+  1135→                          <Input
+  1136→                            type="number"
+  1137→                            inputMode="decimal"
+  1138→                            value={item.quantity || ''}
+  1139→                            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+  1140→                            placeholder="0"
+  1141→                            className="h-9 text-left"
+  1142→                            min="0"
+  1143→                            step="0.01"
+  1144→                          />
+  1145→                        </TableCell>
+  1146→                        {showUnitCount && (
+  1147→                          <TableCell>
+  1148→                            <Input
+  1149→                              type="number"
+  1150→                              inputMode="numeric"
+  1151→                              value={item.unit_count || ''}
+  1152→                              onChange={(e) => updateItem(index, 'unit_count', e.target.value)}
+  1153→                              placeholder="1"
+  1154→                              className="h-9 text-center"
+  1155→                              min="1"
+  1156→                              step="1"
+  1157→                            />
+  1158→                          </TableCell>
+  1159→                        )}
+  1160→                        {showUnitCount && (
+  1161→                          <TableCell className="text-center">
+  1162→                            <div className="flex items-center justify-center gap-1">
+  1163→                              <Calculator className="w-3.5 h-3.5 text-primary" />
+  1164→                              <span className={`font-bold text-sm ${totalItemPieces > 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+  1165→                                {totalItemPieces.toLocaleString('ar-EG')}
+  1166→                              </span>
+  1167→                            </div>
+  1168→                            {item.unit_count > 1 && (
+  1169→                              <div className="text-[10px] text-muted-foreground mt-0.5">
+  1170→                                {item.quantity} × {item.unit_count}
+  1171→                              </div>
+  1172→                            )}
+  1173→                          </TableCell>
+  1174→                        )}
+  1175→                        <TableCell>
+  1176→                          <Input
+  1177→                            type="number"
+  1178→                            inputMode="decimal"
+  1179→                            value={item.unit_price || ''}
+  1180→                            onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+  1181→                            placeholder="0.00"
+  1182→                            className="h-9 text-left"
+  1183→                            min="0"
+  1184→                            step="0.01"
+  1185→                          />
+  1186→                        </TableCell>
+  1187→                        <TableCell className="font-semibold text-left">
+  1188→                          {formatCurrency(item.total_price)}
+  1189→                        </TableCell>
+  1190→                        <TableCell>
+  1191→                          <Button
+  1192→                            variant="ghost"
+  1193→                            size="icon"
+  1194→                            onClick={() => removeItem(index)}
+  1195→                            className="h-8 w-8 text-destructive hover:text-destructive"
+  1196→                          >
+  1197→                            <Trash2 className="w-4 h-4" />
+  1198→                          </Button>
+  1199→                        </TableCell>
+  1200→                      </TableRow>
+  1201→                    );
+  1202→                  })}
+  1203→                </TableBody>
+  1204→              </Table>
+  1205→            </div>
+  1206→          </CardContent>
+  1207→        </Card>
+  1208→      </motion.div>
+  1209→
+  1210→      {/* Totals & Notes */}
+  1211→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  1212→        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }}>
+  1213→          <Card className="border-0 shadow-md">
+  1214→            <CardContent className="p-5">
+  1215→              <Label htmlFor="notes">ملاحظات</Label>
+  1216→              <Textarea
+  1217→                id="notes"
+  1218→                value={notes}
+  1219→                onChange={(e) => setNotesChanged(e.target.value)}
+  1220→                placeholder="أي ملاحظات إضافية..."
+  1221→                className="mt-2"
+  1222→                rows={4}
+  1223→              />
+  1224→            </CardContent>
+  1225→          </Card>
+  1226→        </motion.div>
+  1227→
+  1228→        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }}>
+  1229→          <Card className="border-0 shadow-md">
+  1230→            <CardContent className="p-5 space-y-4">
+  1231→              <div className="flex items-center gap-3 pb-3 border-b">
+  1232→                <Checkbox
+  1233→                  id="apply-tax"
+  1234→                  checked={applyTax}
+  1235→                  onCheckedChange={(checked) => { setApplyTax(checked as boolean); markChanged(); }}
+  1236→                />
+  1237→                <Label htmlFor="apply-tax" className="cursor-pointer">
+  1238→                  تطبيق الضريبة
+  1239→                </Label>
+  1240→                {applyTax && (
+  1241→                  <div className="flex items-center gap-2 mr-auto">
+  1242→                    <Input
+  1243→                      type="number"
+  1244→                      inputMode="decimal"
+  1245→                      value={taxRate || ''}
+  1246→                      onChange={(e) => { setTaxRate(Number(e.target.value) || 0); markChanged(); }}
+  1247→                      className="w-20 h-8 text-left"
+  1248→                      min="0"
+  1249→                      max="100"
+  1250→                      step="0.01"
+  1251→                    />
+  1252→                    <span className="text-sm text-muted-foreground">%</span>
+  1253→                  </div>
+  1254→                )}
+  1255→              </div>
+  1256→
+  1257→              <div className="flex items-center justify-between">
+  1258→                <span className="text-muted-foreground">المجموع الفرعي</span>
+  1259→                <span className="font-semibold">{formatCurrency(subtotal)}</span>
+  1260→              </div>
+  1261→
+  1262→              {applyTax && (
+  1263→                <div className="flex items-center justify-between">
+  1264→                  <span className="text-muted-foreground">
+  1265→                    الضريبة ({taxRate}%)
+  1266→                  </span>
+  1267→                  <span className="font-semibold">{formatCurrency(taxAmount)}</span>
+  1268→                </div>
+  1269→              )}
+  1270→
+  1271→              <div className="flex items-center justify-between pt-3 border-t">
+  1272→                <span className="text-lg font-bold">الإجمالي النهائي</span>
+  1273→                <span className="text-xl font-bold text-primary">
+  1274→                  {formatCurrency(total)}
+  1275→                </span>
+  1276→              </div>
+  1277→
+  1278→              <div className="flex items-center justify-between text-sm text-muted-foreground">
+  1279→                <span>عدد الأصناف: {items.length}</span>
+  1280→                <span>إجمالي القطع: {totalPieces.toLocaleString('ar-EG')}</span>
+  1281→              </div>
+  1282→            </CardContent>
+  1283→          </Card>
+  1284→        </motion.div>
+  1285→      </div>
+  1286→
+  1287→      {/* Discard Changes Dialog */}
+  1288→      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+  1289→        <AlertDialogContent>
+  1290→          <AlertDialogHeader>
+  1291→            <AlertDialogTitle>تغييرات غير محفوظة</AlertDialogTitle>
+  1292→            <AlertDialogDescription>
+  1293→              لديك تغييرات غير محفوظة. هل تريد المغادرة بدون حفظ؟
+  1294→            </AlertDialogDescription>
+  1295→          </AlertDialogHeader>
+  1296→          <AlertDialogFooter>
+  1297→            <AlertDialogCancel>البقاء</AlertDialogCancel>
+  1298→            <AlertDialogAction onClick={() => { setShowDiscardDialog(false); navigateTo('invoices'); }}>
+  1299→              مغادرة بدون حفظ
+  1300→            </AlertDialogAction>
+  1301→          </AlertDialogFooter>
+  1302→        </AlertDialogContent>
+  1303→      </AlertDialog>
+  1304→    </div>
+  1305→  );
+  1306→}
+  1307→

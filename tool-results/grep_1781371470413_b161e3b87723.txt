@@ -1,0 +1,252 @@
+/home/z/my-project/src/components/app/inventory-page.tsx:915:                    <Table>
+/home/z/my-project/src/components/app/inventory-page.tsx:916:                      <TableHeader>
+/home/z/my-project/src/components/app/inventory-page.tsx:917:                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/inventory-page.tsx:918:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">المنتج</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:919:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الفرع</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:920:                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الكمية الحالية</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:921:                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider hidden md:table-cell">الحد الأدنى</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:922:                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:923:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">آخر تحديث</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:924:                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
+/home/z/my-project/src/components/app/inventory-page.tsx:927:                      <TableBody>
+/home/z/my-project/src/components/app/inventory-page.tsx:940:                            <TableRow
+/home/z/my-project/src/components/app/inventory-page.tsx:949:                              <TableCell>
+/home/z/my-project/src/components/app/inventory-page.tsx:957:                              <TableCell>
+/home/z/my-project/src/components/app/inventory-page.tsx:962:                              <TableCell>
+/home/z/my-project/src/components/app/inventory-page.tsx:986:                              <TableCell className="text-center hidden md:table-cell">
+/home/z/my-project/src/components/app/inventory-page.tsx:991:                              <TableCell className="text-center">
+/home/z/my-project/src/components/app/inventory-page.tsx:994:                              <TableCell className="text-right hidden lg:table-cell">
+/home/z/my-project/src/components/app/inventory-page.tsx:999:                              <TableCell>
+/home/z/my-project/src/components/app/accounting-page.tsx:744:                    <Table>
+/home/z/my-project/src/components/app/accounting-page.tsx:745:                      <TableHeader>
+/home/z/my-project/src/components/app/accounting-page.tsx:746:                        <TableRow className="bg-muted/30">
+/home/z/my-project/src/components/app/accounting-page.tsx:747:                          <TableHead className="text-right font-bold">رقم القيد</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:748:                          <TableHead className="text-right font-bold">التاريخ</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:749:                          <TableHead className="text-right font-bold hidden md:table-cell">الوصف</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:750:                          <TableHead className="text-right font-bold">إجمالي المدين</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:751:                          <TableHead className="text-right font-bold">إجمالي الدائن</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:752:                          <TableHead className="text-center font-bold">الحالة</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:753:                          <TableHead className="text-center font-bold">الإجراءات</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:756:                      <TableBody>
+/home/z/my-project/src/components/app/accounting-page.tsx:758:                          <TableRow key={entry.id} className="hover:bg-muted/30 transition-colors">
+/home/z/my-project/src/components/app/accounting-page.tsx:759:                            <TableCell className="font-medium">
+/home/z/my-project/src/components/app/accounting-page.tsx:767:                            <TableCell>{formatDate(entry.entry_date)}</TableCell>
+/home/z/my-project/src/components/app/accounting-page.tsx:768:                            <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+/home/z/my-project/src/components/app/accounting-page.tsx:771:                            <TableCell className="font-semibold text-primary">
+/home/z/my-project/src/components/app/accounting-page.tsx:774:                            <TableCell className="font-semibold">
+/home/z/my-project/src/components/app/accounting-page.tsx:777:                            <TableCell className="text-center">
+/home/z/my-project/src/components/app/accounting-page.tsx:796:                            <TableCell>
+/home/z/my-project/src/components/app/accounting-page.tsx:1144:                      <Table>
+/home/z/my-project/src/components/app/accounting-page.tsx:1145:                        <TableHeader>
+/home/z/my-project/src/components/app/accounting-page.tsx:1146:                          <TableRow className="bg-muted/30">
+/home/z/my-project/src/components/app/accounting-page.tsx:1147:                            <TableHead className="text-right text-xs font-bold">اسم الحساب</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:1148:                            <TableHead className="text-right text-xs font-bold">مدين</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:1149:                            <TableHead className="text-right text-xs font-bold">دائن</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:1150:                            <TableHead className="text-right text-xs font-bold hidden sm:table-cell">البيان</TableHead>
+/home/z/my-project/src/components/app/accounting-page.tsx:1153:                        <TableBody>
+/home/z/my-project/src/components/app/accounting-page.tsx:1155:                            <TableRow key={line.id}>
+/home/z/my-project/src/components/app/accounting-page.tsx:1156:                              <TableCell className="text-sm font-medium">
+/home/z/my-project/src/components/app/accounting-page.tsx:1159:                              <TableCell className="text-sm text-primary font-semibold">
+/home/z/my-project/src/components/app/accounting-page.tsx:1162:                              <TableCell className="text-sm font-semibold">
+/home/z/my-project/src/components/app/accounting-page.tsx:1165:                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
+/home/z/my-project/src/components/app/payments-page.tsx:521:                <Table>
+/home/z/my-project/src/components/app/payments-page.tsx:522:                  <TableHeader>
+/home/z/my-project/src/components/app/payments-page.tsx:523:                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/payments-page.tsx:524:                      <TableHead className="text-right font-semibold">رقم الإيصال</TableHead>
+/home/z/my-project/src/components/app/payments-page.tsx:525:                      <TableHead className="text-right font-semibold">الفرع</TableHead>
+/home/z/my-project/src/components/app/payments-page.tsx:526:                      <TableHead className="text-right font-semibold">التاريخ</TableHead>
+/home/z/my-project/src/components/app/payments-page.tsx:527:                      <TableHead className="text-right font-semibold">المبلغ</TableHead>
+/home/z/my-project/src/components/app/payments-page.tsx:528:                      <TableHead className="text-center font-semibold">طريقة الدفع</TableHead>
+/home/z/my-project/src/components/app/payments-page.tsx:529:                      <TableHead className="text-center font-semibold">طباعة</TableHead>
+/home/z/my-project/src/components/app/payments-page.tsx:532:                  <TableBody>
+/home/z/my-project/src/components/app/payments-page.tsx:534:                      <TableRow key={payment.id} className="transition-colors duration-150 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10">
+/home/z/my-project/src/components/app/payments-page.tsx:535:                        <TableCell>
+/home/z/my-project/src/components/app/payments-page.tsx:543:                        <TableCell>
+/home/z/my-project/src/components/app/payments-page.tsx:549:                        <TableCell>
+/home/z/my-project/src/components/app/payments-page.tsx:555:                        <TableCell>
+/home/z/my-project/src/components/app/payments-page.tsx:558:                        <TableCell className="text-center">
+/home/z/my-project/src/components/app/payments-page.tsx:563:                        <TableCell className="text-center">
+/home/z/my-project/src/components/app/branches-page.tsx:434:                <Table>
+/home/z/my-project/src/components/app/branches-page.tsx:435:                  <TableHeader>
+/home/z/my-project/src/components/app/branches-page.tsx:436:                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/branches-page.tsx:437:                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3">الفرع</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:438:                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden lg:table-cell">العنوان</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:439:                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden md:table-cell">الهاتف</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:440:                      <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-3 hidden xl:table-cell">الرقم الضريبي</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:441:                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الحالة</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:442:                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">تفعيل</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:443:                      <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-3">الإجراءات</TableHead>
+/home/z/my-project/src/components/app/branches-page.tsx:446:                  <TableBody>
+/home/z/my-project/src/components/app/branches-page.tsx:448:                      <TableRow key={branch.id} className="transition-colors hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10">
+/home/z/my-project/src/components/app/branches-page.tsx:449:                        <TableCell>
+/home/z/my-project/src/components/app/branches-page.tsx:472:                        <TableCell className="hidden lg:table-cell">
+/home/z/my-project/src/components/app/branches-page.tsx:484:                        <TableCell className="hidden md:table-cell">
+/home/z/my-project/src/components/app/branches-page.tsx:496:                        <TableCell className="hidden xl:table-cell">
+/home/z/my-project/src/components/app/branches-page.tsx:508:                        <TableCell className="text-center">
+/home/z/my-project/src/components/app/branches-page.tsx:525:                        <TableCell className="text-center">
+/home/z/my-project/src/components/app/branches-page.tsx:531:                        <TableCell>
+/home/z/my-project/src/components/app/reservations-page.tsx:635:          <table>
+/home/z/my-project/src/components/app/reservations-page.tsx:864:                    <Table>
+/home/z/my-project/src/components/app/reservations-page.tsx:865:                      <TableHeader>
+/home/z/my-project/src/components/app/reservations-page.tsx:866:                        <TableRow className="bg-muted/30">
+/home/z/my-project/src/components/app/reservations-page.tsx:867:                          <TableHead className="text-right">رقم الحجز</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:868:                          <TableHead className="text-right">العميل</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:869:                          <TableHead className="text-right hidden md:table-cell">المناسبة</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:870:                          <TableHead className="text-right">التاريخ</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:871:                          <TableHead className="text-center">الحالة</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:872:                          <TableHead className="text-center hidden lg:table-cell">الإجمالي</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:873:                          <TableHead className="text-center">الإجراءات</TableHead>
+/home/z/my-project/src/components/app/reservations-page.tsx:876:                      <TableBody>
+/home/z/my-project/src/components/app/reservations-page.tsx:882:                            <TableRow key={reservation.id} className="hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors">
+/home/z/my-project/src/components/app/reservations-page.tsx:883:                              <TableCell>
+/home/z/my-project/src/components/app/reservations-page.tsx:888:                              <TableCell>
+/home/z/my-project/src/components/app/reservations-page.tsx:899:                              <TableCell className="hidden md:table-cell text-sm">{eventTypeLabel}</TableCell>
+/home/z/my-project/src/components/app/reservations-page.tsx:900:                              <TableCell>
+/home/z/my-project/src/components/app/reservations-page.tsx:912:                              <TableCell className="text-center">
+/home/z/my-project/src/components/app/reservations-page.tsx:917:                              <TableCell className="text-center hidden lg:table-cell text-sm font-medium">
+/home/z/my-project/src/components/app/reservations-page.tsx:920:                              <TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:546:                    <Table>
+/home/z/my-project/src/components/app/customers-page.tsx:547:                      <TableHeader>
+/home/z/my-project/src/components/app/customers-page.tsx:548:                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+/home/z/my-project/src/components/app/customers-page.tsx:549:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">الاسم</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:550:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">الهاتف</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:551:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden md:table-cell">العنوان</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:552:                          <TableHead className="text-right font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">الرقم الضريبي</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:553:                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الحالة</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:554:                          <TableHead className="text-center font-semibold text-xs uppercase tracking-wider">الإجراءات</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:557:                      <TableBody>
+/home/z/my-project/src/components/app/customers-page.tsx:559:                          <TableRow key={c.id} className="transition-colors">
+/home/z/my-project/src/components/app/customers-page.tsx:560:                            <TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:573:                            <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+/home/z/my-project/src/components/app/customers-page.tsx:579:                            <TableCell className="hidden md:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
+/home/z/my-project/src/components/app/customers-page.tsx:585:                            <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+/home/z/my-project/src/components/app/customers-page.tsx:588:                            <TableCell className="text-center">
+/home/z/my-project/src/components/app/customers-page.tsx:600:                            <TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:824:                      <Table>
+/home/z/my-project/src/components/app/customers-page.tsx:825:                        <TableHeader>
+/home/z/my-project/src/components/app/customers-page.tsx:826:                          <TableRow>
+/home/z/my-project/src/components/app/customers-page.tsx:827:                            <TableHead className="text-right text-xs">رقم الفاتورة</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:828:                            <TableHead className="text-right text-xs">الفرع</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:829:                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:830:                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:831:                            <TableHead className="text-center text-xs">الحالة</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:834:                        <TableBody>
+/home/z/my-project/src/components/app/customers-page.tsx:836:                            <TableRow key={inv.id}>
+/home/z/my-project/src/components/app/customers-page.tsx:837:                              <TableCell className="font-medium text-xs">{inv.invoice_number}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:838:                              <TableCell className="text-xs">{inv.branches?.name || '—'}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:839:                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(inv.invoice_date)}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:840:                              <TableCell className="font-semibold text-xs">{formatCurrency(Number(inv.total))}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:841:                              <TableCell className="text-center">
+/home/z/my-project/src/components/app/customers-page.tsx:866:                      <Table>
+/home/z/my-project/src/components/app/customers-page.tsx:867:                        <TableHeader>
+/home/z/my-project/src/components/app/customers-page.tsx:868:                          <TableRow>
+/home/z/my-project/src/components/app/customers-page.tsx:869:                            <TableHead className="text-right text-xs">رقم المرتجع</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:870:                            <TableHead className="text-right text-xs hidden sm:table-cell">الفرع</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:871:                            <TableHead className="text-right text-xs hidden sm:table-cell">التاريخ</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:872:                            <TableHead className="text-right text-xs">المبلغ</TableHead>
+/home/z/my-project/src/components/app/customers-page.tsx:875:                        <TableBody>
+/home/z/my-project/src/components/app/customers-page.tsx:877:                            <TableRow key={ret.id}>
+/home/z/my-project/src/components/app/customers-page.tsx:878:                              <TableCell className="font-medium text-xs">{ret.return_number}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:879:                              <TableCell className="text-xs hidden sm:table-cell">{ret.branches?.name || '—'}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:880:                              <TableCell className="text-xs hidden sm:table-cell">{formatDate(ret.return_date)}</TableCell>
+/home/z/my-project/src/components/app/customers-page.tsx:881:                              <TableCell className="font-semibold text-xs text-red-600">{formatCurrency(Number(ret.total))}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:872:                      <Table>
+/home/z/my-project/src/components/app/reports-page.tsx:873:                        <TableHeader>
+/home/z/my-project/src/components/app/reports-page.tsx:874:                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/reports-page.tsx:875:                            <TableHead className="text-right">#</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:876:                            <TableHead className="text-right">المنتج</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:877:                            <TableHead className="text-center">الكمية المباعة</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:878:                            <TableHead className="text-right">الإجمالي</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:881:                        <TableBody>
+/home/z/my-project/src/components/app/reports-page.tsx:883:                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+/home/z/my-project/src/components/app/reports-page.tsx:884:                              <TableCell className="text-muted-foreground">
+/home/z/my-project/src/components/app/reports-page.tsx:889:                              <TableCell className="font-medium">{p.name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:890:                              <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:891:                              <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1058:                    <Table>
+/home/z/my-project/src/components/app/reports-page.tsx:1059:                      <TableHeader>
+/home/z/my-project/src/components/app/reports-page.tsx:1060:                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/reports-page.tsx:1061:                          <TableHead className="text-right">الفرع</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1062:                          <TableHead className="text-right">إجمالي التحويلات</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1063:                          <TableHead className="text-right">إجمالي المدفوعات</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1064:                          <TableHead className="text-right">المبلغ المتبقي</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1067:                      <TableBody>
+/home/z/my-project/src/components/app/reports-page.tsx:1069:                          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+/home/z/my-project/src/components/app/reports-page.tsx:1070:                            <TableCell className="font-medium">{d.branch_name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1071:                            <TableCell>{formatCurrency(d.total_transferred)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1072:                            <TableCell className="text-emerald-600">{formatCurrency(d.total_paid)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1073:                            <TableCell className={`font-semibold ${d.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+/home/z/my-project/src/components/app/reports-page.tsx:1131:                      <Table>
+/home/z/my-project/src/components/app/reports-page.tsx:1132:                        <TableHeader>
+/home/z/my-project/src/components/app/reports-page.tsx:1133:                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/reports-page.tsx:1134:                            <TableHead className="text-right">المنتج</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1135:                            <TableHead className="text-right">الفرع</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1136:                            <TableHead className="text-center">الكمية الحالية</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1137:                            <TableHead className="text-center">الحد الأدنى</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1138:                            <TableHead className="text-center">الحالة</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1141:                        <TableBody>
+/home/z/my-project/src/components/app/reports-page.tsx:1143:                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+/home/z/my-project/src/components/app/reports-page.tsx:1144:                              <TableCell className="font-medium">{item.product_name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1145:                              <TableCell>{item.branch_name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1146:                              <TableCell className="text-center font-semibold">{item.quantity}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1147:                              <TableCell className="text-center">{item.min_quantity}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1148:                              <TableCell className="text-center">
+/home/z/my-project/src/components/app/reports-page.tsx:1411:                      <Table>
+/home/z/my-project/src/components/app/reports-page.tsx:1412:                        <TableHeader>
+/home/z/my-project/src/components/app/reports-page.tsx:1413:                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/reports-page.tsx:1414:                            <TableHead className="text-right">العميل</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1415:                            <TableHead className="text-center">عدد الفواتير</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1416:                            <TableHead className="text-right">المبلغ المستحق</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1419:                        <TableBody>
+/home/z/my-project/src/components/app/reports-page.tsx:1421:                            <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+/home/z/my-project/src/components/app/reports-page.tsx:1422:                              <TableCell className="font-medium">{c.customer_name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1423:                              <TableCell className="text-center">{c.invoice_count}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1424:                              <TableCell className="font-semibold text-red-600">{formatCurrency(c.total_unpaid)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1552:                      <Table>
+/home/z/my-project/src/components/app/reports-page.tsx:1553:                        <TableHeader>
+/home/z/my-project/src/components/app/reports-page.tsx:1554:                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/reports-page.tsx:1555:                            <TableHead className="text-right">الفرع</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1556:                            <TableHead className="text-center">الفواتير</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1557:                            <TableHead className="text-right">الإيرادات</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1558:                            <TableHead className="text-right">المرتجعات</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1559:                            <TableHead className="text-right">المصروفات</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1560:                            <TableHead className="text-right">صافي</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1563:                        <TableBody>
+/home/z/my-project/src/components/app/reports-page.tsx:1567:                              <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+/home/z/my-project/src/components/app/reports-page.tsx:1568:                                <TableCell className="font-medium">{b.name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1569:                                <TableCell className="text-center">{b.invoices}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1570:                                <TableCell className="text-emerald-600">{formatCurrency(b.revenue)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1571:                                <TableCell className="text-red-600">{formatCurrency(b.returns)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1572:                                <TableCell className="text-amber-600">{formatCurrency(b.expenses)}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1573:                                <TableCell className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+/home/z/my-project/src/components/app/reports-page.tsx:1636:                    <Table>
+/home/z/my-project/src/components/app/reports-page.tsx:1637:                      <TableHeader>
+/home/z/my-project/src/components/app/reports-page.tsx:1638:                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+/home/z/my-project/src/components/app/reports-page.tsx:1639:                          <TableHead className="text-right">#</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1640:                          <TableHead className="text-right">المنتج</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1641:                          <TableHead className="text-center">الكمية</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1642:                          <TableHead className="text-right">الإجمالي</TableHead>
+/home/z/my-project/src/components/app/reports-page.tsx:1645:                      <TableBody>
+/home/z/my-project/src/components/app/reports-page.tsx:1647:                          <TableRow key={i} className="hover:bg-muted/40 transition-colors">
+/home/z/my-project/src/components/app/reports-page.tsx:1648:                            <TableCell className="text-muted-foreground">
+/home/z/my-project/src/components/app/reports-page.tsx:1653:                            <TableCell className="font-medium">{p.name}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1654:                            <TableCell className="text-center">{p.qty.toLocaleString('ar-EG')}</TableCell>
+/home/z/my-project/src/components/app/reports-page.tsx:1655:                            <TableCell className="font-semibold text-emerald-600">{formatCurrency(p.total)}</TableCell>
+/home/z/my-project/src/components/app/users-page.tsx:502:                    <Table>
+/home/z/my-project/src/components/app/users-page.tsx:503:                      <TableHeader>
+/home/z/my-project/src/components/app/users-page.tsx:504:                        <TableRow className="bg-muted/30">
+/home/z/my-project/src/components/app/users-page.tsx:505:                          <TableHead className="text-right">الاسم الكامل</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:506:                          <TableHead className="text-right">اسم المستخدم</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:507:                          <TableHead className="text-right hidden md:table-cell">الدور</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:508:                          <TableHead className="text-right hidden lg:table-cell">الفرع</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:509:                          <TableHead className="text-center">الحالة</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:510:                          <TableHead className="text-center hidden lg:table-cell">آخر دخول</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:511:                          <TableHead className="text-center">الإجراءات</TableHead>
+/home/z/my-project/src/components/app/users-page.tsx:514:                      <TableBody>
+/home/z/my-project/src/components/app/users-page.tsx:519:                            <TableRow key={u.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+/home/z/my-project/src/components/app/users-page.tsx:520:                              <TableCell>
+/home/z/my-project/src/components/app/users-page.tsx:535:                              <TableCell className="text-muted-foreground text-sm">
+/home/z/my-project/src/components/app/users-page.tsx:538:                              <TableCell className="hidden md:table-cell">
+/home/z/my-project/src/components/app/users-page.tsx:547:                              <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+
+[Showing results with pagination = limit: 250]
